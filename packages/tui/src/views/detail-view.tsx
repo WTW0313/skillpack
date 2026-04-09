@@ -47,10 +47,10 @@ export function DetailView() {
         .then(() => { setForking(false); setView('list'); })
         .catch(() => setForking(false));
     }
-    if (input === 'j' || key.downArrow) {
+    if (key.downArrow) {
       setDescScroll((s) => Math.min(s + 1, Math.max(0, descLines.length - visibleDescRows)));
     }
-    if (input === 'k' || key.upArrow) {
+    if (key.upArrow) {
       setDescScroll((s) => Math.max(0, s - 1));
     }
   }, { isActive: !confirming });

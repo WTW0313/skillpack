@@ -48,16 +48,14 @@ export function ListView() {
 
   useInput((input, key) => {
     if (input === 'q') { exit(); return; }
-    if (input === 'j' || key.downArrow) {
+    if (key.downArrow) {
       setCursor((c) => Math.min(c + 1, skills.length - 1));
       return;
     }
-    if (input === 'k' || key.upArrow) {
+    if (key.upArrow) {
       setCursor((c) => Math.max(c - 1, 0));
       return;
     }
-    if (input === 'g') { setCursor(0); return; }
-    if (input === 'G') { setCursor(Math.max(0, skills.length - 1)); return; }
     if (input === '/') { setSearching(true); return; }
     if (input === 'i') { setView('install'); return; }
     if (input === 'c') { setView('create'); return; }

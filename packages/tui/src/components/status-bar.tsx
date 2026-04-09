@@ -5,11 +5,11 @@ export function StatusBar() {
   const { view } = useAppContext();
 
   const shortcuts: Record<string, string> = {
-    list: 'j/k:navigate  Tab:switch  /:search  Enter:detail  i:install  c:create  u:updates  q:quit',
-    detail: 'Esc:back  e:edit  d:delete',
-    install: 'Esc:back  j/k:navigate  Enter:select',
+    list: '↑↓:navigate  Tab:switch  /:search  Enter:detail  i:install  c:create  u:updates  q:quit',
+    detail: 'Esc:back  e:edit  d:delete  f:fork',
+    install: 'Esc:back  ↑↓:navigate  Enter:select',
     create: 'Esc:back  Enter:confirm',
-    update: 'Esc:back  j/k:navigate',
+    update: 'Esc:back  ↑↓:navigate',
   };
 
   return (

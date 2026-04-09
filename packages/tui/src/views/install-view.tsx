@@ -31,8 +31,8 @@ export function InstallView() {
     }
 
     if (step === 'source') {
-      if (input === 'j' || key.downArrow) setCursor((c) => Math.min(c + 1, sources.length - 1));
-      if (input === 'k' || key.upArrow) setCursor((c) => Math.max(c - 1, 0));
+      if (key.downArrow) setCursor((c) => Math.min(c + 1, sources.length - 1));
+      if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
       if (key.return && sources[cursor]) {
         setSelectedSource(sources[cursor].id);
         setCursor(0);
@@ -42,8 +42,8 @@ export function InstallView() {
     }
 
     if (step === 'results') {
-      if (input === 'j' || key.downArrow) setCursor((c) => Math.min(c + 1, results.length - 1));
-      if (input === 'k' || key.upArrow) setCursor((c) => Math.max(c - 1, 0));
+      if (key.downArrow) setCursor((c) => Math.min(c + 1, results.length - 1));
+      if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
       if (key.return && results[cursor]) {
         setSelectedResult(results[cursor]);
         setCursor(0);
@@ -57,8 +57,8 @@ export function InstallView() {
     }
 
     if (step === 'provider') {
-      if (input === 'j' || key.downArrow) setCursor((c) => Math.min(c + 1, providers.length - 1));
-      if (input === 'k' || key.upArrow) setCursor((c) => Math.max(c - 1, 0));
+      if (key.downArrow) setCursor((c) => Math.min(c + 1, providers.length - 1));
+      if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
       if (key.return && providers[cursor]) {
         doInstall(selectedResult?.identifier ?? query, providers[cursor].id);
       }

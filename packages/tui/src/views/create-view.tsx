@@ -26,8 +26,8 @@ export function CreateView() {
       return;
     }
     if (step === 'provider') {
-      if (input === 'j' || key.downArrow) setCursor((c) => Math.min(c + 1, providers.length - 1));
-      if (input === 'k' || key.upArrow) setCursor((c) => Math.max(c - 1, 0));
+      if (key.downArrow) setCursor((c) => Math.min(c + 1, providers.length - 1));
+      if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
       if (key.return && providers[cursor]) {
         setSelectedProvider(providers[cursor].id);
         setStep('name');
