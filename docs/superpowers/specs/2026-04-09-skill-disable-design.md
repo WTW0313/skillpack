@@ -30,12 +30,14 @@
 
 ### 平台能力
 
-| 平台 | canToggle | 原因 |
-|------|-----------|------|
-| Codex | true | 管理自己的 skills 目录 |
-| skills.sh | true | 管理自己的 skills 目录 |
-| Cursor | false | 只读平台，不应修改其管理的文件 |
-| Claude | false | 只读平台，不应修改其管理的文件 |
+所有平台均支持禁用/启用。重命名是可逆的安全操作，不同于 install/uninstall/create 等写操作。
+
+| 平台 | canToggle | 其他写操作 |
+|------|-----------|-----------|
+| Codex | true | install, uninstall, create |
+| skills.sh | true | install, uninstall, create |
+| Cursor | true | 无（其他操作仍只读） |
+| Claude | true | 无（其他操作仍只读） |
 
 ### Symlink 兼容性
 
@@ -124,22 +126,26 @@ async enable(name: string): Promise<void> {
 
 ### ClaudeProvider.scan() 适配
 
-`ClaudeProvider` 有自己的 `scan()` override（遍历 `cache/<pub>/<plugin>/<ver>/skills/<name>/` 深层结构）。虽然 Claude 是 `canToggle: false`，但 scan 不涉及 `.disabled-*` 识别（Claude 目录不会出现被 skillpack 禁用的 skill）。因此 ClaudeProvider 无需修改。
-
-若未来 Claude 开放 `canToggle`，需要在其 scan 的最内层 skill 目录遍历中增加 `.disabled-` 识别，逻辑与 BaseProvider 一致。
+`ClaudeProvider` 有自己的 `scan()` override（遍历 `cache/<pub>/<plugin>/<ver>/skills/<name>/` 深层结构）。需要在最内层 skill 目录遍历中增加 `.disabled-` 识别，逻辑与 BaseProvider 一致。同时 ClaudeProvider 需要 override `disable()`/`enable()` 方法，操作最内层的 skill 目录。
 
 ### Provider capabilities 更新
 
 ```typescript
-// CodexProvider
+// CodexProvider, SkillsShProvider — canToggle: true
 readonly capabilities: ProviderCapabilities = {
   canInstall: true, canUninstall: true, canUpdate: true,
-  canToggle: true,  // 新增
+  canToggle: true,
   canCreate: true,
 };
 
-// SkillsShProvider — 同样 canToggle: true
-// CursorProvider, ClaudeProvider — 保持 canToggle: false
+// CursorProvider — canToggle: true, 其余保持 false
+readonly capabilities: ProviderCapabilities = {
+  canInstall: false, canUninstall: false, canUpdate: false,
+  canToggle: true,
+  canCreate: false,
+};
+
+// ClaudeProvider — 同 CursorProvider
 ```
 
 ## SkillManager 层变更
@@ -167,7 +173,7 @@ async toggleSkill(skill: Skill): Promise<void> {
 ### 列表视图
 
 - `Space` 键：对选中 skill 调用 `manager.toggleSkill()`，然后 `refresh()`
-- 仅当 skill 所在平台 `canToggle: true` 时响应
+- 所有平台均支持 toggle
 - 状态列显示：
   - `on`（绿色）— 正常启用
   - `disabled`（黄色，名称暗淡）— 已禁用
@@ -191,6 +197,6 @@ async toggleSkill(skill: Skill): Promise<void> {
 ## 安全约束
 
 1. 禁用前检查目标路径 `.disabled-<name>` 不存在，避免覆盖
-2. `canToggle: false` 的平台（Cursor、Claude）TUI 中不响应 Space 键
+2. 所有平台均支持 toggle，TUI 中 Space 键对所有 skill 生效
 3. Symlink 安全：rename 操作 symlink 本身，不 follow
 4. 操作即时生效，无需确认（因为恢复同样只需一次 Space）
