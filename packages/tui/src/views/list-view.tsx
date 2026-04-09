@@ -11,6 +11,7 @@ import { StatusBar } from '../components/status-bar.js';
 
 const HEADER_LINES = 1;
 const TAB_LINES = 1;
+const COL_HEADER_LINES = 1;
 const STATUS_LINES = 2;
 const MARGIN_LINES = 2;
 
@@ -27,7 +28,7 @@ export function ListView() {
   const [searching, setSearching] = useState(false);
 
   const searchLines = searching ? 2 : 0;
-  const visibleRows = Math.max(1, rows - HEADER_LINES - TAB_LINES - STATUS_LINES - MARGIN_LINES - searchLines);
+  const visibleRows = Math.max(1, rows - HEADER_LINES - TAB_LINES - COL_HEADER_LINES - STATUS_LINES - MARGIN_LINES - searchLines);
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { setCursor(0); setScrollOffset(0); }, [activeTab]);
@@ -109,16 +110,22 @@ export function ListView() {
       <Box flexDirection="column" flexGrow={1} paddingX={1}>
         {skills.length === 0 ? (
           <Text dimColor>No skills found</Text>
-        ) : (
-          visibleSkills.map((skill, index) => (
+        ) : (<>
+          <Box gap={1}>
+            <Text dimColor>{' '}</Text>
+            <Text dimColor bold>{'Name'.padEnd(30)}</Text>
+            <Text dimColor bold>{'Provider'.padEnd(10)}</Text>
+            <Text dimColor bold>{'Status'}</Text>
+          </Box>
+          {visibleSkills.map((skill, index) => (
             <SkillRow
               key={`${skill.provider}:${skill.name}`}
               skill={skill}
               isSelected={scrollOffset + index === cursor}
               isConflicting={manager.isConflicting(skill.name)}
             />
-          ))
-        )}
+          ))}
+        </>)}
       </Box>
 
       <StatusBar />
