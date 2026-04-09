@@ -29,7 +29,15 @@ export function useSkillManager(): SkillManagerResult {
         const providerFactories: Record<string, () => InstanceType<typeof CodexProvider | typeof CursorProvider | typeof ClaudeProvider | typeof SkillsShProvider>> = {
           codex: () => new CodexProvider(cfg.providers.codex?.paths),
           cursor: () => new CursorProvider(cfg.providers.cursor?.paths),
-          claude: () => new ClaudeProvider(cfg.providers.claude?.paths),
+          claude: () => {
+            const allPaths = cfg.providers.claude?.paths ?? [];
+            const cachePaths = allPaths.filter((p) => p.includes('plugins') || p.includes('cache'));
+            const flatPaths = allPaths.filter((p) => !p.includes('plugins') && !p.includes('cache'));
+            return new ClaudeProvider(
+              cachePaths.length > 0 ? cachePaths : undefined,
+              flatPaths.length > 0 ? flatPaths : undefined,
+            );
+          },
           skillssh: () => new SkillsShProvider(cfg.providers.skillssh?.paths),
         };
 

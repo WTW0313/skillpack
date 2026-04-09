@@ -20,12 +20,57 @@ export class ClaudeProvider extends BaseProvider {
   readonly capabilities: ProviderCapabilities = {
     canInstall: false, canUninstall: false, canUpdate: false, canToggle: true, canCreate: false,
   };
-  constructor(basePaths?: string[]) {
+  readonly flatPaths: string[];
+
+  constructor(basePaths?: string[], flatPaths?: string[]) {
     super();
     this.basePaths = basePaths ?? [path.join(os.homedir(), '.claude', 'plugins', 'cache')];
+    this.flatPaths = flatPaths ?? [path.join(os.homedir(), '.claude', 'skills')];
   }
 
   override async scan(): Promise<Skill[]> {
+    const flatSkills = await this.scanFlat();
+    const deepSkills = await this.scanDeep();
+    return [...flatSkills, ...deepSkills];
+  }
+
+  private async scanFlat(): Promise<Skill[]> {
+    const skills: Skill[] = [];
+    for (const basePath of this.flatPaths) {
+      try { await access(basePath); } catch { continue; }
+      const entries = await readdir(basePath, { withFileTypes: true });
+      for (const entry of entries) {
+        let isDir = entry.isDirectory();
+        if (!isDir && entry.isSymbolicLink()) {
+          try { isDir = (await stat(path.join(basePath, entry.name))).isDirectory(); } catch { continue; }
+        }
+        if (!isDir) continue;
+        const isDisabled = entry.name.startsWith('.disabled-');
+        const skillDirName = isDisabled ? entry.name.slice('.disabled-'.length) : entry.name;
+        if (entry.name.startsWith('.') && !isDisabled) continue;
+        const skillDir = path.join(basePath, entry.name);
+        const skillMdPath = path.join(skillDir, 'SKILL.md');
+        try {
+          const content = await readFile(skillMdPath, 'utf-8');
+          const parsed = parseSkillMd(content);
+          skills.push({
+            name: parsed.name || skillDirName,
+            description: parsed.description,
+            provider: this.id,
+            path: skillDir,
+            version: parsed.raw.version as string | undefined,
+            enabled: !isDisabled,
+            scope: 'global',
+            readonly: true,
+            metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
+          });
+        } catch { /* skip */ }
+      }
+    }
+    return skills;
+  }
+
+  private async scanDeep(): Promise<Skill[]> {
     const skills: Skill[] = [];
     for (const basePath of this.basePaths) {
       try { await access(basePath); } catch { continue; }
@@ -69,6 +114,23 @@ export class ClaudeProvider extends BaseProvider {
   }
 
   override async disable(name: string): Promise<void> {
+    // Try flat paths first (e.g. ~/.claude/skills/)
+    for (const fp of this.flatPaths) {
+      const src = path.join(fp, name);
+      const dest = path.join(fp, `.disabled-${name}`);
+      try {
+        await access(src);
+        await access(dest).then(
+          () => { throw new Error(`Target ${dest} already exists`); },
+          () => { /* good */ },
+        );
+        await rename(src, dest);
+        return;
+      } catch (err) {
+        if ((err as Error).message?.includes('already exists')) throw err;
+      }
+    }
+    // Then deep cache paths
     for (const basePath of this.basePaths) {
       try { await access(basePath); } catch { continue; }
       const publishers = await readdir(basePath, { withFileTypes: true });
@@ -105,6 +167,17 @@ export class ClaudeProvider extends BaseProvider {
   }
 
   override async enable(name: string): Promise<void> {
+    // Try flat paths first
+    for (const fp of this.flatPaths) {
+      const src = path.join(fp, `.disabled-${name}`);
+      const dest = path.join(fp, name);
+      try {
+        await access(src);
+        await rename(src, dest);
+        return;
+      } catch { /* try next */ }
+    }
+    // Then deep cache paths
     for (const basePath of this.basePaths) {
       try { await access(basePath); } catch { continue; }
       const publishers = await readdir(basePath, { withFileTypes: true });
