@@ -19,9 +19,7 @@ export function InstallView() {
   const sources = manager.getSources();
   const providers = manager.getProviders().filter((p) => p.capabilities.canInstall);
 
-  const isTextStep = step === 'query';
-
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.escape) {
       if (step === 'source') { setView('list'); return; }
       if (step === 'query') { setStep('source'); return; }
@@ -29,6 +27,8 @@ export function InstallView() {
       if (step === 'provider') { setStep('results'); return; }
       return;
     }
+
+    if (step === 'query') return;
 
     if (step === 'source') {
       if (key.downArrow) setCursor((c) => Math.min(c + 1, sources.length - 1));
@@ -63,7 +63,7 @@ export function InstallView() {
         doInstall(selectedResult?.identifier ?? query, providers[cursor].id);
       }
     }
-  }, { isActive: !isTextStep });
+  });
 
   const [searching, setSearching] = useState(false);
 

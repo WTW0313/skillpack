@@ -16,15 +16,17 @@ export function CreateView() {
   const [error, setError] = useState('');
 
   const providers = manager.getProviders().filter((p) => p.capabilities.canCreate);
-  const isTextStep = step === 'name' || step === 'description';
 
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.escape) {
       if (step === 'provider') { setView('list'); return; }
       if (step === 'name') { setStep('provider'); return; }
       if (step === 'description') { setStep('name'); return; }
       return;
     }
+
+    if (step === 'name' || step === 'description') return;
+
     if (step === 'provider') {
       if (key.downArrow) setCursor((c) => Math.min(c + 1, providers.length - 1));
       if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
@@ -33,7 +35,7 @@ export function CreateView() {
         setStep('name');
       }
     }
-  }, { isActive: !isTextStep });
+  });
 
   const handleNameSubmit = (value: string) => {
     if (!value.trim()) {
