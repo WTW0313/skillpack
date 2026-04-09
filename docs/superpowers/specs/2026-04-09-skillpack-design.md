@@ -385,63 +385,73 @@ class ConflictDetector {
 
 ### 主界面
 
+界面固定在终端视口内，列表内容超出时自动滚动。列表带有表头行标注各列含义。只读状态不在列表中显示，仅在详情页展示。冲突用 `!` 标记。
+
 ```
-┌─────────────────────────────────────────────────┐
-│  skillpack                            ? help    │
-├─────────────────────────────────────────────────┤
-│  [All] [Codex] [Cursor] [skills.sh] [Claude]   │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ▸ gsap-core         skills.sh   installed      │
-│  ▸ figma             codex       installed  ⚠   │
-│  ▸ create-rule       cursor      installed      │
-│  ...                                            │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  ↑↓ navigate  Tab group  / search  i install    │
-│  d delete  e edit  c create  u update  ? help   │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  skillpack — 49 skills  [1-10/49]                   │
+├─────────────────────────────────────────────────────┤
+│  [All]  Codex  Cursor  skills.sh  Claude  Project   │
+├─────────────────────────────────────────────────────┤
+│    Name                         Provider    Status   │
+│  > figma                        codex       on       │
+│    gh-address-comments          codex       on       │
+│    gh-fix-ci                    codex       on       │
+│    pdf                          codex       on       │
+│    babysit                      cursor      on       │
+│    create-rule                  cursor      on       │
+│    ...                                               │
+├─────────────────────────────────────────────────────┤
+│  ↑↓:navigate  Tab:switch  /:search  Enter:detail    │
+│  i:install  c:create  u:updates  q:quit             │
+└─────────────────────────────────────────────────────┘
 ```
+
+**列表行为：**
+- Name 列固定宽度，超长名称以 `…` 截断
+- 滚动位置在标题栏显示 `[起始-结束/总数]`
+- `>` 指示当前选中行
 
 ### 快捷键
 
 | 键 | 操作 | 说明 |
 |----|------|------|
-| `↑↓` / `j k` | 导航 | 列表上下移动 |
-| `Tab` | 切换分组 | All / 各平台 |
+| `↑↓` | 导航 | 列表上下移动，自动滚动 |
+| `Tab` | 切换分组 | All / 各平台 / Project |
 | `/` | 搜索 | 模糊匹配 name + description |
 | `Enter` | 详情 | 进入 skill 详情页 |
 | `i` | 安装 | 选择源 -> 搜索 -> 选平台 -> 确认 |
-| `d` | 卸载 | 确认后 Provider.uninstall() |
-| `e` | 编辑 | 仅限 local skills；内联编辑 name/description |
-| `E` | 深度编辑 | 仅限 local skills；用 $EDITOR 打开 SKILL.md |
+| `d` | 卸载 | 确认后 Provider.uninstall()（仅 local skills） |
+| `e` / `E` | 编辑 | 仅限 local skills；用 $EDITOR 打开 SKILL.md |
 | `c` | 创建 | 选平台 -> 填名称/描述 -> 生成模板 -> $EDITOR |
-| `u` | 更新 | 单个 skill 检查远程更新并应用 |
-| `U` | 批量更新 | 检查所有远程 skill 的更新 |
+| `u` | 更新 | 检查远程 skill 的更新 |
 | `f` | Fork to Local | 复制远程 skill 为本地可编辑副本 |
-| `Space` | 启/停 | toggle enable/disable |
 | `q` | 退出 | |
 
 ### 详情页
 
+描述区域超出视口时可用 `↑↓` 滚动，显示滚动位置指示器。只读状态和 Fork 提示仅在此页展示。
+
 ```
 ┌─────────────────────────────────────────────────┐
-│  ← Back    figma                                │
+│  < Esc  figma                                   │
 ├─────────────────────────────────────────────────┤
 │  Platform:  codex                               │
 │  Path:      ~/.codex/skills/figma/              │
 │  Version:   2.0.7                               │
 │  Source:    github (openai/skills)               │
 │  Status:    enabled                              │
-│  ⚠ Conflict: also exists in cursor, claude       │
-├─────────────────────────────────────────────────┤
-│  # Figma MCP                                    │
+│  Editable:  read-only (f to fork)                │
 │                                                 │
+│  ⚠ Conflicts                                    │
+│    cursor: ~/.cursor/skills-cursor/figma/        │
+├─────────────────────────────────────────────────┤
+│  Description ▲ [1-8/12] ▼                       │
 │  Use the Figma MCP server to fetch design       │
 │  context, screenshots, variables, and assets... │
 │                                                 │
 ├─────────────────────────────────────────────────┤
-│  e edit  d delete  u update  Esc back           │
+│  Esc:back  e:edit  d:delete  f:fork             │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -523,7 +533,9 @@ skillpack 维护配置文件 `~/.config/skillpack/config.json`：
 2. **Provider capabilities** — 不是所有平台都支持所有操作，TUI 动态适配
 3. **skills.sh 委托** — 安装走 `npx skills add` 而非自行实现，保持生态兼容
 4. **冲突非阻断** — 提示但不强制，用户有最终决定权
-5. **Local 可编辑，Remote 只读** — 远程安装的 skill 不可直接修改，需 Fork to Local 后编辑
+5. **Local 可编辑，Remote 只读** — 远程安装的 skill 不可直接修改，需 Fork to Local 后编辑；只读状态仅在详情页展示，列表中不显示
 6. **版本锁定** — lock 文件记录精确版本/commit，确保环境可复现
 7. **全局 + 项目级** — 全局 skills 默认加载，项目级 skills 自动扫描 cwd 并可覆盖同名全局 skill
 8. **配置即发现** — 首次运行自动检测平台，零配置开箱即用
+9. **固定视口** — TUI 固定在终端高度内，列表超出时自动滚动，避免终端输出无限增长
+10. **箭头键导航** — 使用标准 `↑↓` 箭头键，不使用 vim 风格的 `j/k` 键，降低学习门槛
