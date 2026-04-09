@@ -9,11 +9,11 @@ import { SkillRow, COL_NAME_WIDTH, COL_PROVIDER_WIDTH } from '../components/skil
 import { SearchInput } from '../components/search-input.js';
 import { StatusBar } from '../components/status-bar.js';
 
-const HEADER_LINES = 1;
-const TAB_LINES = 1;
-const COL_HEADER_LINES = 1;
+const HEADER_LINES = 2;
+const TAB_LINES = 2;
+const COL_HEADER_LINES = 2;
 const STATUS_LINES = 2;
-const MARGIN_LINES = 2;
+const MARGIN_LINES = 1;
 
 export function ListView() {
   const { exit } = useApp();
@@ -85,7 +85,7 @@ export function ListView() {
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Box paddingX={1}>
+      <Box paddingX={1} marginBottom={1}>
         <Text bold color="cyan">skillpack</Text>
         <Text dimColor> — {skills.length} skills</Text>
         {showScrollIndicator && (
@@ -93,10 +93,12 @@ export function ListView() {
         )}
       </Box>
 
-      <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      <Box marginBottom={1}>
+        <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      </Box>
 
       {searching && (
-        <Box>
+        <Box marginBottom={1}>
           <SearchInput
             onChange={setSearchQuery}
             onSubmit={() => setSearching(false)}
@@ -105,11 +107,11 @@ export function ListView() {
         </Box>
       )}
 
-      <Box flexDirection="column" flexGrow={1} paddingX={1}>
+      <Box flexDirection="column" paddingX={1}>
         {skills.length === 0 ? (
           <Text dimColor>No skills found</Text>
         ) : (<>
-          <Box gap={1}>
+          <Box gap={1} marginBottom={1}>
             <Text dimColor>{' '}</Text>
             <Text dimColor bold>{'Name'.padEnd(COL_NAME_WIDTH)}</Text>
             <Text dimColor bold>{'Provider'.padEnd(COL_PROVIDER_WIDTH)}</Text>
@@ -125,6 +127,8 @@ export function ListView() {
           ))}
         </>)}
       </Box>
+
+      <Box flexGrow={1} />
 
       <StatusBar />
     </Box>
