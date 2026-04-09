@@ -20,8 +20,7 @@ export function SkillRow({ skill, isSelected, isConflicting }: SkillRowProps) {
       <Text color={skill.enabled ? 'green' : 'red'}>
         {skill.enabled ? 'on' : 'off'}
       </Text>
-      {skill.readonly && <Text dimColor> [ro]</Text>}
-      {isConflicting && <Text color="yellow"> ! conflict</Text>}
+      {isConflicting && <Text color="yellow"> !</Text>}
     </Box>
   );
 }
