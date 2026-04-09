@@ -10,7 +10,7 @@ export class SkillsShProvider extends BaseProvider {
   readonly displayName = 'skills.sh';
   readonly basePaths: string[];
   readonly capabilities: ProviderCapabilities = {
-    canInstall: true, canUninstall: true, canUpdate: true, canToggle: false, canCreate: true,
+    canInstall: true, canUninstall: true, canUpdate: true, canToggle: true, canCreate: true,
   };
   constructor(basePaths?: string[]) {
     super();

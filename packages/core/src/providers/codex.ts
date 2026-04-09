@@ -11,7 +11,7 @@ export class CodexProvider extends BaseProvider {
   readonly displayName = 'Codex';
   readonly basePaths: string[];
   readonly capabilities: ProviderCapabilities = {
-    canInstall: true, canUninstall: true, canUpdate: true, canToggle: false, canCreate: true,
+    canInstall: true, canUninstall: true, canUpdate: true, canToggle: true, canCreate: true,
   };
 
   constructor(basePaths?: string[]) {

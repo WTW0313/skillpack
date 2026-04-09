@@ -21,12 +21,12 @@ export function SkillRow({ skill, isSelected, isConflicting }: SkillRowProps) {
       <Text color={isSelected ? 'cyan' : undefined}>
         {isSelected ? '>' : ' '}
       </Text>
-      <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
+      <Text color={isSelected ? 'cyan' : (skill.enabled ? 'white' : undefined)} bold={isSelected} dimColor={!skill.enabled}>
         {truncate(skill.name, COL_NAME_WIDTH)}
       </Text>
       <Text dimColor>{skill.provider.padEnd(COL_PROVIDER_WIDTH)}</Text>
-      <Text color={skill.enabled ? 'green' : 'red'}>
-        {skill.enabled ? 'on' : 'off'}
+      <Text color={skill.enabled ? 'green' : 'yellow'}>
+        {skill.enabled ? 'on' : 'disabled'}
       </Text>
       {isConflicting && <Text color="yellow"> !</Text>}
     </Box>

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { CodexProvider } from '../../src/providers/codex.js';
@@ -47,5 +47,37 @@ describe('CodexProvider', () => {
     await provider.uninstall('to-delete');
     const skills = await provider.scan();
     expect(skills).toHaveLength(0);
+  });
+
+  it('disables a skill by renaming directory', async () => {
+    const skillDir = path.join(dir, 'my-skill');
+    await mkdir(skillDir);
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: my-skill\ndescription: Toggle me\n---\n');
+
+    await provider.disable('my-skill');
+
+    await expect(access(path.join(dir, 'my-skill'))).rejects.toThrow();
+    await expect(access(path.join(dir, '.disabled-my-skill'))).resolves.toBeUndefined();
+
+    const skills = await provider.scan();
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('my-skill');
+    expect(skills[0].enabled).toBe(false);
+  });
+
+  it('enables a disabled skill', async () => {
+    const disabledDir = path.join(dir, '.disabled-my-skill');
+    await mkdir(disabledDir);
+    await writeFile(path.join(disabledDir, 'SKILL.md'), '---\nname: my-skill\ndescription: Toggle me\n---\n');
+
+    await provider.enable('my-skill');
+
+    await expect(access(path.join(dir, '.disabled-my-skill'))).rejects.toThrow();
+    await expect(access(path.join(dir, 'my-skill'))).resolves.toBeUndefined();
+
+    const skills = await provider.scan();
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('my-skill');
+    expect(skills[0].enabled).toBe(true);
   });
 });

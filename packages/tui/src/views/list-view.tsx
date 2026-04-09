@@ -60,6 +60,10 @@ export function ListView() {
     if (input === 'i') { setView('install'); return; }
     if (input === 'c') { setView('create'); return; }
     if (input === 'u') { setView('update'); return; }
+    if (input === ' ' && skills[cursor]) {
+      manager.toggleSkill(skills[cursor]).then(() => refresh());
+      return;
+    }
     if (key.return && skills[cursor]) {
       setSelectedSkill(skills[cursor]);
       setView('detail');

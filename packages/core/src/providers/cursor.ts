@@ -7,7 +7,7 @@ export class CursorProvider extends BaseProvider {
   readonly displayName = 'Cursor';
   readonly basePaths: string[];
   readonly capabilities: ProviderCapabilities = {
-    canInstall: false, canUninstall: false, canUpdate: false, canToggle: false, canCreate: false,
+    canInstall: false, canUninstall: false, canUpdate: false, canToggle: true, canCreate: false,
   };
   constructor(basePaths?: string[]) {
     super();

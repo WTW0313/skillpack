@@ -86,6 +86,19 @@ export class SkillManager {
     return provider.create(template);
   }
 
+  async toggleSkill(skill: Skill): Promise<void> {
+    const provider = this.providers.get(skill.provider);
+    if (!provider) throw new Error(`Provider not found: ${skill.provider}`);
+    if (!provider.capabilities.canToggle) {
+      throw new Error(`${provider.displayName} does not support toggle`);
+    }
+    if (skill.enabled) {
+      await provider.disable(skill.name);
+    } else {
+      await provider.enable(skill.name);
+    }
+  }
+
   async uninstallSkill(skill: Skill): Promise<void> {
     const provider = this.providers.get(skill.provider);
     if (!provider) throw new Error(`Provider not found: ${skill.provider}`);

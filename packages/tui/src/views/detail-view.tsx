@@ -35,6 +35,10 @@ export function DetailView() {
       refresh();
       return;
     }
+    if (input === ' ' && selectedSkill) {
+      manager.toggleSkill(selectedSkill).then(() => refresh());
+      return;
+    }
     if (input === 'd' && selectedSkill && !selectedSkill.readonly) {
       setConfirming(true);
     }
