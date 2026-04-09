@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { AppProvider, useAppContext } from './context/app-context.js';
@@ -8,6 +9,16 @@ import { InstallView } from './views/install-view.js';
 import { CreateView } from './views/create-view.js';
 import { UpdateView } from './views/update-view.js';
 import { useTerminalSize } from './hooks/use-terminal-size.js';
+
+function useAlternateScreen() {
+  useEffect(() => {
+    process.stdout.write('\x1B[?1049h');
+    process.stdout.write('\x1B[H');
+    return () => {
+      process.stdout.write('\x1B[?1049l');
+    };
+  }, []);
+}
 
 function Router() {
   const { view } = useAppContext();
@@ -22,6 +33,7 @@ function Router() {
 }
 
 export function App() {
+  useAlternateScreen();
   const { manager, config, error } = useSkillManager();
   const { rows } = useTerminalSize();
 

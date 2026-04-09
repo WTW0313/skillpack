@@ -3,4 +3,10 @@ import React from 'react';
 import { render } from 'ink';
 import { App } from '../src/app.js';
 
-render(React.createElement(App));
+const { waitUntilExit } = render(React.createElement(App), {
+  patchConsole: false,
+});
+
+waitUntilExit().then(() => {
+  process.exit(0);
+});
