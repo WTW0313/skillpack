@@ -1,0 +1,52 @@
+import type { IInstallSource } from './source.js';
+import type { RemoteSkill, UpdateInfo, DownloadResult } from '../models/source.js';
+import type { Skill } from '../models/skill.js';
+import { execFile } from 'node:child_process';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
+export function parseGitHubIdentifier(identifier: string): { owner: string; repo: string; ref: string; path: string } {
+  const urlMatch = identifier.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/(.+)/);
+  if (urlMatch) return { owner: urlMatch[1], repo: urlMatch[2], ref: urlMatch[3], path: urlMatch[4] };
+  const atMatch = identifier.match(/^([^/]+)\/([^@]+)@(.+)$/);
+  if (atMatch) return { owner: atMatch[1], repo: atMatch[2], ref: 'main', path: atMatch[3] };
+  const slashMatch = identifier.match(/^([^/]+)\/([^/]+)$/);
+  if (slashMatch) return { owner: slashMatch[1], repo: slashMatch[2], ref: 'main', path: '.' };
+  throw new Error(`Cannot parse GitHub identifier: ${identifier}`);
+}
+
+export class GitHubSource implements IInstallSource {
+  readonly id = 'github';
+  readonly displayName = 'GitHub';
+
+  async search(_query: string): Promise<RemoteSkill[]> { return []; }
+
+  async fetch(identifier: string): Promise<DownloadResult> {
+    const parsed = parseGitHubIdentifier(identifier);
+    const tempDir = await mkdtemp(path.join(tmpdir(), 'skillpack-gh-'));
+    const repoUrl = `https://github.com/${parsed.owner}/${parsed.repo}.git`;
+    await execFileAsync('git', ['clone', '--depth', '1', '--filter=blob:none', '--sparse', '--branch', parsed.ref, repoUrl, tempDir]);
+    if (parsed.path !== '.') {
+      await execFileAsync('git', ['-C', tempDir, 'sparse-checkout', 'set', parsed.path]);
+    }
+    const skillName = path.basename(parsed.path);
+    const skillDir = parsed.path === '.' ? tempDir : path.join(tempDir, parsed.path);
+    return { tempDir: skillDir, skillName, files: [] };
+  }
+
+  async checkUpdate(skill: Skill): Promise<UpdateInfo | null> {
+    if (!skill.source?.repo || !skill.source?.commit) return null;
+    try {
+      const { stdout } = await execFileAsync('git', ['ls-remote', `https://github.com/${skill.source.repo}.git`, skill.source.ref || 'HEAD']);
+      const latestCommit = stdout.split('\t')[0];
+      if (latestCommit && latestCommit !== skill.source.commit) {
+        return { currentVersion: skill.source.commit.slice(0, 7), latestVersion: latestCommit.slice(0, 7), hasUpdate: true };
+      }
+    } catch { /* skip */ }
+    return null;
+  }
+}
