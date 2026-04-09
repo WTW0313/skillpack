@@ -127,8 +127,28 @@ export class SkillManager {
     const provider = this.providers.get(providerId);
     if (!provider) throw new Error(`Provider not found: ${providerId}`);
     const result = await source.fetch(identifier);
-    if (sourceId === 'skillssh') { await this.scanAll(); return; }
-    await provider.install(result.skillName, { sourceType: sourceId as 'github' | 'skillssh', identifier, tempDir: result.tempDir });
+
+    if (sourceId === 'skillssh' && providerId === 'skillssh') {
+      // npx skills add already placed it in ~/.agents/skills/, just rescan
+      await this.scanAll();
+    } else if (sourceId === 'skillssh') {
+      // Installed to ~/.agents/skills/ by npx, but user wants it in a different provider.
+      // Find the newly installed skill and copy it to the target.
+      const skillsshProvider = this.providers.get('skillssh');
+      if (skillsshProvider) {
+        const srcDir = path.join(skillsshProvider.basePaths[0], result.skillName);
+        try {
+          await access(srcDir);
+          await provider.install(result.skillName, { sourceType: 'skillssh', identifier, tempDir: srcDir });
+        } catch {
+          // Fallback: skill name might differ from identifier, just rescan
+        }
+      }
+      await this.scanAll();
+    } else {
+      await provider.install(result.skillName, { sourceType: sourceId as 'github' | 'skillssh', identifier, tempDir: result.tempDir });
+      await this.scanAll();
+    }
 
     if (this.globalLock) {
       this.globalLock.setEntry(result.skillName, {
@@ -139,8 +159,6 @@ export class SkillManager {
       });
       await this.globalLock.save();
     }
-
-    await this.scanAll();
   }
 
   async checkUpdates(): Promise<Array<{ skill: Skill; update: UpdateInfo }>> {

@@ -1,4 +1,4 @@
-import { Box, Text, useStdout } from 'ink';
+import { Box, Text } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { AppProvider, useAppContext } from './context/app-context.js';
 import { useSkillManager } from './hooks/use-skill-manager.js';
