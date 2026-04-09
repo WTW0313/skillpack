@@ -65,25 +65,24 @@ export function InstallView() {
     }
   }, { isActive: !isTextStep });
 
+  const [searching, setSearching] = useState(false);
+
   const handleQuerySubmit = async (value: string) => {
     setQuery(value);
     setError('');
+    setSearching(true);
     try {
       const found = await manager.searchRemote(selectedSource, value);
-      if (found.length === 0 && selectedSource === 'github') {
-        setResults([{
-          name: value.split('/').pop() ?? value,
-          description: 'Direct install',
-          source: 'github',
-          identifier: value,
-        }]);
-      } else {
-        setResults(found);
-      }
+      setResults(found);
       setCursor(0);
+      if (found.length === 0) {
+        setError(`No results for "${value}"`);
+      }
       setStep('results');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -118,11 +117,15 @@ export function InstallView() {
 
       {step === 'query' && (
         <Box flexDirection="column" marginY={1}>
-          <Text bold>Search {selectedSource}:</Text>
-          <Box>
-            <Text color="cyan">&gt; </Text>
-            <TextInput placeholder="query or owner/repo..." onSubmit={handleQuerySubmit} />
-          </Box>
+          <Text bold>Search {selectedSource === 'github' ? 'GitHub (owner/repo or owner/repo@path)' : 'skills.sh'}:</Text>
+          {searching ? (
+            <Spinner label="Searching..." />
+          ) : (
+            <Box>
+              <Text color="cyan">&gt; </Text>
+              <TextInput placeholder={selectedSource === 'github' ? 'owner/repo@skill-path' : 'search keyword...'} onSubmit={handleQuerySubmit} />
+            </Box>
+          )}
         </Box>
       )}
 

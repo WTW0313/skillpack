@@ -23,7 +23,20 @@ export class GitHubSource implements IInstallSource {
   readonly id = 'github';
   readonly displayName = 'GitHub';
 
-  async search(_query: string): Promise<RemoteSkill[]> { return []; }
+  async search(query: string): Promise<RemoteSkill[]> {
+    try {
+      const parsed = parseGitHubIdentifier(query);
+      const skillName = parsed.path === '.' ? parsed.repo : path.basename(parsed.path);
+      return [{
+        name: skillName,
+        description: `${parsed.owner}/${parsed.repo}` + (parsed.path !== '.' ? ` → ${parsed.path}` : ''),
+        source: 'github',
+        identifier: query,
+      }];
+    } catch {
+      return [];
+    }
+  }
 
   async fetch(identifier: string): Promise<DownloadResult> {
     const parsed = parseGitHubIdentifier(identifier);
