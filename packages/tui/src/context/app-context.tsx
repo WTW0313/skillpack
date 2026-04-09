@@ -1,0 +1,64 @@
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import type { SkillManager, Skill, ConflictInfo } from '@skillpack/core';
+
+export type ViewType = 'list' | 'detail' | 'install' | 'create' | 'update';
+
+interface AppState {
+  manager: SkillManager;
+  skills: Skill[];
+  conflicts: ConflictInfo[];
+  activeTab: string;
+  view: ViewType;
+  selectedSkill: Skill | null;
+  searchQuery: string;
+  loading: boolean;
+}
+
+interface AppContextValue extends AppState {
+  setActiveTab: (tab: string) => void;
+  setView: (view: ViewType) => void;
+  setSelectedSkill: (skill: Skill | null) => void;
+  setSearchQuery: (query: string) => void;
+  setLoading: (loading: boolean) => void;
+  refresh: () => Promise<void>;
+}
+
+const AppContext = createContext<AppContextValue | null>(null);
+
+export function useAppContext(): AppContextValue {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error('useAppContext must be used within AppProvider');
+  return ctx;
+}
+
+interface AppProviderProps {
+  manager: SkillManager;
+  children: ReactNode;
+}
+
+export function AppProvider({ manager, children }: AppProviderProps) {
+  const [skills, setSkills] = useState<Skill[]>(manager.getAllSkills());
+  const [conflicts, setConflicts] = useState<ConflictInfo[]>(manager.getConflicts());
+  const [activeTab, setActiveTab] = useState('All');
+  const [view, setView] = useState<ViewType>('list');
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    await manager.scanAll();
+    setSkills(manager.getAllSkills());
+    setConflicts(manager.getConflicts());
+    setLoading(false);
+  }, [manager]);
+
+  return (
+    <AppContext.Provider value={{
+      manager, skills, conflicts, activeTab, view, selectedSkill, searchQuery, loading,
+      setActiveTab, setView, setSelectedSkill, setSearchQuery, setLoading, refresh,
+    }}>
+      {children}
+    </AppContext.Provider>
+  );
+}
