@@ -5,7 +5,7 @@ import { useAppContext } from '../context/app-context.js';
 import { useFilteredSkills } from '../hooks/use-skills.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { TabBar } from '../components/tab-bar.js';
-import { SkillRow } from '../components/skill-row.js';
+import { SkillRow, COL_NAME_WIDTH, COL_PROVIDER_WIDTH } from '../components/skill-row.js';
 import { SearchInput } from '../components/search-input.js';
 import { StatusBar } from '../components/status-bar.js';
 
@@ -113,8 +113,8 @@ export function ListView() {
         ) : (<>
           <Box gap={1}>
             <Text dimColor>{' '}</Text>
-            <Text dimColor bold>{'Name'.padEnd(30)}</Text>
-            <Text dimColor bold>{'Provider'.padEnd(10)}</Text>
+            <Text dimColor bold>{'Name'.padEnd(COL_NAME_WIDTH)}</Text>
+            <Text dimColor bold>{'Provider'.padEnd(COL_PROVIDER_WIDTH)}</Text>
             <Text dimColor bold>{'Status'}</Text>
           </Box>
           {visibleSkills.map((skill, index) => (
