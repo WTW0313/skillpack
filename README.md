@@ -18,8 +18,8 @@ Unified TUI manager for agent skills across Codex, Cursor, Claude, and skills.sh
 
 ```bash
 git clone <repo-url> && cd skillpack
-npm install
-npm run build
+pnpm install
+pnpm run build
 ```
 
 Run directly:
@@ -31,13 +31,13 @@ node packages/tui/dist/bin/skillpack.js
 Or link globally:
 
 ```bash
-npm link --workspace=packages/tui
+cd packages/tui && pnpm link --global
 skillpack
 ```
 
 ## Quick Start
 
-Launch `skillpack` to see all discovered skills grouped by provider. Use arrow keys or `j`/`k` to navigate, `Tab` to switch between provider tabs, and `/` to search.
+Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` to switch between provider tabs, and `/` to search.
 
 Press `Enter` on any skill to view its details, `i` to install a new skill from a remote source, or `c` to create one from scratch.
 
@@ -47,8 +47,8 @@ Press `Enter` on any skill to view its details, `i` to install a new skill from 
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| `↑` / `k` | Navigate up | Move selection up |
-| `↓` / `j` | Navigate down | Move selection down |
+| `↑` | Navigate up | Move selection up |
+| `↓` | Navigate down | Move selection down |
 | `Tab` | Switch tab | Cycle through All / provider groups |
 | `/` | Search | Fuzzy match on name + description |
 | `Enter` | Detail | Open skill detail view |
@@ -149,7 +149,8 @@ skillpack/
 │           ├── hooks/         # useSkillManager, useKeyboardNav
 │           └── app.tsx        # App shell and router
 ├── docs/                      # Design specs and implementation plans
-└── package.json               # Workspace root
+├── package.json               # Workspace root
+└── pnpm-workspace.yaml        # pnpm workspace 配置
 ```
 
 ## License

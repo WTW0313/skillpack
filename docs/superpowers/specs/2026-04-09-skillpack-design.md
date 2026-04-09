@@ -154,7 +154,7 @@ Tab 栏新增作用域指示：
 
 ## 项目结构
 
-Monorepo，TypeScript project references 管理：
+Monorepo，pnpm workspaces + TypeScript project references 管理：
 
 ```
 skillpack/
@@ -182,6 +182,7 @@ skillpack/
 │       │   └── app.tsx        # 入口
 │       └── package.json
 ├── package.json               # workspace root
+├── pnpm-workspace.yaml        # pnpm workspace 配置
 └── tsconfig.json
 ```
 

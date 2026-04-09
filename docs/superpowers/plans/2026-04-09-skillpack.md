@@ -6,7 +6,7 @@
 
 **Architecture:** Monorepo with two packages — `@skillpack/core` (platform-agnostic logic: providers, sources, models, lock files) and `@skillpack/tui` (Ink-based terminal UI). Core exposes a `SkillManager` that coordinates providers and sources. TUI consumes core's API.
 
-**Tech Stack:** TypeScript, Ink 6.x, React 18, @inkjs/ui, gray-matter, fuse.js
+**Tech Stack:** TypeScript, Ink 6.x, React 19, @inkjs/ui, gray-matter, fuse.js, pnpm workspaces
 
 **Spec:** `docs/superpowers/specs/2026-04-09-skillpack-design.md`
 
@@ -16,7 +16,8 @@
 
 ```
 skillpack/
-├── package.json                          # npm workspaces root
+├── package.json                          # workspace root
+├── pnpm-workspace.yaml                   # pnpm workspace 配置
 ├── tsconfig.json                         # base tsconfig
 ├── packages/
 │   ├── core/
