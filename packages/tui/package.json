@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@skillpack/core": "*",
+    "@skillpack/core": "workspace:*",
     "ink": "^6.5.0",
     "react": "^19.0.0",
     "@inkjs/ui": "^2.0.0",

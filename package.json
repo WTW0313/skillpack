@@ -2,10 +2,9 @@
   "name": "skillpack",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["packages/*"],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
-    "dev": "npm run dev --workspace=packages/tui"
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "dev": "pnpm --filter @skillpack/tui run dev"
   }
 }
