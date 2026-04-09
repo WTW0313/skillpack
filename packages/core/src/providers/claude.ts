@@ -1,9 +1,17 @@
 import { BaseProvider, type ProviderCapabilities } from './provider.js';
 import type { Skill } from '../models/index.js';
-import { readdir, readFile, access, rename } from 'node:fs/promises';
+import { readdir, readFile, access, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { parseSkillMd } from '../parser.js';
+
+async function isDirEntry(entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string }, parentPath: string): Promise<boolean> {
+  if (entry.isDirectory()) return true;
+  if (entry.isSymbolicLink()) {
+    try { return (await stat(path.join(parentPath, entry.name))).isDirectory(); } catch { return false; }
+  }
+  return false;
+}
 
 export class ClaudeProvider extends BaseProvider {
   readonly id = 'claude';
@@ -23,18 +31,20 @@ export class ClaudeProvider extends BaseProvider {
       try { await access(basePath); } catch { continue; }
       const publishers = await readdir(basePath, { withFileTypes: true });
       for (const pub of publishers) {
-        if (!pub.isDirectory()) continue;
-        const plugins = await readdir(path.join(basePath, pub.name), { withFileTypes: true });
+        if (!(await isDirEntry(pub, basePath))) continue;
+        const pubPath = path.join(basePath, pub.name);
+        const plugins = await readdir(pubPath, { withFileTypes: true });
         for (const plugin of plugins) {
-          if (!plugin.isDirectory()) continue;
-          const versions = await readdir(path.join(basePath, pub.name, plugin.name), { withFileTypes: true });
+          if (!(await isDirEntry(plugin, pubPath))) continue;
+          const pluginPath = path.join(pubPath, plugin.name);
+          const versions = await readdir(pluginPath, { withFileTypes: true });
           for (const ver of versions) {
-            if (!ver.isDirectory()) continue;
-            const skillsDir = path.join(basePath, pub.name, plugin.name, ver.name, 'skills');
+            if (!(await isDirEntry(ver, pluginPath))) continue;
+            const skillsDir = path.join(pluginPath, ver.name, 'skills');
             try { await access(skillsDir); } catch { continue; }
             const skillEntries = await readdir(skillsDir, { withFileTypes: true });
             for (const entry of skillEntries) {
-              if (!entry.isDirectory()) continue;
+              if (!(await isDirEntry(entry, skillsDir))) continue;
               const isDisabled = entry.name.startsWith('.disabled-');
               const skillDirName = isDisabled ? entry.name.slice('.disabled-'.length) : entry.name;
               if (entry.name.startsWith('.') && !isDisabled) continue;
@@ -63,14 +73,16 @@ export class ClaudeProvider extends BaseProvider {
       try { await access(basePath); } catch { continue; }
       const publishers = await readdir(basePath, { withFileTypes: true });
       for (const pub of publishers) {
-        if (!pub.isDirectory()) continue;
-        const plugins = await readdir(path.join(basePath, pub.name), { withFileTypes: true });
+        if (!(await isDirEntry(pub, basePath))) continue;
+        const pubPath = path.join(basePath, pub.name);
+        const plugins = await readdir(pubPath, { withFileTypes: true });
         for (const plugin of plugins) {
-          if (!plugin.isDirectory()) continue;
-          const versions = await readdir(path.join(basePath, pub.name, plugin.name), { withFileTypes: true });
+          if (!(await isDirEntry(plugin, pubPath))) continue;
+          const pluginPath = path.join(pubPath, plugin.name);
+          const versions = await readdir(pluginPath, { withFileTypes: true });
           for (const ver of versions) {
-            if (!ver.isDirectory()) continue;
-            const skillsDir = path.join(basePath, pub.name, plugin.name, ver.name, 'skills');
+            if (!(await isDirEntry(ver, pluginPath))) continue;
+            const skillsDir = path.join(pluginPath, ver.name, 'skills');
             try { await access(skillsDir); } catch { continue; }
             const src = path.join(skillsDir, name);
             const dest = path.join(skillsDir, `.disabled-${name}`);
@@ -97,14 +109,16 @@ export class ClaudeProvider extends BaseProvider {
       try { await access(basePath); } catch { continue; }
       const publishers = await readdir(basePath, { withFileTypes: true });
       for (const pub of publishers) {
-        if (!pub.isDirectory()) continue;
-        const plugins = await readdir(path.join(basePath, pub.name), { withFileTypes: true });
+        if (!(await isDirEntry(pub, basePath))) continue;
+        const pubPath = path.join(basePath, pub.name);
+        const plugins = await readdir(pubPath, { withFileTypes: true });
         for (const plugin of plugins) {
-          if (!plugin.isDirectory()) continue;
-          const versions = await readdir(path.join(basePath, pub.name, plugin.name), { withFileTypes: true });
+          if (!(await isDirEntry(plugin, pubPath))) continue;
+          const pluginPath = path.join(pubPath, plugin.name);
+          const versions = await readdir(pluginPath, { withFileTypes: true });
           for (const ver of versions) {
-            if (!ver.isDirectory()) continue;
-            const skillsDir = path.join(basePath, pub.name, plugin.name, ver.name, 'skills');
+            if (!(await isDirEntry(ver, pluginPath))) continue;
+            const skillsDir = path.join(pluginPath, ver.name, 'skills');
             try { await access(skillsDir); } catch { continue; }
             const src = path.join(skillsDir, `.disabled-${name}`);
             const dest = path.join(skillsDir, name);

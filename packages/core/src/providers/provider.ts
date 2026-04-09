@@ -1,6 +1,6 @@
 import type { Skill, SkillTemplate } from '../models/index.js';
 import type { InstallRequest } from '../models/source.js';
-import { readdir, access, readFile, rename } from 'node:fs/promises';
+import { readdir, access, readFile, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { parseSkillMd } from '../parser.js';
 
@@ -39,7 +39,11 @@ export abstract class BaseProvider implements ISkillProvider {
       try { await access(basePath); } catch { continue; }
       const entries = await readdir(basePath, { withFileTypes: true });
       for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
+        let isDir = entry.isDirectory();
+        if (!isDir && entry.isSymbolicLink()) {
+          try { isDir = (await stat(path.join(basePath, entry.name))).isDirectory(); } catch { /* broken symlink */ }
+        }
+        if (!isDir) continue;
         const isDisabled = entry.name.startsWith('.disabled-');
         const skillDirName = isDisabled ? entry.name.slice('.disabled-'.length) : entry.name;
         if (entry.name.startsWith('.') && !isDisabled) continue;
