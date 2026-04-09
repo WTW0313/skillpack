@@ -32,7 +32,7 @@ export function UpdateView() {
   }
 
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" flexGrow={1} padding={1}>
       <Text bold color="cyan">Available Updates</Text>
 
       {updates.length === 0 ? (

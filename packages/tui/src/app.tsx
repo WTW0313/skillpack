@@ -1,4 +1,4 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { AppProvider, useAppContext } from './context/app-context.js';
 import { useSkillManager } from './hooks/use-skill-manager.js';
@@ -7,6 +7,7 @@ import { DetailView } from './views/detail-view.js';
 import { InstallView } from './views/install-view.js';
 import { CreateView } from './views/create-view.js';
 import { UpdateView } from './views/update-view.js';
+import { useTerminalSize } from './hooks/use-terminal-size.js';
 
 function Router() {
   const { view } = useAppContext();
@@ -22,10 +23,11 @@ function Router() {
 
 export function App() {
   const { manager, config, error } = useSkillManager();
+  const { rows } = useTerminalSize();
 
   if (error) {
     return (
-      <Box>
+      <Box height={rows}>
         <Text color="red">Error: {error}</Text>
       </Box>
     );
@@ -33,7 +35,7 @@ export function App() {
 
   if (!manager || !config) {
     return (
-      <Box>
+      <Box height={rows}>
         <Spinner label="Loading skillpack..." />
       </Box>
     );
@@ -41,7 +43,9 @@ export function App() {
 
   return (
     <AppProvider manager={manager} config={config}>
-      <Router />
+      <Box flexDirection="column" height={rows}>
+        <Router />
+      </Box>
     </AppProvider>
   );
 }
