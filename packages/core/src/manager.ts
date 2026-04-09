@@ -1,9 +1,14 @@
+import { cp, readdir, readFile, access } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
 import type { ISkillProvider } from './providers/provider.js';
 import type { IInstallSource } from './sources/source.js';
 import type { Skill, SkillTemplate } from './models/index.js';
 import type { ConflictInfo } from './models/conflict.js';
 import type { RemoteSkill, UpdateInfo } from './models/source.js';
 import { ConflictDetector } from './conflicts.js';
+import { LockfileManager } from './lockfile.js';
+import { parseSkillMd } from './parser.js';
 
 export class SkillManager {
   private providers = new Map<string, ISkillProvider>();
@@ -11,6 +16,7 @@ export class SkillManager {
   private skills: Skill[] = [];
   private conflicts: ConflictInfo[] = [];
   private conflictDetector = new ConflictDetector();
+  private globalLock?: LockfileManager;
 
   registerProvider(provider: ISkillProvider): void { this.providers.set(provider.id, provider); }
   registerSource(source: IInstallSource): void { this.sources.set(source.id, source); }
@@ -18,10 +24,54 @@ export class SkillManager {
   getProviders(): ISkillProvider[] { return [...this.providers.values()]; }
   getSources(): IInstallSource[] { return [...this.sources.values()]; }
 
-  async scanAll(): Promise<void> {
+  async init(configDir?: string): Promise<void> {
+    const lockPath = path.join(configDir ?? path.join(os.homedir(), '.config', 'skillpack'), 'skillpack.lock');
+    this.globalLock = new LockfileManager(lockPath);
+    await this.globalLock.load();
+  }
+
+  async scanAll(cwd?: string, projectSkillsDir?: string): Promise<void> {
     const results = await Promise.all([...this.providers.values()].map((p) => p.scan()));
-    this.skills = results.flat();
+    let allSkills = results.flat();
+
+    if (cwd && projectSkillsDir) {
+      const projectSkills = await this.scanProjectSkills(cwd, projectSkillsDir);
+      const projectNames = new Set(projectSkills.map((s) => s.name));
+      allSkills = allSkills.filter((s) => !projectNames.has(s.name));
+      allSkills = [...allSkills, ...projectSkills];
+    }
+
+    this.skills = allSkills;
     this.conflicts = this.conflictDetector.detect(this.skills);
+  }
+
+  async scanProjectSkills(cwd: string, projectSkillsDir: string): Promise<Skill[]> {
+    const projectPath = path.join(cwd, projectSkillsDir);
+    try { await access(projectPath); } catch { return []; }
+    const entries = await readdir(projectPath, { withFileTypes: true });
+    const skills: Skill[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const skillDir = path.join(projectPath, entry.name);
+      const skillMdPath = path.join(skillDir, 'SKILL.md');
+      try {
+        const content = await readFile(skillMdPath, 'utf-8');
+        const parsed = parseSkillMd(content);
+        skills.push({
+          name: parsed.name || entry.name,
+          description: parsed.description,
+          provider: 'project',
+          path: skillDir,
+          version: parsed.raw.version as string | undefined,
+          enabled: true,
+          scope: 'project',
+          readonly: false,
+          metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
+          source: { type: 'local' },
+        });
+      } catch { /* skip */ }
+    }
+    return skills;
   }
 
   getAllSkills(): Skill[] { return this.skills; }
@@ -48,6 +98,29 @@ export class SkillManager {
     return source.search(query);
   }
 
+  async forkToLocal(skill: Skill, targetProviderId: string): Promise<Skill> {
+    const provider = this.providers.get(targetProviderId);
+    if (!provider) throw new Error(`Provider not found: ${targetProviderId}`);
+    if (!provider.capabilities.canCreate) {
+      throw new Error(`Provider ${targetProviderId} does not support creating skills`);
+    }
+    const destDir = path.join(provider.basePaths[0], skill.name);
+    await cp(skill.path, destDir, { recursive: true });
+    return {
+      ...skill,
+      provider: targetProviderId,
+      path: destDir,
+      readonly: false,
+      source: {
+        type: 'local',
+        createdAt: new Date().toISOString(),
+        forkedFrom: skill.source?.type !== 'local'
+          ? { source: skill.source!.type as 'github' | 'skillssh', identifier: skill.source!.repo ?? skill.name }
+          : undefined,
+      },
+    };
+  }
+
   async installFromSource(sourceId: string, identifier: string, providerId: string): Promise<void> {
     const source = this.sources.get(sourceId);
     if (!source) throw new Error(`Source not found: ${sourceId}`);
@@ -56,6 +129,17 @@ export class SkillManager {
     const result = await source.fetch(identifier);
     if (sourceId === 'skillssh') { await this.scanAll(); return; }
     await provider.install(result.skillName, { sourceType: sourceId as 'github' | 'skillssh', identifier, tempDir: result.tempDir });
+
+    if (this.globalLock) {
+      this.globalLock.setEntry(result.skillName, {
+        source: sourceId,
+        identifier,
+        installedAt: new Date().toISOString(),
+        integrity: '',
+      });
+      await this.globalLock.save();
+    }
+
     await this.scanAll();
   }
 

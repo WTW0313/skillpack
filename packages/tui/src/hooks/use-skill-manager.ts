@@ -3,10 +3,18 @@ import {
   SkillManager, ConfigManager,
   CodexProvider, CursorProvider, ClaudeProvider, SkillsShProvider,
   GitHubSource, SkillsShSource,
+  type SkillpackConfig,
 } from '@skillpack/core';
 
-export function useSkillManager(): { manager: SkillManager | null; error: string | null } {
+export interface SkillManagerResult {
+  manager: SkillManager | null;
+  config: SkillpackConfig | null;
+  error: string | null;
+}
+
+export function useSkillManager(): SkillManagerResult {
   const [manager, setManager] = useState<SkillManager | null>(null);
+  const [config, setConfig] = useState<SkillpackConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -15,28 +23,32 @@ export function useSkillManager(): { manager: SkillManager | null; error: string
     async function init() {
       try {
         const configManager = new ConfigManager();
-        const config = await configManager.load();
+        const cfg = await configManager.load();
         const mgr = new SkillManager();
 
         const providerFactories: Record<string, () => InstanceType<typeof CodexProvider | typeof CursorProvider | typeof ClaudeProvider | typeof SkillsShProvider>> = {
-          codex: () => new CodexProvider(config.providers.codex?.paths),
-          cursor: () => new CursorProvider(config.providers.cursor?.paths),
-          claude: () => new ClaudeProvider(config.providers.claude?.paths),
-          skillssh: () => new SkillsShProvider(config.providers.skillssh?.paths),
+          codex: () => new CodexProvider(cfg.providers.codex?.paths),
+          cursor: () => new CursorProvider(cfg.providers.cursor?.paths),
+          claude: () => new ClaudeProvider(cfg.providers.claude?.paths),
+          skillssh: () => new SkillsShProvider(cfg.providers.skillssh?.paths),
         };
 
         for (const [id, factory] of Object.entries(providerFactories)) {
-          if (config.providers[id]?.enabled) {
+          if (cfg.providers[id]?.enabled) {
             mgr.registerProvider(factory());
           }
         }
 
-        if (config.sources.github?.enabled) mgr.registerSource(new GitHubSource());
-        if (config.sources.skillssh?.enabled) mgr.registerSource(new SkillsShSource());
+        if (cfg.sources.github?.enabled) mgr.registerSource(new GitHubSource());
+        if (cfg.sources.skillssh?.enabled) mgr.registerSource(new SkillsShSource());
 
-        await mgr.scanAll();
+        await mgr.init();
+        await mgr.scanAll(process.cwd(), cfg.projectSkillsDir);
 
-        if (!cancelled) setManager(mgr);
+        if (!cancelled) {
+          setManager(mgr);
+          setConfig(cfg);
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       }
@@ -46,5 +58,5 @@ export function useSkillManager(): { manager: SkillManager | null; error: string
     return () => { cancelled = true; };
   }, []);
 
-  return { manager, error };
+  return { manager, config, error };
 }

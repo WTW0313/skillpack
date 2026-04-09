@@ -21,7 +21,7 @@ function Router() {
 }
 
 export function App() {
-  const { manager, error } = useSkillManager();
+  const { manager, config, error } = useSkillManager();
 
   if (error) {
     return (
@@ -31,7 +31,7 @@ export function App() {
     );
   }
 
-  if (!manager) {
+  if (!manager || !config) {
     return (
       <Box>
         <Spinner label="Loading skillpack..." />
@@ -40,7 +40,7 @@ export function App() {
   }
 
   return (
-    <AppProvider manager={manager}>
+    <AppProvider manager={manager} config={config}>
       <Router />
     </AppProvider>
   );

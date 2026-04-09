@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { SkillManager, Skill, ConflictInfo } from '@skillpack/core';
+import type { SkillManager, Skill, ConflictInfo, SkillpackConfig } from '@skillpack/core';
 
 export type ViewType = 'list' | 'detail' | 'install' | 'create' | 'update';
 
 interface AppState {
   manager: SkillManager;
+  config: SkillpackConfig;
   skills: Skill[];
   conflicts: ConflictInfo[];
   activeTab: string;
@@ -33,10 +34,11 @@ export function useAppContext(): AppContextValue {
 
 interface AppProviderProps {
   manager: SkillManager;
+  config: SkillpackConfig;
   children: ReactNode;
 }
 
-export function AppProvider({ manager, children }: AppProviderProps) {
+export function AppProvider({ manager, config, children }: AppProviderProps) {
   const [skills, setSkills] = useState<Skill[]>(manager.getAllSkills());
   const [conflicts, setConflicts] = useState<ConflictInfo[]>(manager.getConflicts());
   const [activeTab, setActiveTab] = useState('All');
@@ -47,15 +49,15 @@ export function AppProvider({ manager, children }: AppProviderProps) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    await manager.scanAll();
+    await manager.scanAll(process.cwd(), config.projectSkillsDir);
     setSkills(manager.getAllSkills());
     setConflicts(manager.getConflicts());
     setLoading(false);
-  }, [manager]);
+  }, [manager, config]);
 
   return (
     <AppContext.Provider value={{
-      manager, skills, conflicts, activeTab, view, selectedSkill, searchQuery, loading,
+      manager, config, skills, conflicts, activeTab, view, selectedSkill, searchQuery, loading,
       setActiveTab, setView, setSelectedSkill, setSearchQuery, setLoading, refresh,
     }}>
       {children}

@@ -9,6 +9,7 @@ import { StatusBar } from '../components/status-bar.js';
 export function DetailView() {
   const { selectedSkill, setView, refresh, manager } = useAppContext();
   const [confirming, setConfirming] = useState(false);
+  const [forking, setForking] = useState(false);
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
@@ -23,6 +24,15 @@ export function DetailView() {
     }
     if (input === 'd' && selectedSkill && !selectedSkill.readonly) {
       setConfirming(true);
+    }
+    if ((input === 'f' || input === 'F') && selectedSkill?.readonly && !forking) {
+      setForking(true);
+      const writableProvider = manager.getProviders().find((p) => p.capabilities.canCreate);
+      if (!writableProvider) { setForking(false); return; }
+      manager.forkToLocal(selectedSkill, writableProvider.id)
+        .then(() => refresh())
+        .then(() => { setForking(false); setView('list'); })
+        .catch(() => setForking(false));
     }
   }, { isActive: !confirming });
 
