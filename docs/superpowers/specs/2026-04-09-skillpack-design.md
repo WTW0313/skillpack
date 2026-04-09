@@ -21,6 +21,115 @@ Skillpack 是一个 TUI（终端交互式界面）应用，用于统一管理分
 
 架构设计为可扩展——新增平台只需实现 Provider 接口并注册。
 
+## 作用域：全局 vs 项目级
+
+Skills 分为两个作用域：
+
+### 全局 Skills
+
+各 agent 平台目录下的 skills 作为全局默认加载项：
+
+- `~/.codex/skills/`、`~/.cursor/skills-cursor/`、`~/.claude/plugins/cache/`、`~/.agents/skills/`
+- 对所有项目生效
+- 由 `skillpack.lock`（位于 `~/.config/skillpack/skillpack.lock`）锁定版本
+
+### 项目级 Skills
+
+运行时自动扫描当前工作目录，发现项目级 skill 定义：
+
+- 扫描路径：`<cwd>/.skillpack/skills/`（项目本地 skills 目录）
+- 项目级 lock 文件：`<cwd>/.skillpack/skillpack.lock`
+- 项目级 skills 优先级高于全局同名 skill（覆盖）
+- 适合团队共享的项目专属 skills（提交到 git）
+
+```
+my-project/
+├── .skillpack/
+│   ├── skills/              # 项目级 skills
+│   │   └── my-project-lint/
+│   │       └── SKILL.md
+│   └── skillpack.lock       # 项目级版本锁定
+└── ...
+```
+
+### TUI 中的体现
+
+Tab 栏新增作用域指示：
+
+```
+[All] [Codex] [Cursor] [skills.sh] [Claude] [Project]
+```
+
+列表中通过标签区分 `global` / `project`。项目级 skills 在 Project tab 下集中展示。
+
+## 版本锁定
+
+### Lock 文件格式
+
+`skillpack.lock` 记录每个远程安装的 skill 的精确版本，确保可复现：
+
+```json
+{
+  "lockfileVersion": 1,
+  "skills": {
+    "gsap-core": {
+      "source": "skillssh",
+      "identifier": "vercel-labs/agent-skills@gsap-core",
+      "version": "1.2.3",
+      "installedAt": "2026-04-09T10:00:00Z",
+      "integrity": "sha256-xxxx"
+    },
+    "figma": {
+      "source": "github",
+      "repo": "openai/skills",
+      "ref": "main",
+      "commit": "abc123def456",
+      "path": "skills/.curated/figma",
+      "installedAt": "2026-04-08T15:00:00Z",
+      "integrity": "sha256-yyyy"
+    }
+  }
+}
+```
+
+### Lock 文件行为
+
+- **安装时**：写入精确的 commit SHA / version，计算内容 integrity hash
+- **更新时**：更新 lock 文件中对应条目
+- **校验**：启动时可选校验本地文件 integrity 是否与 lock 一致（检测手动篡改）
+- **全局 lock**：`~/.config/skillpack/skillpack.lock`
+- **项目 lock**：`<cwd>/.skillpack/skillpack.lock`（可提交到 git，团队共享）
+
+## 更新机制
+
+### 检查更新
+
+- 启动时可选自动检查（配置项 `autoCheckUpdates: true`）
+- 手动触发：主界面按 `U`（大写）批量检查所有 skill 的更新
+- 单个 skill：详情页或列表中按 `u` 检查并更新
+
+### 更新流程
+
+```
+检查更新
+  -> Source.checkUpdate(skill) 对比 lock 中的 commit/version 与远程最新
+  -> 有更新时显示：当前版本、最新版本、changelog（如果有）
+  -> 用户确认后:
+     -> GitHub: 下载新版本到临时目录 -> 替换本地文件 -> 更新 lock
+     -> skills.sh: npx skills update <package> -> 更新 lock
+  -> scan() 刷新列表
+```
+
+### 批量更新
+
+```
+按 U 触发
+  -> 并行检查所有远程安装的 skills
+  -> 列出可更新的 skills（版本对比表）
+  -> 用户选择全部更新 / 逐个确认 / 取消
+  -> 执行更新 -> 更新 lock 文件
+```
+
 ## 安装来源
 
 两个一等公民的远程安装通道，加上本地创建：
@@ -28,6 +137,20 @@ Skillpack 是一个 TUI（终端交互式界面）应用，用于统一管理分
 - **GitHub** — 从任意 GitHub repo 安装（公开 + 私有），支持 `owner/repo` + path 或完整 URL
 - **skills.sh** — 通过 skills.sh registry 搜索和安装，委托 `npx skills add` 执行
 - **本地创建** — 用户在 TUI 中选择平台、填写信息，生成模板后用 $EDITOR 编辑
+
+## 可编辑性规则
+
+只有本地创建的 skills（`source.type === 'local'`）可以被编辑。远程安装的 skills 为只读：
+
+| 来源 | 浏览 | 编辑 | 卸载 | 更新 |
+|------|------|------|------|------|
+| `local` | Yes | Yes | Yes | N/A |
+| `github` | Yes | **只读** | Yes | Yes（从远程拉取） |
+| `skillssh` | Yes | **只读** | Yes | Yes（npx skills update） |
+
+- TUI 中远程 skill 按 `e` 时提示"此 skill 为远程安装，不可编辑"
+- 如需修改远程 skill，提供 **Fork to Local** 操作：复制到本地 skills 目录，`source.type` 改为 `local`，断开与远程的关联
+- Fork 后的 skill 不再接收远程更新
 
 ## 项目结构
 
@@ -80,6 +203,8 @@ interface Skill {
   path: string;                  // 本地绝对路径
   version?: string;
   enabled: boolean;
+  scope: 'global' | 'project';  // 作用域
+  readonly: boolean;             // 是否只读 (remote=true, local=false)
   metadata: {
     license?: string;
     author?: string;
@@ -89,8 +214,13 @@ interface Skill {
     type: 'github' | 'skillssh' | 'local';
     repo?: string;               // github: "owner/repo"
     ref?: string;                // github: branch/tag
+    commit?: string;             // github: 精确 commit SHA
     createdAt?: string;          // local: 创建时间
     installedAt?: string;        // 远程: 安装时间
+    forkedFrom?: {               // Fork to Local 时记录原始来源
+      source: 'github' | 'skillssh';
+      identifier: string;
+    };
   };
 }
 ```
@@ -283,9 +413,12 @@ class ConflictDetector {
 | `Enter` | 详情 | 进入 skill 详情页 |
 | `i` | 安装 | 选择源 -> 搜索 -> 选平台 -> 确认 |
 | `d` | 卸载 | 确认后 Provider.uninstall() |
-| `e` | 编辑 | 内联编辑 name/description，`E` 打开 $EDITOR |
+| `e` | 编辑 | 仅限 local skills；内联编辑 name/description |
+| `E` | 深度编辑 | 仅限 local skills；用 $EDITOR 打开 SKILL.md |
 | `c` | 创建 | 选平台 -> 填名称/描述 -> 生成模板 -> $EDITOR |
-| `u` | 更新 | 检查远程更新并应用 |
+| `u` | 更新 | 单个 skill 检查远程更新并应用 |
+| `U` | 批量更新 | 检查所有远程 skill 的更新 |
+| `f` | Fork to Local | 复制远程 skill 为本地可编辑副本 |
 | `Space` | 启/停 | toggle enable/disable |
 | `q` | 退出 | |
 
@@ -342,11 +475,20 @@ description: {{description}}
 <!-- Core instructions for the agent -->
 ```
 
-### 编辑流程
+### 编辑流程（仅限 local skills）
 
 - `e` — 进入编辑模式：name、description、enabled 内联修改（写回 frontmatter）
 - `E` — 用 `$EDITOR` 打开完整 SKILL.md
 - 编辑器关闭后解析更新的 frontmatter 刷新视图
+- 远程安装的 skill 按 `e`/`E` 时提示只读，并建议使用 `f` Fork to Local
+
+### Fork to Local 流程
+
+1. 按 `f` -> 选择目标 Provider（canCreate=true 的平台）
+2. 复制 skill 目录到目标 Provider 的 basePath
+3. 修改 `source.type` 为 `local`，记录 `forkedFrom` 信息
+4. 断开与远程的关联（不再接收更新）
+5. 新副本出现在列表中，可编辑
 
 ## 配置
 
@@ -355,6 +497,8 @@ skillpack 维护配置文件 `~/.config/skillpack/config.json`：
 ```json
 {
   "editor": "$EDITOR",
+  "autoCheckUpdates": true,
+  "projectSkillsDir": ".skillpack/skills",
   "providers": {
     "codex": { "enabled": true, "paths": ["~/.codex/skills"] },
     "cursor": { "enabled": true, "paths": ["~/.cursor/skills-cursor"] },
@@ -370,6 +514,8 @@ skillpack 维护配置文件 `~/.config/skillpack/config.json`：
 
 - 用户可禁用不关心的平台、自定义扫描路径
 - 首次运行时自动检测已存在的平台目录生成默认配置
+- `autoCheckUpdates`：启动时是否自动检查远程 skill 更新
+- `projectSkillsDir`：项目级 skills 目录名（默认 `.skillpack/skills`）
 
 ## 关键设计决策
 
@@ -377,5 +523,7 @@ skillpack 维护配置文件 `~/.config/skillpack/config.json`：
 2. **Provider capabilities** — 不是所有平台都支持所有操作，TUI 动态适配
 3. **skills.sh 委托** — 安装走 `npx skills add` 而非自行实现，保持生态兼容
 4. **冲突非阻断** — 提示但不强制，用户有最终决定权
-5. **混合编辑** — 简单改动 TUI 内联，深度编辑跳 $EDITOR
-6. **配置即发现** — 首次运行自动检测平台，零配置开箱即用
+5. **Local 可编辑，Remote 只读** — 远程安装的 skill 不可直接修改，需 Fork to Local 后编辑
+6. **版本锁定** — lock 文件记录精确版本/commit，确保环境可复现
+7. **全局 + 项目级** — 全局 skills 默认加载，项目级 skills 自动扫描 cwd 并可覆盖同名全局 skill
+8. **配置即发现** — 首次运行自动检测平台，零配置开箱即用
