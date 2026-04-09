@@ -26,7 +26,7 @@ const DEFAULT_CONFIG: SkillpackConfig = {
   providers: {
     codex: { enabled: true, paths: [path.join(os.homedir(), '.codex', 'skills')] },
     cursor: { enabled: true, paths: [path.join(os.homedir(), '.cursor', 'skills-cursor')] },
-    claude: { enabled: true, paths: [path.join(os.homedir(), '.claude', 'plugins', 'cache')] },
+    claude: { enabled: true, paths: [path.join(os.homedir(), '.claude', 'plugins', 'cache'), path.join(os.homedir(), '.claude', 'skills')] },
     skillssh: { enabled: true, paths: [path.join(os.homedir(), '.agents', 'skills')] },
   },
   sources: {
