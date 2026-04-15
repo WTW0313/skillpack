@@ -1,4 +1,4 @@
-import matter from 'gray-matter';
+import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import type { SkillMetadata } from './models/index.js';
 
 export interface ParsedSkillMd {
@@ -9,8 +9,12 @@ export interface ParsedSkillMd {
   raw: Record<string, unknown>;
 }
 
+const FRONTMATTER_RE = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+
 export function parseSkillMd(content: string): ParsedSkillMd {
-  const { data, content: body } = matter(content);
+  const match = content.match(FRONTMATTER_RE);
+  const data: Record<string, unknown> = match ? (yamlParse(match[1]) ?? {}) : {};
+  const body = match ? content.slice(match[0].length) : content;
 
   return {
     name: typeof data.name === 'string' ? data.name : '',
@@ -45,10 +49,12 @@ export function generateSkillMd(template: {
   if (template.metadata?.author) frontmatter.author = template.metadata.author;
   if (template.metadata?.tags) frontmatter.tags = template.metadata.tags;
 
-  const fm = matter.stringify('', frontmatter).trim();
+  const fm = yamlStringify(frontmatter).trim();
   const title = kebabToTitle(template.name);
 
-  return `${fm}
+  return `---
+${fm}
+---
 
 # ${title}
 

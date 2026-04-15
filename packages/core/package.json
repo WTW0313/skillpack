@@ -10,12 +10,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "gray-matter": "^4.0.3",
-    "glob": "^11.0.0"
+    "glob": "11.1.0",
+    "yaml": "2.8.3"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "22.19.17",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
   }
 }

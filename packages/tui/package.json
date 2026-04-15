@@ -12,15 +12,15 @@
   },
   "dependencies": {
     "@skillpack/core": "workspace:*",
-    "ink": "^6.5.0",
-    "react": "^19.0.0",
-    "@inkjs/ui": "^2.0.0",
-    "fuse.js": "^7.0.0"
+    "ink": "6.8.0",
+    "react": "19.2.5",
+    "@inkjs/ui": "2.0.0",
+    "fuse.js": "7.3.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "@types/react": "^19.0.0",
-    "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
+    "typescript": "5.9.3",
+    "@types/react": "19.2.14",
+    "vitest": "3.2.4",
+    "@types/node": "22.19.17"
   }
 }
