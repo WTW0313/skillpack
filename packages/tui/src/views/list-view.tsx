@@ -2,33 +2,29 @@ import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { useAppContext } from '../context/app-context.js';
-import { useFilteredSkills } from '../hooks/use-skills.js';
+import { useFilteredSkills, TABS } from '../hooks/use-skills.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { TabBar } from '../components/tab-bar.js';
 import { SkillRow, COL_NAME_WIDTH, COL_PROVIDER_WIDTH } from '../components/skill-row.js';
 import { SearchInput } from '../components/search-input.js';
 import { StatusBar } from '../components/status-bar.js';
 
-const HEADER_LINES = 2;
-const TAB_LINES = 2;
-const COL_HEADER_LINES = 2;
-const STATUS_LINES = 2;
-const MARGIN_LINES = 1;
+const CHROME_LINES = 7;
 
 export function ListView() {
   const { exit } = useApp();
   const {
     loading, activeTab, setActiveTab, setView, setSelectedSkill,
-    setSearchQuery, refresh, manager,
+    setSearchQuery, refresh, manager, skills: allSkills,
   } = useAppContext();
   const { skills, tabs } = useFilteredSkills();
-  const { rows } = useTerminalSize();
+  const { rows, columns } = useTerminalSize();
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [searching, setSearching] = useState(false);
 
   const searchLines = searching ? 2 : 0;
-  const visibleRows = Math.max(1, rows - HEADER_LINES - TAB_LINES - COL_HEADER_LINES - STATUS_LINES - MARGIN_LINES - searchLines);
+  const visibleRows = Math.max(1, rows - CHROME_LINES - searchLines);
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { setCursor(0); setScrollOffset(0); }, [activeTab]);
@@ -45,6 +41,23 @@ export function ListView() {
     () => skills.slice(scrollOffset, scrollOffset + visibleRows),
     [skills, scrollOffset, visibleRows],
   );
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const tab of TABS) {
+      if (tab === 'All') {
+        counts[tab] = allSkills.length;
+      } else if (tab === 'Project') {
+        counts[tab] = allSkills.filter((s) => s.scope === 'project').length;
+      } else {
+        const providerMap: Record<string, string> = {
+          Codex: 'codex', Cursor: 'cursor', Claude: 'claude', 'skills.sh': 'skillssh',
+        };
+        counts[tab] = allSkills.filter((s) => s.provider === providerMap[tab]).length;
+      }
+    }
+    return counts;
+  }, [allSkills]);
 
   useInput((input, key) => {
     if (input === 'q') { exit(); return; }
@@ -79,30 +92,34 @@ export function ListView() {
   }, { isActive: !searching });
 
   if (loading) {
-    return <Box><Spinner label="Scanning skills..." /></Box>;
+    return <Box><Spinner label="Scanning skills…" /></Box>;
   }
 
-  const showScrollIndicator = skills.length > visibleRows;
-  const scrollPercent = skills.length <= visibleRows
-    ? 100
-    : Math.round((scrollOffset / (skills.length - visibleRows)) * 100);
+  const showScroll = skills.length > visibleRows;
+  const scrollBarHeight = Math.max(1, Math.round(visibleRows * (visibleRows / skills.length)));
+  const scrollBarOffset = skills.length <= visibleRows
+    ? 0
+    : Math.round(scrollOffset / (skills.length - visibleRows) * (visibleRows - scrollBarHeight));
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      <Box paddingX={1} marginBottom={1}>
-        <Text bold color="cyan">skillpack</Text>
-        <Text dimColor> — {skills.length} skills</Text>
-        {showScrollIndicator && (
-          <Text dimColor>  [{scrollOffset + 1}-{Math.min(scrollOffset + visibleRows, skills.length)}/{skills.length}]</Text>
+      {/* Header */}
+      <Box paddingX={1}>
+        <Text bold color="magenta">◆ skillpack</Text>
+        <Text dimColor>  {skills.length} skill{skills.length !== 1 ? 's' : ''}</Text>
+        {showScroll && (
+          <Text dimColor>  {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, skills.length)} of {skills.length}</Text>
         )}
       </Box>
 
-      <Box marginBottom={1}>
-        <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Tabs */}
+      <Box>
+        <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} counts={tabCounts} />
       </Box>
 
+      {/* Search */}
       {searching && (
-        <Box marginBottom={1}>
+        <Box marginTop={1} paddingX={1}>
           <SearchInput
             onChange={setSearchQuery}
             onSubmit={() => setSearching(false)}
@@ -111,29 +128,55 @@ export function ListView() {
         </Box>
       )}
 
-      <Box flexDirection="column" paddingX={1}>
-        {skills.length === 0 ? (
-          <Text dimColor>No skills found</Text>
-        ) : (<>
-          <Box gap={1} marginBottom={1}>
-            <Text dimColor>{' '}</Text>
-            <Text dimColor bold>{'Name'.padEnd(COL_NAME_WIDTH)}</Text>
-            <Text dimColor bold>{'Provider'.padEnd(COL_PROVIDER_WIDTH)}</Text>
-            <Text dimColor bold>{'Status'}</Text>
+      {/* Column headers */}
+      <Box paddingX={1} marginTop={1}>
+        <Box gap={1}>
+          <Text>{' '}</Text>
+          <Text dimColor>{'NAME'.padEnd(COL_NAME_WIDTH)}</Text>
+          <Text dimColor>{'PROVIDER'.padEnd(COL_PROVIDER_WIDTH)}</Text>
+          <Text dimColor>{'⏻'}</Text>
+        </Box>
+      </Box>
+
+      {/* Skill list + scrollbar */}
+      <Box flexDirection="row" flexGrow={1}>
+        <Box flexDirection="column" paddingX={1} flexGrow={1}>
+          {skills.length === 0 ? (
+            <Box marginTop={1}>
+              <Text dimColor>  No skills found. Press </Text>
+              <Text bold>i</Text>
+              <Text dimColor> to install or </Text>
+              <Text bold>c</Text>
+              <Text dimColor> to create one.</Text>
+            </Box>
+          ) : (
+            visibleSkills.map((skill, index) => (
+              <SkillRow
+                key={`${skill.provider}:${skill.name}`}
+                skill={skill}
+                isSelected={scrollOffset + index === cursor}
+                isConflicting={manager.isConflicting(skill.name)}
+              />
+            ))
+          )}
+        </Box>
+
+        {/* Scrollbar track */}
+        {showScroll && (
+          <Box flexDirection="column" width={1}>
+            {Array.from({ length: visibleRows }, (_, i) => {
+              const isThumb = i >= scrollBarOffset && i < scrollBarOffset + scrollBarHeight;
+              return (
+                <Text key={i} dimColor={!isThumb} color={isThumb ? 'magenta' : undefined}>
+                  {isThumb ? '┃' : '│'}
+                </Text>
+              );
+            })}
           </Box>
-          {visibleSkills.map((skill, index) => (
-            <SkillRow
-              key={`${skill.provider}:${skill.name}`}
-              skill={skill}
-              isSelected={scrollOffset + index === cursor}
-              isConflicting={manager.isConflicting(skill.name)}
-            />
-          ))}
-        </>)}
+        )}
       </Box>
 
       <Box flexGrow={1} />
-
       <StatusBar />
     </Box>
   );

@@ -14,8 +14,8 @@ export function SearchInput({ onChange, onSubmit, onCancel }: SearchInputProps) 
 
   return (
     <Box>
-      <Text color="cyan">/ </Text>
-      <TextInput placeholder="Search skills..." onChange={onChange} onSubmit={onSubmit} />
+      <Text color="magenta" bold>/ </Text>
+      <TextInput placeholder="filter skills…" onChange={onChange} onSubmit={onSubmit} />
     </Box>
   );
 }

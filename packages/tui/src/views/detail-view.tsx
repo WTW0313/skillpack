@@ -7,14 +7,13 @@ import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { StatusBar } from '../components/status-bar.js';
 
-const META_LINES = 8;
-const CHROME_LINES = 5;
+const META_LINES = 10;
+const CHROME_LINES = 4;
 
 export function DetailView() {
   const { selectedSkill, setView, refresh, manager } = useAppContext();
   const { rows } = useTerminalSize();
   const [confirming, setConfirming] = useState(false);
-  const [forking, setForking] = useState(false);
   const [descScroll, setDescScroll] = useState(0);
 
   const descLines = useMemo(() => {
@@ -42,15 +41,6 @@ export function DetailView() {
     if (input === 'd' && selectedSkill && !selectedSkill.readonly) {
       setConfirming(true);
     }
-    if ((input === 'f' || input === 'F') && selectedSkill?.readonly && !forking) {
-      setForking(true);
-      const writableProvider = manager.getProviders().find((p) => p.capabilities.canCreate);
-      if (!writableProvider) { setForking(false); return; }
-      manager.forkToLocal(selectedSkill, writableProvider.id)
-        .then(() => refresh())
-        .then(() => { setForking(false); setView('list'); })
-        .catch(() => setForking(false));
-    }
     if (key.downArrow) {
       setDescScroll((s) => Math.min(s + 1, Math.max(0, descLines.length - visibleDescRows)));
     }
@@ -69,7 +59,7 @@ export function DetailView() {
     return (
       <Box flexDirection="column" padding={1}>
         <ConfirmDialog
-          message={`Delete skill "${selectedSkill.name}"?`}
+          message={`Delete "${selectedSkill.name}"?`}
           onConfirm={async () => {
             await manager.uninstallSkill(selectedSkill);
             await refresh();
@@ -86,52 +76,85 @@ export function DetailView() {
 
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
+      {/* Navigation + title */}
       <Box>
-        <Text dimColor>{'< Esc '}</Text>
-        <Text bold color="cyan">{selectedSkill.name}</Text>
+        <Text dimColor>‹ esc  </Text>
+        <Text bold color="magenta">◆</Text>
+        <Text bold> {selectedSkill.name}</Text>
       </Box>
 
-      <Box marginY={1} flexDirection="column">
-        <Box><Text dimColor>{'Platform:  '}</Text><Text>{selectedSkill.provider}</Text></Box>
-        <Box><Text dimColor>{'Path:      '}</Text><Text>{selectedSkill.path}</Text></Box>
+      {/* Metadata */}
+      <Box marginTop={1} flexDirection="column" gap={0}>
+        <Box gap={1}>
+          <Text dimColor>{'provider'.padEnd(10)}</Text>
+          <Text>{selectedSkill.provider}</Text>
+        </Box>
+        <Box gap={1}>
+          <Text dimColor>{'path'.padEnd(10)}</Text>
+          <Text dimColor>{selectedSkill.path}</Text>
+        </Box>
         {selectedSkill.version && (
-          <Box><Text dimColor>{'Version:   '}</Text><Text>{selectedSkill.version}</Text></Box>
+          <Box gap={1}>
+            <Text dimColor>{'version'.padEnd(10)}</Text>
+            <Text>{selectedSkill.version}</Text>
+          </Box>
         )}
         {selectedSkill.source && (
-          <Box><Text dimColor>{'Source:    '}</Text><Text>{selectedSkill.source.type}{selectedSkill.source.repo ? ` (${selectedSkill.source.repo})` : ''}</Text></Box>
+          <Box gap={1}>
+            <Text dimColor>{'source'.padEnd(10)}</Text>
+            <Text>{selectedSkill.source.type}{selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}</Text>
+          </Box>
         )}
-        <Box>
-          <Text dimColor>{'Status:    '}</Text>
-          <Text color={selectedSkill.enabled ? 'green' : 'red'}>{selectedSkill.enabled ? 'enabled' : 'disabled'}</Text>
+        <Box gap={1}>
+          <Text dimColor>{'status'.padEnd(10)}</Text>
+          <Text color={selectedSkill.enabled ? 'green' : undefined} dimColor={!selectedSkill.enabled}>
+            {selectedSkill.enabled ? '● enabled' : '○ disabled'}
+          </Text>
         </Box>
-        <Box>
-          <Text dimColor>{'Editable:  '}</Text>
-          <Text color={selectedSkill.readonly ? 'yellow' : 'green'}>{selectedSkill.readonly ? 'read-only (f to fork)' : 'yes'}</Text>
+        <Box gap={1}>
+          <Text dimColor>{'editable'.padEnd(10)}</Text>
+          <Text color={selectedSkill.readonly ? 'yellow' : 'green'}>
+            {selectedSkill.readonly ? 'read-only' : 'yes'}
+          </Text>
         </Box>
       </Box>
 
+      {/* Conflicts */}
       {conflict && (
-        <Box flexDirection="column">
-          <Text bold color="yellow">Conflicts</Text>
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold color="yellow">⚠ Conflicts</Text>
           {conflict.instances.map((inst) => (
-            <Text key={`${inst.provider}:${inst.path}`} color="yellow">
-              {'  '}{inst.provider}: {inst.path}
+            <Text key={`${inst.provider}:${inst.path}`} dimColor>
+              {'  '}{inst.provider} → {inst.path}
             </Text>
           ))}
         </Box>
       )}
 
+      {/* Description */}
       {descLines.length > 0 && (
-        <Box flexDirection="column" flexGrow={1} marginTop={1} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false}>
+        <Box flexDirection="column" flexGrow={1} marginTop={1}>
+          <Box>
+            <Text dimColor>{'─'.repeat(40)}</Text>
+          </Box>
           {descScrollable && (
-            <Text dimColor>Description {descScroll > 0 ? '▲' : ' '} [{descScroll + 1}-{Math.min(descScroll + visibleDescRows, descLines.length)}/{descLines.length}] {descScroll + visibleDescRows < descLines.length ? '▼' : ' '}</Text>
+            <Box gap={1}>
+              <Text dimColor>description</Text>
+              {descScroll > 0 && <Text>▲</Text>}
+              <Text dimColor>{descScroll + 1}–{Math.min(descScroll + visibleDescRows, descLines.length)} of {descLines.length}</Text>
+              {descScroll + visibleDescRows < descLines.length && <Text>▼</Text>}
+            </Box>
           )}
-          {visibleDesc.map((line, i) => (
-            <Text key={i}>{line}</Text>
-          ))}
+          {!descScrollable && <Text dimColor>description</Text>}
+          <Box flexDirection="column" marginTop={0}>
+            {visibleDesc.map((line, i) => (
+              <Text key={i}>{line}</Text>
+            ))}
+          </Box>
         </Box>
       )}
 
+      <Box flexGrow={1} />
       <StatusBar />
     </Box>
   );

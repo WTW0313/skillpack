@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import type { Skill } from '@skillpack/core';
 
-export const COL_NAME_WIDTH = 28;
+export const COL_NAME_WIDTH = 30;
 export const COL_PROVIDER_WIDTH = 10;
 
 function truncate(s: string, max: number): string {
@@ -16,19 +16,26 @@ interface SkillRowProps {
 }
 
 export function SkillRow({ skill, isSelected, isConflicting }: SkillRowProps) {
+  const statusIcon = skill.enabled ? '●' : '○';
+  const statusColor = skill.enabled ? 'green' : undefined;
+
   return (
     <Box gap={1}>
-      <Text color={isSelected ? 'cyan' : undefined}>
-        {isSelected ? '>' : ' '}
+      <Text color={isSelected ? 'magenta' : undefined}>
+        {isSelected ? '❯' : ' '}
       </Text>
-      <Text color={isSelected ? 'cyan' : (skill.enabled ? 'white' : undefined)} bold={isSelected} dimColor={!skill.enabled}>
+      <Text
+        color={isSelected ? 'white' : (skill.enabled ? undefined : undefined)}
+        bold={isSelected}
+        dimColor={!skill.enabled && !isSelected}
+      >
         {truncate(skill.name, COL_NAME_WIDTH)}
       </Text>
-      <Text dimColor>{skill.provider.padEnd(COL_PROVIDER_WIDTH)}</Text>
-      <Text color={skill.enabled ? 'green' : 'yellow'}>
-        {skill.enabled ? 'on' : 'disabled'}
+      <Text dimColor>{truncate(skill.provider, COL_PROVIDER_WIDTH)}</Text>
+      <Text color={statusColor} dimColor={!skill.enabled}>
+        {statusIcon}
       </Text>
-      {isConflicting && <Text color="yellow"> !</Text>}
+      {isConflicting && <Text color="yellow">⚠</Text>}
     </Box>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { useAppContext } from '../context/app-context.js';
+import { StatusBar } from '../components/status-bar.js';
 import type { Skill, UpdateInfo } from '@skillpack/core';
 
 export function UpdateView() {
@@ -26,40 +27,59 @@ export function UpdateView() {
   if (checking) {
     return (
       <Box padding={1}>
-        <Spinner label="Checking for updates..." />
+        <Spinner label="Checking for updates…" />
       </Box>
     );
   }
 
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
-      <Text bold color="cyan">Available Updates</Text>
+      {/* Header */}
+      <Box>
+        <Text dimColor>‹ esc  </Text>
+        <Text bold color="magenta">Updates</Text>
+        {!checking && (
+          <Text dimColor>  {updates.length} available</Text>
+        )}
+      </Box>
 
       {updates.length === 0 ? (
-        <Box marginY={1}>
-          <Text dimColor>All skills are up to date.</Text>
+        <Box marginTop={2}>
+          <Text dimColor>All skills are up to date. ✓</Text>
         </Box>
       ) : (
-        <Box flexDirection="column" marginY={1}>
+        <Box flexDirection="column" marginTop={1}>
+          {/* Column header */}
+          <Box gap={1} marginBottom={1}>
+            <Text>{' '}</Text>
+            <Text dimColor>{'NAME'.padEnd(30)}</Text>
+            <Text dimColor>VERSION</Text>
+          </Box>
+
           {updates.map(({ skill, update }, i) => (
             <Box key={`${skill.provider}:${skill.name}`} gap={1}>
-              <Text color={i === cursor ? 'cyan' : undefined}>
-                {i === cursor ? '>' : ' '}
+              <Text color={i === cursor ? 'magenta' : undefined}>
+                {i === cursor ? '❯' : ' '}
               </Text>
-              <Text color={i === cursor ? 'cyan' : 'white'} bold={i === cursor}>
+              <Text
+                bold={i === cursor}
+                color={i === cursor ? 'white' : undefined}
+                dimColor={i !== cursor}
+              >
                 {skill.name.padEnd(30)}
               </Text>
-              <Text dimColor>
-                {update.currentVersion ?? '?'} {'→'} {update.latestVersion ?? '?'}
+              <Text dimColor={i !== cursor}>
+                <Text dimColor>{update.currentVersion ?? '?'}</Text>
+                <Text color="magenta"> → </Text>
+                <Text bold={i === cursor}>{update.latestVersion ?? '?'}</Text>
               </Text>
             </Box>
           ))}
         </Box>
       )}
 
-      <Box marginTop={1}>
-        <Text dimColor>Esc: back  up/down: navigate</Text>
-      </Box>
+      <Box flexGrow={1} />
+      <StatusBar />
     </Box>
   );
 }

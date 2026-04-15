@@ -13,9 +13,18 @@ export function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmDialogPro
   });
 
   return (
-    <Box>
-      <Text color="yellow">{message} </Text>
-      <Text dimColor>(y/n)</Text>
+    <Box flexDirection="column" gap={1}>
+      <Box>
+        <Text color="yellow" bold>⚠ </Text>
+        <Text>{message}</Text>
+      </Box>
+      <Box>
+        <Text dimColor>  Press </Text>
+        <Text bold color="green">y</Text>
+        <Text dimColor> to confirm or </Text>
+        <Text bold color="red">n</Text>
+        <Text dimColor> to cancel</Text>
+      </Box>
     </Box>
   );
 }

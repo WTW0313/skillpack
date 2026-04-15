@@ -4,6 +4,7 @@ import { TextInput, Spinner } from '@inkjs/ui';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { useAppContext } from '../context/app-context.js';
+import { StatusBar } from '../components/status-bar.js';
 
 type CreateStep = 'provider' | 'name' | 'description' | 'creating';
 
@@ -67,52 +68,85 @@ export function CreateView() {
     }
   };
 
+  const stepLabels = ['provider', 'name', 'description'];
+  const currentStepIdx = stepLabels.indexOf(step === 'creating' ? 'description' : step);
+
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
-      <Text bold color="cyan">Create Skill</Text>
+      {/* Header */}
+      <Box>
+        <Text dimColor>‹ esc  </Text>
+        <Text bold color="magenta">Create Skill</Text>
+      </Box>
 
-      {error !== '' && <Text color="red">{error}</Text>}
+      {/* Progress */}
+      <Box marginTop={1}>
+        {stepLabels.map((s, i) => (
+          <Box key={s}>
+            {i > 0 && <Text dimColor> › </Text>}
+            <Text
+              bold={i === currentStepIdx}
+              color={i === currentStepIdx ? 'white' : undefined}
+              dimColor={i !== currentStepIdx}
+            >
+              {i + 1}. {s}
+            </Text>
+          </Box>
+        ))}
+      </Box>
+
+      {error !== '' && (
+        <Box marginTop={1}>
+          <Text color="red">✗ {error}</Text>
+        </Box>
+      )}
 
       {step === 'provider' && (
-        <Box flexDirection="column" marginY={1}>
-          <Text bold>Select provider:</Text>
-          {providers.map((p, i) => (
-            <Text key={p.id} color={i === cursor ? 'cyan' : undefined}>
-              {i === cursor ? '> ' : '  '}{p.displayName}
-            </Text>
-          ))}
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>Where to create this skill?</Text>
+          <Box flexDirection="column" marginTop={1}>
+            {providers.map((p, i) => (
+              <Box key={p.id} gap={1}>
+                <Text color={i === cursor ? 'magenta' : undefined}>
+                  {i === cursor ? '❯' : ' '}
+                </Text>
+                <Text bold={i === cursor} color={i === cursor ? 'white' : undefined} dimColor={i !== cursor}>
+                  {p.displayName}
+                </Text>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )}
 
       {step === 'name' && (
-        <Box flexDirection="column" marginY={1}>
-          <Text bold>Skill name:</Text>
-          <Box>
-            <Text color="cyan">&gt; </Text>
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>Skill name</Text>
+          <Box marginTop={1}>
+            <Text color="magenta" bold>❯ </Text>
             <TextInput placeholder="my-skill" onSubmit={handleNameSubmit} />
           </Box>
         </Box>
       )}
 
       {step === 'description' && (
-        <Box flexDirection="column" marginY={1}>
-          <Text bold>Description:</Text>
-          <Box>
-            <Text color="cyan">&gt; </Text>
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>Brief description</Text>
+          <Box marginTop={1}>
+            <Text color="magenta" bold>❯ </Text>
             <TextInput placeholder="What does this skill do?" onSubmit={handleDescriptionSubmit} />
           </Box>
         </Box>
       )}
 
       {step === 'creating' && (
-        <Box marginY={1}>
-          <Spinner label="Creating skill..." />
+        <Box marginTop={1}>
+          <Spinner label="Creating skill…" />
         </Box>
       )}
 
-      <Box marginTop={1}>
-        <Text dimColor>Esc: back</Text>
-      </Box>
+      <Box flexGrow={1} />
+      <StatusBar />
     </Box>
   );
 }

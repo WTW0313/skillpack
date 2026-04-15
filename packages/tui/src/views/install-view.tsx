@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput, Spinner } from '@inkjs/ui';
 import { useAppContext } from '../context/app-context.js';
+import { StatusBar } from '../components/status-bar.js';
 import type { RemoteSkill } from '@skillpack/core';
 
 type InstallStep = 'source' | 'query' | 'results' | 'provider' | 'installing';
@@ -15,6 +16,7 @@ export function InstallView() {
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [selectedResult, setSelectedResult] = useState<RemoteSkill | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const sources = manager.getSources();
   const providers = manager.getProviders().filter((p) => p.capabilities.canInstall);
@@ -65,8 +67,6 @@ export function InstallView() {
     }
   });
 
-  const [searching, setSearching] = useState(false);
-
   const handleQuerySubmit = async (value: string) => {
     setQuery(value);
     setError('');
@@ -98,78 +98,125 @@ export function InstallView() {
     }
   };
 
+  const stepLabels = ['source', 'query', 'results', 'provider'];
+  const currentStepIdx = stepLabels.indexOf(step === 'installing' ? 'provider' : step);
+
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
-      <Text bold color="cyan">Install Skill</Text>
+      {/* Header */}
+      <Box>
+        <Text dimColor>‹ esc  </Text>
+        <Text bold color="magenta">Install Skill</Text>
+      </Box>
 
-      {error !== '' && <Text color="red">{error}</Text>}
+      {/* Progress breadcrumb */}
+      <Box marginTop={1}>
+        {stepLabels.map((s, i) => (
+          <Box key={s}>
+            {i > 0 && <Text dimColor> › </Text>}
+            <Text
+              bold={i === currentStepIdx}
+              color={i === currentStepIdx ? 'white' : undefined}
+              dimColor={i !== currentStepIdx}
+            >
+              {i + 1}. {s}
+            </Text>
+          </Box>
+        ))}
+      </Box>
+
+      {error !== '' && (
+        <Box marginTop={1}>
+          <Text color="red">✗ {error}</Text>
+        </Box>
+      )}
 
       {step === 'source' && (
-        <Box flexDirection="column" marginY={1}>
-          <Text bold>Select source:</Text>
-          {sources.map((source, i) => (
-            <Text key={source.id} color={i === cursor ? 'cyan' : undefined}>
-              {i === cursor ? '> ' : '  '}{source.displayName}
-            </Text>
-          ))}
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>Where to search?</Text>
+          <Box flexDirection="column" marginTop={1}>
+            {sources.map((source, i) => (
+              <Box key={source.id} gap={1}>
+                <Text color={i === cursor ? 'magenta' : undefined}>
+                  {i === cursor ? '❯' : ' '}
+                </Text>
+                <Text bold={i === cursor} color={i === cursor ? 'white' : undefined} dimColor={i !== cursor}>
+                  {source.displayName}
+                </Text>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )}
 
       {step === 'query' && (
-        <Box flexDirection="column" marginY={1}>
-          <Text bold>Search {selectedSource === 'github' ? 'GitHub (owner/repo or owner/repo@path)' : 'skills.sh'}:</Text>
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>
+            {selectedSource === 'github' ? 'Enter owner/repo or owner/repo@path' : 'Search skills.sh'}
+          </Text>
           {searching ? (
-            <Spinner label="Searching..." />
+            <Box marginTop={1}><Spinner label="Searching…" /></Box>
           ) : (
-            <Box>
-              <Text color="cyan">&gt; </Text>
-              <TextInput placeholder={selectedSource === 'github' ? 'owner/repo@skill-path' : 'search keyword...'} onSubmit={handleQuerySubmit} />
+            <Box marginTop={1}>
+              <Text color="magenta" bold>❯ </Text>
+              <TextInput
+                placeholder={selectedSource === 'github' ? 'owner/repo@skill-path' : 'search keyword…'}
+                onSubmit={handleQuerySubmit}
+              />
             </Box>
           )}
         </Box>
       )}
 
       {step === 'results' && (
-        <Box flexDirection="column" marginY={1}>
-          <Text bold>Results:</Text>
-          {results.length === 0 ? (
-            <Text dimColor>No results found</Text>
-          ) : (
-            results.map((r, i) => (
-              <Box key={r.identifier} gap={1}>
-                <Text color={i === cursor ? 'cyan' : undefined}>
-                  {i === cursor ? '>' : ' '}
-                </Text>
-                <Text color={i === cursor ? 'cyan' : 'white'} bold={i === cursor}>
-                  {r.name}
-                </Text>
-                <Text dimColor>{r.description}</Text>
-              </Box>
-            ))
-          )}
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>{results.length} result{results.length !== 1 ? 's' : ''}</Text>
+          <Box flexDirection="column" marginTop={1}>
+            {results.length === 0 ? (
+              <Text dimColor>Nothing found. Press esc to try again.</Text>
+            ) : (
+              results.map((r, i) => (
+                <Box key={r.identifier} gap={1}>
+                  <Text color={i === cursor ? 'magenta' : undefined}>
+                    {i === cursor ? '❯' : ' '}
+                  </Text>
+                  <Text bold={i === cursor} color={i === cursor ? 'white' : undefined} dimColor={i !== cursor}>
+                    {r.name}
+                  </Text>
+                  {r.description && <Text dimColor> {r.description}</Text>}
+                </Box>
+              ))
+            )}
+          </Box>
         </Box>
       )}
 
       {step === 'provider' && (
-        <Box flexDirection="column" marginY={1}>
-          <Text bold>Install to which provider?</Text>
-          {providers.map((p, i) => (
-            <Text key={p.id} color={i === cursor ? 'cyan' : undefined}>
-              {i === cursor ? '> ' : '  '}{p.displayName}
-            </Text>
-          ))}
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>Install to which provider?</Text>
+          <Box flexDirection="column" marginTop={1}>
+            {providers.map((p, i) => (
+              <Box key={p.id} gap={1}>
+                <Text color={i === cursor ? 'magenta' : undefined}>
+                  {i === cursor ? '❯' : ' '}
+                </Text>
+                <Text bold={i === cursor} color={i === cursor ? 'white' : undefined} dimColor={i !== cursor}>
+                  {p.displayName}
+                </Text>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )}
 
       {step === 'installing' && (
-        <Box marginY={1}>
-          <Spinner label="Installing..." />
+        <Box marginTop={1}>
+          <Spinner label="Installing…" />
         </Box>
       )}
 
-      <Box marginTop={1}>
-        <Text dimColor>Esc: back</Text>
-      </Box>
+      <Box flexGrow={1} />
+      <StatusBar />
     </Box>
   );
 }
