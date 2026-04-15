@@ -12,10 +12,10 @@ function truncate(s: string, max: number): string {
 interface SkillRowProps {
   skill: Skill;
   isSelected: boolean;
-  isConflicting: boolean;
+  isDuplicate: boolean;
 }
 
-export function SkillRow({ skill, isSelected, isConflicting }: SkillRowProps) {
+export function SkillRow({ skill, isSelected, isDuplicate }: SkillRowProps) {
   const statusIcon = skill.enabled ? '●' : '○';
   const statusColor = skill.enabled ? 'green' : undefined;
 
@@ -35,7 +35,7 @@ export function SkillRow({ skill, isSelected, isConflicting }: SkillRowProps) {
       <Text color={statusColor} dimColor={!skill.enabled}>
         {statusIcon}
       </Text>
-      {isConflicting && <Text color="yellow">⚠</Text>}
+      {isDuplicate && <Text color="yellow">⚠</Text>}
     </Box>
   );
 }

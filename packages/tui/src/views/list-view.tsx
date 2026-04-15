@@ -89,7 +89,7 @@ export function ListView() {
     if (input === 'c') { setView('create'); return; }
     if (input === 'u') { setView('update'); return; }
     if (input === ' ' && skills[cursor]) {
-      manager.toggleSkill(skills[cursor]).then(() => refresh());
+      manager.toggleSkill(skills[cursor]).then(() => refresh()).catch(() => {});
       return;
     }
     if (key.return && skills[cursor]) {
@@ -192,7 +192,7 @@ export function ListView() {
                 key={`${skill.provider}:${skill.name}`}
                 skill={skill}
                 isSelected={scrollOffset + index === cursor}
-                isConflicting={manager.isConflicting(skill.name)}
+                isDuplicate={manager.isDuplicate(skill.name)}
               />
             ))
           )}

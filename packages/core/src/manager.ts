@@ -4,9 +4,9 @@ import os from 'node:os';
 import type { ISkillProvider } from './providers/provider.js';
 import type { IInstallSource } from './sources/source.js';
 import type { Skill, SkillTemplate } from './models/index.js';
-import type { ConflictInfo } from './models/conflict.js';
+import type { DuplicateInfo } from './models/duplicate.js';
 import type { RemoteSkill, UpdateInfo } from './models/source.js';
-import { ConflictDetector } from './conflicts.js';
+import { DuplicateDetector } from './duplicates.js';
 import { LockfileManager } from './lockfile.js';
 import { parseSkillMd } from './parser.js';
 
@@ -14,8 +14,8 @@ export class SkillManager {
   private providers = new Map<string, ISkillProvider>();
   private sources = new Map<string, IInstallSource>();
   private skills: Skill[] = [];
-  private conflicts: ConflictInfo[] = [];
-  private conflictDetector = new ConflictDetector();
+  private duplicates: DuplicateInfo[] = [];
+  private duplicateDetector = new DuplicateDetector();
   private globalLock?: LockfileManager;
 
   registerProvider(provider: ISkillProvider): void { this.providers.set(provider.id, provider); }
@@ -42,7 +42,7 @@ export class SkillManager {
     }
 
     this.skills = allSkills;
-    this.conflicts = this.conflictDetector.detect(this.skills);
+    this.duplicates = this.duplicateDetector.detect(this.skills);
   }
 
   async scanProjectSkills(cwd: string, projectSkillsDirs: string[]): Promise<Skill[]> {
@@ -83,8 +83,8 @@ export class SkillManager {
 
   getAllSkills(): Skill[] { return this.skills; }
   getSkillsByProvider(providerId: string): Skill[] { return this.skills.filter((s) => s.provider === providerId); }
-  getConflicts(): ConflictInfo[] { return this.conflicts; }
-  isConflicting(skillName: string): boolean { return this.conflicts.some((c) => c.skillName === skillName); }
+  getDuplicates(): DuplicateInfo[] { return this.duplicates; }
+  isDuplicate(skillName: string): boolean { return this.duplicates.some((d) => d.skillName === skillName); }
 
   async createSkill(providerId: string, template: SkillTemplate): Promise<Skill> {
     const provider = this.providers.get(providerId);
@@ -99,17 +99,21 @@ export class SkillManager {
     if (!provider.capabilities.canToggle) {
       throw new Error(`${provider.displayName} does not support toggle`);
     }
+    const dirName = path.basename(skill.path).replace(/^\.disabled-/, '');
     if (skill.enabled) {
-      await provider.disable(skill.name);
+      await provider.disable(dirName);
     } else {
-      await provider.enable(skill.name);
+      await provider.enable(dirName);
     }
   }
 
   async uninstallSkill(skill: Skill): Promise<void> {
     const provider = this.providers.get(skill.provider);
     if (!provider) throw new Error(`Provider not found: ${skill.provider}`);
-    await provider.uninstall(skill.name);
+    if (!provider.capabilities.canUninstall) {
+      throw new Error(`${provider.displayName} does not support uninstall`);
+    }
+    await provider.uninstall(path.basename(skill.path));
   }
 
   async searchRemote(sourceId: string, query: string): Promise<RemoteSkill[]> {

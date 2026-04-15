@@ -7,21 +7,39 @@ import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { StatusBar } from '../components/status-bar.js';
 
-const META_LINES = 10;
-const CHROME_LINES = 4;
-
 export function DetailView() {
   const { selectedSkill, setView, refresh, manager } = useAppContext();
   const { rows } = useTerminalSize();
   const [confirming, setConfirming] = useState(false);
   const [descScroll, setDescScroll] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const duplicate = selectedSkill
+    ? manager.getDuplicates().find((d) => d.skillName === selectedSkill.name)
+    : undefined;
 
   const descLines = useMemo(() => {
     if (!selectedSkill?.description) return [];
     return selectedSkill.description.split('\n');
   }, [selectedSkill]);
 
-  const visibleDescRows = Math.max(1, rows - META_LINES - CHROME_LINES);
+  const visibleDescRows = useMemo(() => {
+    if (!selectedSkill) return 0;
+    let used = 2; // padding (top + bottom)
+    used += 1;    // title
+    used += 1;    // gap before metadata
+    used += 4;    // agent, path, status, editable
+    if (selectedSkill.version) used += 1;
+    if (selectedSkill.source) used += 1;
+    if (duplicate) used += 1 + 1 + duplicate.instances.length; // gap + heading + instances
+    used += 1;    // gap before description
+    used += 1;    // separator
+    used += 1;    // "description" label
+    used += 1;    // status bar
+    if (error) used += 1;
+    return Math.max(0, rows - used);
+  }, [selectedSkill, duplicate, error, rows]);
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
@@ -34,11 +52,17 @@ export function DetailView() {
       refresh();
       return;
     }
-    if (input === ' ' && selectedSkill) {
-      manager.toggleSkill(selectedSkill).then(() => refresh());
+    if (input === ' ' && selectedSkill && !busy) {
+      setError(null);
+      setBusy(true);
+      manager.toggleSkill(selectedSkill)
+        .then(() => refresh())
+        .catch((err: Error) => setError(err.message))
+        .finally(() => setBusy(false));
       return;
     }
     if (input === 'd' && selectedSkill && !selectedSkill.readonly) {
+      setError(null);
       setConfirming(true);
     }
     if (key.downArrow) {
@@ -53,17 +77,20 @@ export function DetailView() {
     return <Box><Text color="red">No skill selected</Text></Box>;
   }
 
-  const conflict = manager.getConflicts().find((c) => c.skillName === selectedSkill.name);
-
   if (confirming) {
     return (
       <Box flexDirection="column" padding={1}>
         <ConfirmDialog
           message={`Delete "${selectedSkill.name}"?`}
           onConfirm={async () => {
-            await manager.uninstallSkill(selectedSkill);
-            await refresh();
-            setView('list');
+            try {
+              await manager.uninstallSkill(selectedSkill);
+              await refresh();
+              setView('list');
+            } catch (err) {
+              setConfirming(false);
+              setError((err as Error).message);
+            }
           }}
           onCancel={() => setConfirming(false)}
         />
@@ -119,11 +146,11 @@ export function DetailView() {
         </Box>
       </Box>
 
-      {/* Conflicts */}
-      {conflict && (
+      {/* Duplicates */}
+      {duplicate && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">⚠ Conflicts</Text>
-          {conflict.instances.map((inst) => (
+          <Text bold color="yellow">⚠ Duplicates</Text>
+          {duplicate.instances.map((inst) => (
             <Text key={`${inst.provider}:${inst.path}`} dimColor>
               {'  '}{inst.provider} → {inst.path}
             </Text>
@@ -132,8 +159,8 @@ export function DetailView() {
       )}
 
       {/* Description */}
-      {descLines.length > 0 && (
-        <Box flexDirection="column" flexGrow={1} marginTop={1}>
+      {descLines.length > 0 && visibleDescRows > 0 && (
+        <Box flexDirection="column" marginTop={1} height={visibleDescRows + 2}>
           <Box>
             <Text dimColor>{'─'.repeat(40)}</Text>
           </Box>
@@ -148,13 +175,18 @@ export function DetailView() {
           {!descScrollable && <Text dimColor>description</Text>}
           <Box flexDirection="column" marginTop={0}>
             {visibleDesc.map((line, i) => (
-              <Text key={i}>{line}</Text>
+              <Text key={i} wrap="truncate">{line}</Text>
             ))}
           </Box>
         </Box>
       )}
 
       <Box flexGrow={1} />
+      {error && (
+        <Box paddingX={1}>
+          <Text color="red">✗ {error}</Text>
+        </Box>
+      )}
       <StatusBar />
     </Box>
   );

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { SkillManager, Skill, ConflictInfo, SkillpackConfig } from '@skillpack/core';
+import type { SkillManager, Skill, DuplicateInfo, SkillpackConfig } from '@skillpack/core';
 
 export type ViewType = 'list' | 'detail' | 'install' | 'create' | 'update';
 
@@ -7,7 +7,7 @@ interface AppState {
   manager: SkillManager;
   config: SkillpackConfig;
   skills: Skill[];
-  conflicts: ConflictInfo[];
+  duplicates: DuplicateInfo[];
   activeTab: string;
   view: ViewType;
   selectedSkill: Skill | null;
@@ -40,7 +40,7 @@ interface AppProviderProps {
 
 export function AppProvider({ manager, config, children }: AppProviderProps) {
   const [skills, setSkills] = useState<Skill[]>(manager.getAllSkills());
-  const [conflicts, setConflicts] = useState<ConflictInfo[]>(manager.getConflicts());
+  const [duplicates, setDuplicates] = useState<DuplicateInfo[]>(manager.getDuplicates());
   const [activeTab, setActiveTab] = useState('All');
   const [view, setView] = useState<ViewType>('list');
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
@@ -50,14 +50,19 @@ export function AppProvider({ manager, config, children }: AppProviderProps) {
   const refresh = useCallback(async () => {
     setLoading(true);
     await manager.scanAll(process.cwd(), config.projectSkillsDirs);
-    setSkills(manager.getAllSkills());
-    setConflicts(manager.getConflicts());
+    const newSkills = manager.getAllSkills();
+    setSkills(newSkills);
+    setDuplicates(manager.getDuplicates());
+    setSelectedSkill((prev) => {
+      if (!prev) return null;
+      return newSkills.find((s) => s.name === prev.name && s.provider === prev.provider) ?? null;
+    });
     setLoading(false);
   }, [manager, config]);
 
   return (
     <AppContext.Provider value={{
-      manager, config, skills, conflicts, activeTab, view, selectedSkill, searchQuery, loading,
+      manager, config, skills, duplicates, activeTab, view, selectedSkill, searchQuery, loading,
       setActiveTab, setView, setSelectedSkill, setSearchQuery, setLoading, refresh,
     }}>
       {children}

@@ -1,12 +1,12 @@
-export interface ConflictInstance {
+export interface DuplicateInstance {
   provider: string;
   path: string;
   version?: string;
 }
 
-export interface ConflictInfo {
+export interface DuplicateInfo {
   skillName: string;
-  instances: ConflictInstance[];
+  instances: DuplicateInstance[];
 }
 
 export interface DiffChange {

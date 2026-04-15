@@ -1,23 +1,23 @@
 import type { Skill } from './models/index.js';
-import type { ConflictInfo, DiffResult } from './models/conflict.js';
+import type { DuplicateInfo, DiffResult } from './models/duplicate.js';
 
-export class ConflictDetector {
-  detect(skills: Skill[]): ConflictInfo[] {
+export class DuplicateDetector {
+  detect(skills: Skill[]): DuplicateInfo[] {
     const groups = new Map<string, Skill[]>();
     for (const skill of skills) {
       const existing = groups.get(skill.name) ?? [];
       existing.push(skill);
       groups.set(skill.name, existing);
     }
-    const conflicts: ConflictInfo[] = [];
+    const duplicates: DuplicateInfo[] = [];
     for (const [name, group] of groups) {
       if (group.length < 2) continue;
-      conflicts.push({
+      duplicates.push({
         skillName: name,
         instances: group.map((s) => ({ provider: s.provider, path: s.path, version: s.version })),
       });
     }
-    return conflicts;
+    return duplicates;
   }
 
   diff(a: Skill, b: Skill): DiffResult {

@@ -9,7 +9,7 @@ Unified TUI manager for agent skills across Codex, Cursor, Claude, and Global (`
 - **Enable / disable toggle** — disable any skill via `.disabled-` directory prefix rename; re-enable restores it instantly
 - **Install from remote sources** — fetch skills from GitHub repos or skills.sh registry
 - **Fork to local** — copy any read-only skill into a writable provider for customization
-- **Conflict detection** — highlights skills with the same name across different providers
+- **Duplicate detection** — highlights skills with the same name across different providers
 - **Create skills** — scaffold new SKILL.md templates with frontmatter and structure
 - **Lock file tracking** — records installed skill provenance in `skillpack.lock`
 - **Fuzzy search** — filter skills by name or description
@@ -66,8 +66,10 @@ Press `Space` to toggle a skill on or off, `Enter` to view its details, `i` to i
 | `Esc` | Back | Return to list view |
 | `Space` | Toggle | Enable or disable the skill |
 | `e` / `E` | Edit | Open SKILL.md in `$EDITOR` (writable skills only) |
-| `d` | Delete | Uninstall skill with confirmation |
+| `d` | Delete | Uninstall skill with confirmation (writable skills only) |
 | `↑` / `↓` | Scroll | Scroll the description when it overflows |
+
+> **Note:** `e` (edit) and `d` (delete) only appear for writable skills. Read-only skills (e.g. plugin cache) only show toggle.
 
 ## Configuration
 
@@ -135,11 +137,11 @@ skillpack/
 ├── packages/
 │   ├── core/                  # @skillpack/core — platform-agnostic library
 │   │   ├── src/
-│   │   │   ├── models/        # Skill, ConflictInfo, RemoteSkill, etc.
+│   │   │   ├── models/        # Skill, DuplicateInfo, RemoteSkill, etc.
 │   │   │   ├── providers/     # Codex, Cursor, Claude, Global providers + BaseProvider
 │   │   │   ├── sources/       # GitHub and skills.sh install sources
 │   │   │   ├── config.ts      # Configuration manager
-│   │   │   ├── conflicts.ts   # Conflict detection logic
+│   │   │   ├── duplicates.ts  # Duplicate detection logic
 │   │   │   ├── lockfile.ts    # Lock file manager
 │   │   │   ├── manager.ts     # SkillManager — central orchestrator
 │   │   │   └── parser.ts      # SKILL.md frontmatter parser (YAML)

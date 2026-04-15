@@ -25,7 +25,7 @@ describe('SkillManager', () => {
     expect(manager.getAllSkills()).toHaveLength(1);
   });
 
-  it('detects conflicts', async () => {
+  it('detects duplicates', async () => {
     const dir2 = await mkdtemp(path.join(tmpdir(), 'skillpack-mgr2-'));
     const provider2 = new CodexProvider([dir2]);
     (provider2 as any).id = 'other';
@@ -36,8 +36,8 @@ describe('SkillManager', () => {
       await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: same-skill\ndescription: dup\n---\n');
     }
     await manager.scanAll();
-    expect(manager.getConflicts()).toHaveLength(1);
-    expect(manager.getConflicts()[0].skillName).toBe('same-skill');
+    expect(manager.getDuplicates()).toHaveLength(1);
+    expect(manager.getDuplicates()[0].skillName).toBe('same-skill');
     await rm(dir2, { recursive: true, force: true });
   });
 
