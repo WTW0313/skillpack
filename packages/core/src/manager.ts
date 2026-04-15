@@ -1,4 +1,4 @@
-import { cp, readdir, readFile, access } from 'node:fs/promises';
+import { cp, readdir, readFile, access, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import type { ISkillProvider } from './providers/provider.js';
@@ -109,11 +109,11 @@ export class SkillManager {
 
   async uninstallSkill(skill: Skill): Promise<void> {
     const provider = this.providers.get(skill.provider);
-    if (!provider) throw new Error(`Provider not found: ${skill.provider}`);
-    if (!provider.capabilities.canUninstall) {
-      throw new Error(`${provider.displayName} does not support uninstall`);
+    if (provider?.capabilities.canUninstall) {
+      await provider.uninstall(path.basename(skill.path));
+    } else {
+      await rm(skill.path, { recursive: true, force: true });
     }
-    await provider.uninstall(path.basename(skill.path));
   }
 
   async searchRemote(sourceId: string, query: string): Promise<RemoteSkill[]> {

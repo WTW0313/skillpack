@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { useAppContext } from '../context/app-context.js';
 
@@ -34,22 +33,16 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
   ],
 };
 
+const DETAIL_SHORTCUTS: Shortcut[] = [
+  { key: 'esc', label: 'back' },
+  { key: 'space', label: 'toggle' },
+  { key: 'e', label: 'edit' },
+  { key: 'd', label: 'delete' },
+];
+
 export function StatusBar() {
-  const { view, selectedSkill } = useAppContext();
-  const shortcuts = useMemo(() => {
-    if (view === 'detail') {
-      const items: Shortcut[] = [
-        { key: 'esc', label: 'back' },
-        { key: 'space', label: 'toggle' },
-      ];
-      if (!selectedSkill?.readonly) {
-        items.push({ key: 'e', label: 'edit' });
-        items.push({ key: 'd', label: 'delete' });
-      }
-      return items;
-    }
-    return SHORTCUTS[view] ?? [];
-  }, [view, selectedSkill]);
+  const { view } = useAppContext();
+  const shortcuts = view === 'detail' ? DETAIL_SHORTCUTS : (SHORTCUTS[view] ?? []);
 
   return (
     <Box paddingX={1} paddingY={0}>

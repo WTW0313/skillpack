@@ -43,7 +43,7 @@ export function DetailView() {
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
-    if ((input === 'e' || input === 'E') && selectedSkill && !selectedSkill.readonly) {
+    if ((input === 'e' || input === 'E') && selectedSkill) {
       const editor = process.env.EDITOR || 'vi';
       const skillMd = path.join(selectedSkill.path, 'SKILL.md');
       try {
@@ -61,7 +61,7 @@ export function DetailView() {
         .finally(() => setBusy(false));
       return;
     }
-    if (input === 'd' && selectedSkill && !selectedSkill.readonly) {
+    if (input === 'd' && selectedSkill) {
       setError(null);
       setConfirming(true);
     }

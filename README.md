@@ -65,11 +65,9 @@ Press `Space` to toggle a skill on or off, `Enter` to view its details, `i` to i
 |-----|--------|-------------|
 | `Esc` | Back | Return to list view |
 | `Space` | Toggle | Enable or disable the skill |
-| `e` / `E` | Edit | Open SKILL.md in `$EDITOR` (writable skills only) |
-| `d` | Delete | Uninstall skill with confirmation (writable skills only) |
+| `e` / `E` | Edit | Open SKILL.md in `$EDITOR` |
+| `d` | Delete | Uninstall skill with confirmation |
 | `↑` / `↓` | Scroll | Scroll the description when it overflows |
-
-> **Note:** `e` (edit) and `d` (delete) only appear for writable skills. Read-only skills (e.g. plugin cache) only show toggle.
 
 ## Configuration
 

@@ -60,7 +60,7 @@ export abstract class BaseProvider implements ISkillProvider {
             version: parsed.raw.version as string | undefined,
             enabled: !isDisabled,
             scope: 'global',
-            readonly: true,
+            readonly: !this.capabilities.canCreate,
             metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
           });
         } catch { /* no SKILL.md — skip */ }
