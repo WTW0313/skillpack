@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { useAppContext } from '../context/app-context.js';
@@ -15,19 +15,30 @@ export function ListView() {
   const { exit } = useApp();
   const {
     loading, activeTab, setActiveTab, setView, setSelectedSkill,
-    setSearchQuery, refresh, manager, skills: allSkills,
+    searchQuery, setSearchQuery, refresh, manager, skills: allSkills,
   } = useAppContext();
   const { skills, tabs } = useFilteredSkills();
-  const { rows, columns } = useTerminalSize();
+  const { rows } = useTerminalSize();
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [searching, setSearching] = useState(false);
 
+  const prevSkillsLenRef = useRef(skills.length);
+
   const searchLines = searching ? 2 : 0;
-  const visibleRows = Math.max(1, rows - CHROME_LINES - searchLines);
+  const filterLines = (!searching && searchQuery) ? 1 : 0;
+  const visibleRows = Math.max(1, rows - CHROME_LINES - searchLines - filterLines);
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { setCursor(0); setScrollOffset(0); }, [activeTab]);
+
+  useEffect(() => {
+    if (skills.length !== prevSkillsLenRef.current) {
+      setCursor(0);
+      setScrollOffset(0);
+      prevSkillsLenRef.current = skills.length;
+    }
+  }, [skills.length]);
 
   useEffect(() => {
     if (cursor < scrollOffset) {
@@ -61,6 +72,10 @@ export function ListView() {
 
   useInput((input, key) => {
     if (input === 'q') { exit(); return; }
+    if (key.escape && searchQuery) {
+      setSearchQuery('');
+      return;
+    }
     if (key.downArrow) {
       setCursor((c) => Math.min(c + 1, skills.length - 1));
       return;
@@ -117,14 +132,24 @@ export function ListView() {
         <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} counts={tabCounts} />
       </Box>
 
-      {/* Search */}
+      {/* Search input (active) */}
       {searching && (
         <Box marginTop={1} paddingX={1}>
           <SearchInput
+            defaultValue={searchQuery}
             onChange={setSearchQuery}
             onSubmit={() => setSearching(false)}
             onCancel={() => { setSearching(false); setSearchQuery(''); }}
           />
+        </Box>
+      )}
+
+      {/* Active filter indicator (when search bar is closed but query is active) */}
+      {!searching && searchQuery && (
+        <Box paddingX={1} marginTop={1}>
+          <Text dimColor>filtered by </Text>
+          <Text color="magenta" bold>"{searchQuery}"</Text>
+          <Text dimColor>  esc to clear</Text>
         </Box>
       )}
 
@@ -143,11 +168,23 @@ export function ListView() {
         <Box flexDirection="column" paddingX={1} flexGrow={1}>
           {skills.length === 0 ? (
             <Box marginTop={1}>
-              <Text dimColor>  No skills found. Press </Text>
-              <Text bold>i</Text>
-              <Text dimColor> to install or </Text>
-              <Text bold>c</Text>
-              <Text dimColor> to create one.</Text>
+              {searchQuery ? (
+                <>
+                  <Text dimColor>  No matches for </Text>
+                  <Text color="magenta">"{searchQuery}"</Text>
+                  <Text dimColor>. Press </Text>
+                  <Text bold>esc</Text>
+                  <Text dimColor> to clear.</Text>
+                </>
+              ) : (
+                <>
+                  <Text dimColor>  No skills found. Press </Text>
+                  <Text bold>i</Text>
+                  <Text dimColor> to install or </Text>
+                  <Text bold>c</Text>
+                  <Text dimColor> to create one.</Text>
+                </>
+              )}
             </Box>
           ) : (
             visibleSkills.map((skill, index) => (

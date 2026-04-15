@@ -25,7 +25,7 @@ export function SkillRow({ skill, isSelected, isConflicting }: SkillRowProps) {
         {isSelected ? '❯' : ' '}
       </Text>
       <Text
-        color={isSelected ? 'white' : (skill.enabled ? undefined : undefined)}
+        color={isSelected ? 'white' : (skill.enabled ? undefined : 'gray')}
         bold={isSelected}
         dimColor={!skill.enabled && !isSelected}
       >
