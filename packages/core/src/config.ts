@@ -14,7 +14,7 @@ export interface SourceConfig {
 export interface SkillpackConfig {
   editor: string;
   autoCheckUpdates: boolean;
-  projectSkillsDir: string;
+  projectSkillsDirs: string[];
   providers: Record<string, ProviderConfig>;
   sources: Record<string, SourceConfig>;
 }
@@ -22,12 +22,12 @@ export interface SkillpackConfig {
 const DEFAULT_CONFIG: SkillpackConfig = {
   editor: process.env.EDITOR || 'vi',
   autoCheckUpdates: true,
-  projectSkillsDir: '.skillpack/skills',
+  projectSkillsDirs: ['.codex/skills', '.cursor/skills-cursor', '.claude/skills', '.agents/skills'],
   providers: {
     codex: { enabled: true, paths: [path.join(os.homedir(), '.codex', 'skills')] },
     cursor: { enabled: true, paths: [path.join(os.homedir(), '.cursor', 'skills-cursor')] },
     claude: { enabled: true, paths: [path.join(os.homedir(), '.claude', 'plugins', 'cache'), path.join(os.homedir(), '.claude', 'skills')] },
-    skillssh: { enabled: true, paths: [path.join(os.homedir(), '.agents', 'skills')] },
+    global: { enabled: true, paths: [path.join(os.homedir(), '.agents', 'skills')] },
   },
   sources: {
     github: { enabled: true },

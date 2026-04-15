@@ -21,7 +21,7 @@ describe('ConflictDetector', () => {
   });
 
   it('detects multiple conflicts', () => {
-    const conflicts = detector.detect([makeSkill('a', 'codex'), makeSkill('a', 'cursor'), makeSkill('b', 'codex'), makeSkill('b', 'claude'), makeSkill('b', 'skillssh')]);
+    const conflicts = detector.detect([makeSkill('a', 'codex'), makeSkill('a', 'cursor'), makeSkill('b', 'codex'), makeSkill('b', 'claude'), makeSkill('b', 'global')]);
     expect(conflicts).toHaveLength(2);
     expect(conflicts.find((c) => c.skillName === 'b')?.instances).toHaveLength(3);
   });

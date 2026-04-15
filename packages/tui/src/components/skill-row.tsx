@@ -2,7 +2,7 @@ import { Box, Text } from 'ink';
 import type { Skill } from '@skillpack/core';
 
 export const COL_NAME_WIDTH = 30;
-export const COL_PROVIDER_WIDTH = 10;
+export const COL_AGENT_WIDTH = 10;
 
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s.padEnd(max);
@@ -31,7 +31,7 @@ export function SkillRow({ skill, isSelected, isConflicting }: SkillRowProps) {
       >
         {truncate(skill.name, COL_NAME_WIDTH)}
       </Text>
-      <Text dimColor>{truncate(skill.provider, COL_PROVIDER_WIDTH)}</Text>
+      <Text dimColor>{truncate(skill.provider, COL_AGENT_WIDTH)}</Text>
       <Text color={statusColor} dimColor={!skill.enabled}>
         {statusIcon}
       </Text>

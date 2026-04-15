@@ -86,7 +86,7 @@ export function DetailView() {
       {/* Metadata */}
       <Box marginTop={1} flexDirection="column" gap={0}>
         <Box gap={1}>
-          <Text dimColor>{'provider'.padEnd(10)}</Text>
+          <Text dimColor>{'agent'.padEnd(10)}</Text>
           <Text>{selectedSkill.provider}</Text>
         </Box>
         <Box gap={1}>

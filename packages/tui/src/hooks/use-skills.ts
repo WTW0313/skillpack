@@ -8,7 +8,7 @@ const TAB_PROVIDER_MAP: Record<string, string | null> = {
   Codex: 'codex',
   Cursor: 'cursor',
   Claude: 'claude',
-  'skills.sh': 'skillssh',
+  Global: 'global',
   Project: 'project',
 };
 

@@ -49,7 +49,7 @@ export function AppProvider({ manager, config, children }: AppProviderProps) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    await manager.scanAll(process.cwd(), config.projectSkillsDir);
+    await manager.scanAll(process.cwd(), config.projectSkillsDirs);
     setSkills(manager.getAllSkills());
     setConflicts(manager.getConflicts());
     setLoading(false);

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   SkillManager, ConfigManager,
-  CodexProvider, CursorProvider, ClaudeProvider, SkillsShProvider,
+  CodexProvider, CursorProvider, ClaudeProvider, GlobalProvider,
   GitHubSource, SkillsShSource,
   type SkillpackConfig,
 } from '@skillpack/core';
@@ -26,7 +26,7 @@ export function useSkillManager(): SkillManagerResult {
         const cfg = await configManager.load();
         const mgr = new SkillManager();
 
-        const providerFactories: Record<string, () => InstanceType<typeof CodexProvider | typeof CursorProvider | typeof ClaudeProvider | typeof SkillsShProvider>> = {
+        const providerFactories: Record<string, () => InstanceType<typeof CodexProvider | typeof CursorProvider | typeof ClaudeProvider | typeof GlobalProvider>> = {
           codex: () => new CodexProvider(cfg.providers.codex?.paths),
           cursor: () => new CursorProvider(cfg.providers.cursor?.paths),
           claude: () => {
@@ -38,7 +38,7 @@ export function useSkillManager(): SkillManagerResult {
               flatPaths.length > 0 ? flatPaths : undefined,
             );
           },
-          skillssh: () => new SkillsShProvider(cfg.providers.skillssh?.paths),
+          global: () => new GlobalProvider(cfg.providers.global?.paths),
         };
 
         for (const [id, factory] of Object.entries(providerFactories)) {
@@ -51,7 +51,7 @@ export function useSkillManager(): SkillManagerResult {
         if (cfg.sources.skillssh?.enabled) mgr.registerSource(new SkillsShSource());
 
         await mgr.init();
-        await mgr.scanAll(process.cwd(), cfg.projectSkillsDir);
+        await mgr.scanAll(process.cwd(), cfg.projectSkillsDirs);
 
         if (!cancelled) {
           setManager(mgr);

@@ -30,12 +30,12 @@ export class SkillManager {
     await this.globalLock.load();
   }
 
-  async scanAll(cwd?: string, projectSkillsDir?: string): Promise<void> {
+  async scanAll(cwd?: string, projectSkillsDirs?: string[]): Promise<void> {
     const results = await Promise.all([...this.providers.values()].map((p) => p.scan()));
     let allSkills = results.flat();
 
-    if (cwd && projectSkillsDir) {
-      const projectSkills = await this.scanProjectSkills(cwd, projectSkillsDir);
+    if (cwd && projectSkillsDirs?.length) {
+      const projectSkills = await this.scanProjectSkills(cwd, projectSkillsDirs);
       const projectNames = new Set(projectSkills.map((s) => s.name));
       allSkills = allSkills.filter((s) => !projectNames.has(s.name));
       allSkills = [...allSkills, ...projectSkills];
@@ -45,31 +45,38 @@ export class SkillManager {
     this.conflicts = this.conflictDetector.detect(this.skills);
   }
 
-  async scanProjectSkills(cwd: string, projectSkillsDir: string): Promise<Skill[]> {
-    const projectPath = path.join(cwd, projectSkillsDir);
-    try { await access(projectPath); } catch { return []; }
-    const entries = await readdir(projectPath, { withFileTypes: true });
+  async scanProjectSkills(cwd: string, projectSkillsDirs: string[]): Promise<Skill[]> {
     const skills: Skill[] = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-      const skillDir = path.join(projectPath, entry.name);
-      const skillMdPath = path.join(skillDir, 'SKILL.md');
-      try {
-        const content = await readFile(skillMdPath, 'utf-8');
-        const parsed = parseSkillMd(content);
-        skills.push({
-          name: parsed.name || entry.name,
-          description: parsed.description,
-          provider: 'project',
-          path: skillDir,
-          version: parsed.raw.version as string | undefined,
-          enabled: true,
-          scope: 'project',
-          readonly: false,
-          metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
-          source: { type: 'local' },
-        });
-      } catch { /* skip */ }
+    const seen = new Set<string>();
+    for (const dir of projectSkillsDirs) {
+      const projectPath = path.join(cwd, dir);
+      try { await access(projectPath); } catch { continue; }
+      const entries = await readdir(projectPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+        if (seen.has(entry.name)) continue;
+        const skillDir = path.join(projectPath, entry.name);
+        const skillMdPath = path.join(skillDir, 'SKILL.md');
+        try {
+          const content = await readFile(skillMdPath, 'utf-8');
+          const parsed = parseSkillMd(content);
+          const name = parsed.name || entry.name;
+          if (seen.has(name)) continue;
+          seen.add(name);
+          skills.push({
+            name,
+            description: parsed.description,
+            provider: 'project',
+            path: skillDir,
+            version: parsed.raw.version as string | undefined,
+            enabled: true,
+            scope: 'project',
+            readonly: false,
+            metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
+            source: { type: 'local' },
+          });
+        } catch { /* skip */ }
+      }
     }
     return skills;
   }
@@ -141,15 +148,15 @@ export class SkillManager {
     if (!provider) throw new Error(`Provider not found: ${providerId}`);
     const result = await source.fetch(identifier);
 
-    if (sourceId === 'skillssh' && providerId === 'skillssh') {
+    if (sourceId === 'skillssh' && providerId === 'global') {
       // npx skills add already placed it in ~/.agents/skills/, just rescan
       await this.scanAll();
     } else if (sourceId === 'skillssh') {
       // Installed to ~/.agents/skills/ by npx, but user wants it in a different provider.
       // Find the newly installed skill and copy it to the target.
-      const skillsshProvider = this.providers.get('skillssh');
-      if (skillsshProvider) {
-        const srcDir = path.join(skillsshProvider.basePaths[0], result.skillName);
+      const globalProvider = this.providers.get('global');
+      if (globalProvider) {
+        const srcDir = path.join(globalProvider.basePaths[0], result.skillName);
         try {
           await access(srcDir);
           await provider.install(result.skillName, { sourceType: 'skillssh', identifier, tempDir: srcDir });

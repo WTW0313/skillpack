@@ -5,7 +5,7 @@ import { useAppContext } from '../context/app-context.js';
 import { useFilteredSkills, TABS } from '../hooks/use-skills.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { TabBar } from '../components/tab-bar.js';
-import { SkillRow, COL_NAME_WIDTH, COL_PROVIDER_WIDTH } from '../components/skill-row.js';
+import { SkillRow, COL_NAME_WIDTH, COL_AGENT_WIDTH } from '../components/skill-row.js';
 import { SearchInput } from '../components/search-input.js';
 import { StatusBar } from '../components/status-bar.js';
 
@@ -62,7 +62,7 @@ export function ListView() {
         counts[tab] = allSkills.filter((s) => s.scope === 'project').length;
       } else {
         const providerMap: Record<string, string> = {
-          Codex: 'codex', Cursor: 'cursor', Claude: 'claude', 'skills.sh': 'skillssh',
+          Codex: 'codex', Cursor: 'cursor', Claude: 'claude', Global: 'global',
         };
         counts[tab] = allSkills.filter((s) => s.provider === providerMap[tab]).length;
       }
@@ -158,7 +158,7 @@ export function ListView() {
         <Box gap={1}>
           <Text>{' '}</Text>
           <Text dimColor>{'NAME'.padEnd(COL_NAME_WIDTH)}</Text>
-          <Text dimColor>{'PROVIDER'.padEnd(COL_PROVIDER_WIDTH)}</Text>
+          <Text dimColor>{'AGENT'.padEnd(COL_AGENT_WIDTH)}</Text>
           <Text dimColor>{'⏻'}</Text>
         </Box>
       </Box>

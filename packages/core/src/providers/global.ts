@@ -5,9 +5,9 @@ import { mkdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
-export class SkillsShProvider extends BaseProvider {
-  readonly id = 'skillssh';
-  readonly displayName = 'skills.sh';
+export class GlobalProvider extends BaseProvider {
+  readonly id = 'global';
+  readonly displayName = 'Global';
   readonly basePaths: string[];
   readonly capabilities: ProviderCapabilities = {
     canInstall: true, canUninstall: true, canUpdate: true, canToggle: true, canCreate: true,
