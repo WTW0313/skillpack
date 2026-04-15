@@ -1,11 +1,12 @@
 # Skillpack
 
-Unified TUI manager for agent skills across Codex, Cursor, Claude, and skills.sh.
+Unified TUI manager for agent skills across Codex, Cursor, Claude, and Global (`~/.agents/skills`).
 
 ## Features
 
-- **Multi-platform scanning** — discovers skills from Codex, Cursor, Claude, and skills.sh directories automatically
-- **Project-level skills** — scans `.skillpack/skills/` in the current working directory with override priority over global skills
+- **Multi-platform scanning** — discovers skills from Codex, Cursor, Claude, and Global provider directories automatically, with symlink support
+- **Project-level skills** — scans per-project skill directories (`.codex/skills`, `.cursor/skills-cursor`, `.claude/skills`, `.agents/skills`) with override priority over global skills
+- **Enable / disable toggle** — disable any skill via `.disabled-` directory prefix rename; re-enable restores it instantly
 - **Install from remote sources** — fetch skills from GitHub repos or skills.sh registry
 - **Fork to local** — copy any read-only skill into a writable provider for customization
 - **Conflict detection** — highlights skills with the same name across different providers
@@ -37,9 +38,9 @@ skillpack
 
 ## Quick Start
 
-Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` to switch between provider tabs, and `/` to search.
+Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to switch between provider tabs (All, Codex, Cursor, Claude, Global, Project), and `/` to search.
 
-Press `Enter` on any skill to view its details, `i` to install a new skill from a remote source, or `c` to create one from scratch.
+Press `Space` to toggle a skill on or off, `Enter` to view its details, `i` to install from a remote source, or `c` to create one from scratch.
 
 ## Keyboard Shortcuts
 
@@ -47,11 +48,12 @@ Press `Enter` on any skill to view its details, `i` to install a new skill from 
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| `↑` | Navigate up | Move selection up |
-| `↓` | Navigate down | Move selection down |
-| `Tab` | Switch tab | Cycle through All / provider groups |
-| `/` | Search | Fuzzy match on name + description |
+| `↑` / `↓` | Navigate | Move selection up / down |
+| `Space` | Toggle | Enable or disable the selected skill |
 | `Enter` | Detail | Open skill detail view |
+| `Tab` / `Shift+Tab` | Switch tab | Cycle through All / Codex / Cursor / Claude / Global / Project |
+| `/` | Search | Fuzzy match on name + description |
+| `Esc` | Clear search | Clear the active search filter |
 | `i` | Install | Install from GitHub or skills.sh |
 | `c` | Create | Scaffold a new skill |
 | `u` | Update | Check for updates |
@@ -62,9 +64,10 @@ Press `Enter` on any skill to view its details, `i` to install a new skill from 
 | Key | Action | Description |
 |-----|--------|-------------|
 | `Esc` | Back | Return to list view |
+| `Space` | Toggle | Enable or disable the skill |
 | `e` / `E` | Edit | Open SKILL.md in `$EDITOR` (writable skills only) |
 | `d` | Delete | Uninstall skill with confirmation |
-| `f` | Fork | Copy read-only skill to a writable provider |
+| `↑` / `↓` | Scroll | Scroll the description when it overflows |
 
 ## Configuration
 
@@ -74,15 +77,20 @@ Skillpack stores its configuration at `~/.config/skillpack/config.json`. On firs
 {
   "editor": "vi",
   "autoCheckUpdates": true,
-  "projectSkillsDir": ".skillpack/skills",
+  "projectSkillsDirs": [
+    ".codex/skills",
+    ".cursor/skills-cursor",
+    ".claude/skills",
+    ".agents/skills"
+  ],
   "providers": {
-    "codex":   { "enabled": true, "paths": ["~/.codex/skills"] },
-    "cursor":  { "enabled": true, "paths": ["~/.cursor/skills-cursor"] },
-    "claude":  { "enabled": true, "paths": ["~/.claude/plugins/cache"] },
-    "skillssh": { "enabled": true, "paths": ["~/.agents/skills"] }
+    "codex":  { "enabled": true, "paths": ["~/.codex/skills"] },
+    "cursor": { "enabled": true, "paths": ["~/.cursor/skills-cursor"] },
+    "claude": { "enabled": true, "paths": ["~/.claude/plugins/cache", "~/.claude/skills"] },
+    "global": { "enabled": true, "paths": ["~/.agents/skills"] }
   },
   "sources": {
-    "github":  { "enabled": true },
+    "github":   { "enabled": true },
     "skillssh": { "enabled": true }
   }
 }
@@ -92,30 +100,25 @@ The lock file lives at `~/.config/skillpack/skillpack.lock` and records the sour
 
 ## Adding a Provider
 
-Implement the `ISkillProvider` interface from `@skillpack/core`:
+Extend the `BaseProvider` class from `@skillpack/core` (which implements `ISkillProvider` with default `scan`, `enable`, `disable` via `.disabled-` prefix rename):
 
 ```typescript
-import type { ISkillProvider } from '@skillpack/core';
+import { BaseProvider, type ProviderCapabilities } from '@skillpack/core';
 
-class MyProvider implements ISkillProvider {
+class MyProvider extends BaseProvider {
   readonly id = 'my-platform';
   readonly displayName = 'My Platform';
   readonly basePaths = ['/path/to/skills'];
-  readonly capabilities = {
+  readonly capabilities: ProviderCapabilities = {
     canInstall: true,
     canUninstall: true,
     canUpdate: false,
-    canToggle: false,
+    canToggle: true,
     canCreate: true,
   };
 
-  async scan() { /* return Skill[] */ }
-  async install(name, request) { /* ... */ }
-  async uninstall(name) { /* ... */ }
-  async update(name) { /* ... */ }
-  async enable(name) { /* ... */ }
-  async disable(name) { /* ... */ }
-  async create(template) { /* return Skill */ }
+  override async uninstall(name: string) { /* ... */ }
+  override async create(template) { /* return Skill */ }
 }
 ```
 
@@ -133,24 +136,24 @@ skillpack/
 │   ├── core/                  # @skillpack/core — platform-agnostic library
 │   │   ├── src/
 │   │   │   ├── models/        # Skill, ConflictInfo, RemoteSkill, etc.
-│   │   │   ├── providers/     # Codex, Cursor, Claude, SkillsSh providers
+│   │   │   ├── providers/     # Codex, Cursor, Claude, Global providers + BaseProvider
 │   │   │   ├── sources/       # GitHub and skills.sh install sources
 │   │   │   ├── config.ts      # Configuration manager
 │   │   │   ├── conflicts.ts   # Conflict detection logic
 │   │   │   ├── lockfile.ts    # Lock file manager
 │   │   │   ├── manager.ts     # SkillManager — central orchestrator
-│   │   │   └── parser.ts      # SKILL.md frontmatter parser
+│   │   │   └── parser.ts      # SKILL.md frontmatter parser (YAML)
 │   │   └── tests/
 │   └── tui/                   # @skillpack/tui — Ink-based terminal UI
 │       └── src/
 │           ├── views/         # ListView, DetailView, InstallView, CreateView, UpdateView
-│           ├── components/    # StatusBar, ConfirmDialog, SearchInput, SkillList, TabBar
+│           ├── components/    # StatusBar, ConfirmDialog, SearchInput, SkillRow, TabBar
 │           ├── context/       # React context for app state
-│           ├── hooks/         # useSkillManager, useKeyboardNav
+│           ├── hooks/         # useSkillManager, useSkills, useSearch, useTerminalSize
 │           └── app.tsx        # App shell and router
 ├── docs/                      # Design specs and implementation plans
 ├── package.json               # Workspace root
-└── pnpm-workspace.yaml        # pnpm workspace 配置
+└── pnpm-workspace.yaml        # pnpm workspace config
 ```
 
 ## License
