@@ -1,0 +1,7 @@
+---
+description: Run pnpm install outside the sandbox to use the global content-addressable store and avoid creating a local .pnpm-store directory.
+globs:
+alwaysApply: true
+---
+
+When running `pnpm install` (or any pnpm command that modifies `node_modules`), always set `required_permissions: ["all"]` on the Shell tool call to bypass the sandbox. The sandbox blocks access to the global pnpm store, causing pnpm to fall back to a local `.pnpm-store/` in the project directory.
