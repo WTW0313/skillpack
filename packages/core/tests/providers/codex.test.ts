@@ -36,7 +36,6 @@ describe('CodexProvider', () => {
   it('creates a new skill', async () => {
     const skill = await provider.create({ name: 'new-skill', description: 'Brand new' });
     expect(skill.name).toBe('new-skill');
-    expect(skill.readonly).toBe(false);
     expect(skill.source?.type).toBe('local');
   });
 

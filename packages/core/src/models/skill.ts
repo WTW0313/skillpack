@@ -25,7 +25,6 @@ export interface Skill {
   version?: string;
   enabled: boolean;
   scope: 'global' | 'project';
-  readonly: boolean;
   metadata: SkillMetadata;
   source?: SkillSource;
 }

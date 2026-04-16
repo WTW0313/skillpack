@@ -71,7 +71,6 @@ export class SkillManager {
             version: parsed.raw.version as string | undefined,
             enabled: true,
             scope: 'project',
-            readonly: false,
             metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
             source: { type: 'local' },
           });
@@ -134,7 +133,6 @@ export class SkillManager {
       ...skill,
       provider: targetProviderId,
       path: destDir,
-      readonly: false,
       source: {
         type: 'local',
         createdAt: new Date().toISOString(),

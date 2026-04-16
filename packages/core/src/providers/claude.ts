@@ -61,7 +61,6 @@ export class ClaudeProvider extends BaseProvider {
             version: parsed.raw.version as string | undefined,
             enabled: !isDisabled,
             scope: 'global',
-            readonly: true,
             metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
           });
         } catch { /* skip */ }
@@ -101,7 +100,7 @@ export class ClaudeProvider extends BaseProvider {
                   name: parsed.name || skillDirName, description: parsed.description,
                   provider: this.id, path: path.join(skillsDir, entry.name),
                   version: ver.name !== 'unknown' ? ver.name : undefined,
-                  enabled: !isDisabled, scope: 'global', readonly: true,
+                  enabled: !isDisabled, scope: 'global',
                   metadata: { license: parsed.metadata.license, author: parsed.metadata.author ?? pub.name, tags: parsed.metadata.tags },
                 });
               } catch { /* skip */ }

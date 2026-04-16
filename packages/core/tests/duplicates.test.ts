@@ -3,7 +3,7 @@ import { DuplicateDetector } from '../src/duplicates.js';
 import type { Skill } from '../src/models/index.js';
 
 function makeSkill(name: string, provider: string): Skill {
-  return { name, description: '', provider, path: `/fake/${provider}/${name}`, enabled: true, scope: 'global', readonly: true, metadata: {} };
+  return { name, description: '', provider, path: `/fake/${provider}/${name}`, enabled: true, scope: 'global', metadata: {} };
 }
 
 describe('DuplicateDetector', () => {

@@ -29,7 +29,7 @@ export function DetailView() {
     let used = 2; // padding (top + bottom)
     used += 1;    // title
     used += 1;    // gap before metadata
-    used += 4;    // agent, path, status, editable
+    used += 3;    // agent, path, status
     if (selectedSkill.version) used += 1;
     if (selectedSkill.source) used += 1;
     if (duplicate) used += 1 + 1 + duplicate.instances.length; // gap + heading + instances
@@ -136,12 +136,6 @@ export function DetailView() {
           <Text dimColor>{'status'.padEnd(10)}</Text>
           <Text color={selectedSkill.enabled ? 'green' : undefined} dimColor={!selectedSkill.enabled}>
             {selectedSkill.enabled ? '● enabled' : '○ disabled'}
-          </Text>
-        </Box>
-        <Box gap={1}>
-          <Text dimColor>{'editable'.padEnd(10)}</Text>
-          <Text color={selectedSkill.readonly ? 'yellow' : 'green'}>
-            {selectedSkill.readonly ? 'read-only' : 'yes'}
           </Text>
         </Box>
       </Box>

@@ -34,7 +34,7 @@ export class CodexProvider extends BaseProvider {
     await writeFile(path.join(skillDir, 'SKILL.md'), generateSkillMd(template), 'utf-8');
     return {
       name: template.name, description: template.description,
-      provider: this.id, path: skillDir, enabled: true, scope: 'global', readonly: false,
+      provider: this.id, path: skillDir, enabled: true, scope: 'global',
       metadata: template.metadata ?? {},
       source: { type: 'local', createdAt: new Date().toISOString() },
     };
