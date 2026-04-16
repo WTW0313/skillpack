@@ -1,26 +1,53 @@
 {
-  "name": "@skillpack/tui",
+  "name": "skillpack",
   "version": "0.1.0",
+  "description": "Unified TUI manager for agent skills across Codex, Cursor, Claude, and Global",
   "type": "module",
   "bin": {
-    "skillpack": "./dist/bin/skillpack.js"
+    "skillpack": "./dist/skillpack.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cli",
+    "tui",
+    "agent",
+    "skills",
+    "cursor",
+    "claude",
+    "codex",
+    "ink"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WTW0313/skillpack.git"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
+    "build:dev": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@skillpack/core": "workspace:*",
+    "@inkjs/ui": "2.0.0",
+    "fuse.js": "7.3.0",
+    "glob": "11.1.0",
     "ink": "6.8.0",
     "react": "19.2.5",
-    "@inkjs/ui": "2.0.0",
-    "fuse.js": "7.3.0"
+    "yaml": "2.8.3"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
+    "@skillpack/core": "workspace:*",
+    "@types/node": "22.19.17",
     "@types/react": "19.2.14",
-    "vitest": "3.2.4",
-    "@types/node": "22.19.17"
+    "tsup": "^8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
   }
 }
