@@ -2,7 +2,7 @@ import type { IInstallSource } from './source.js';
 import type { RemoteSkill, UpdateInfo, DownloadResult } from '../models/source.js';
 import type { Skill } from '../models/skill.js';
 import { execFile } from 'node:child_process';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -43,12 +43,26 @@ export class GitHubSource implements IInstallSource {
     const tempDir = await mkdtemp(path.join(tmpdir(), 'skillpack-gh-'));
     const repoUrl = `https://github.com/${parsed.owner}/${parsed.repo}.git`;
     await execFileAsync('git', ['clone', '--depth', '1', '--filter=blob:none', '--sparse', '--branch', parsed.ref, repoUrl, tempDir]);
+
     if (parsed.path !== '.') {
-      await execFileAsync('git', ['-C', tempDir, 'sparse-checkout', 'set', parsed.path]);
+      const candidates = [parsed.path, `skills/${parsed.path}`];
+      await execFileAsync('git', ['-C', tempDir, 'sparse-checkout', 'set', ...candidates]);
+
+      const resolvedPath = (await Promise.all(
+        candidates.map(async (c) => {
+          try { await access(path.join(tempDir, c, 'SKILL.md')); return c; } catch { return null; }
+        }),
+      )).find((c) => c !== null);
+
+      if (!resolvedPath) {
+        throw new Error(`Skill not found at "${parsed.path}" or "skills/${parsed.path}" in ${parsed.owner}/${parsed.repo}`);
+      }
+
+      const skillName = path.basename(resolvedPath);
+      return { tempDir: path.join(tempDir, resolvedPath), skillName, files: [] };
     }
-    const skillName = path.basename(parsed.path);
-    const skillDir = parsed.path === '.' ? tempDir : path.join(tempDir, parsed.path);
-    return { tempDir: skillDir, skillName, files: [] };
+
+    return { tempDir, skillName: parsed.repo, files: [] };
   }
 
   async checkUpdate(skill: Skill): Promise<UpdateInfo | null> {

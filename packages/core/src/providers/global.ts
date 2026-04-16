@@ -1,7 +1,8 @@
 import { BaseProvider, type ProviderCapabilities } from './provider.js';
 import type { Skill, SkillTemplate } from '../models/index.js';
+import type { InstallRequest } from '../models/source.js';
 import { generateSkillMd } from '../parser.js';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, rm, cp } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
@@ -15,6 +16,11 @@ export class GlobalProvider extends BaseProvider {
   constructor(basePaths?: string[]) {
     super();
     this.basePaths = basePaths ?? [path.join(os.homedir(), '.agents', 'skills')];
+  }
+
+  override async install(name: string, request: InstallRequest): Promise<void> {
+    const dest = path.join(this.basePaths[0], name);
+    await cp(request.tempDir, dest, { recursive: true });
   }
 
   override async uninstall(name: string): Promise<void> {
