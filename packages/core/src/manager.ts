@@ -8,6 +8,7 @@ import type { DuplicateInfo } from './models/duplicate.js';
 import type { RemoteSkill, UpdateInfo } from './models/source.js';
 import { DuplicateDetector } from './duplicates.js';
 import { LockfileManager } from './lockfile.js';
+import { SkillsLockReader } from './skills-lock.js';
 import { parseSkillMd } from './parser.js';
 
 export class SkillManager {
@@ -17,6 +18,8 @@ export class SkillManager {
   private duplicates: DuplicateInfo[] = [];
   private duplicateDetector = new DuplicateDetector();
   private globalLock?: LockfileManager;
+  private skillsLock = new SkillsLockReader();
+  private globalSkillsDir = path.join(os.homedir(), '.agents', 'skills');
 
   registerProvider(provider: ISkillProvider): void { this.providers.set(provider.id, provider); }
   registerSource(source: IInstallSource): void { this.sources.set(source.id, source); }
@@ -27,7 +30,10 @@ export class SkillManager {
   async init(configDir?: string): Promise<void> {
     const lockPath = path.join(configDir ?? path.join(os.homedir(), '.config', 'skillpack'), 'skillpack.lock');
     this.globalLock = new LockfileManager(lockPath);
-    await this.globalLock.load();
+    await Promise.all([
+      this.globalLock.load(),
+      this.skillsLock.load(),
+    ]);
   }
 
   async scanAll(cwd?: string, projectSkillsDirs?: string[]): Promise<void> {
@@ -41,19 +47,62 @@ export class SkillManager {
       allSkills = [...allSkills, ...projectSkills];
     }
 
+    await this.skillsLock.load();
+
+    const skillsLockEntries = this.skillsLock.getEntries();
+    const hydratedBySkillsLock = new Set<string>();
+
+    // Pass 1: hydrate skills whose real path lives under ~/.agents/skills/ from .skill-lock.json
+    for (const skill of allSkills) {
+      const realPath = skill.resolvedPath ?? skill.path;
+      if (!realPath.startsWith(this.globalSkillsDir + path.sep)) continue;
+      const entry = skillsLockEntries[skill.name];
+      if (!entry) continue;
+      hydratedBySkillsLock.add(skill.name);
+      skill.source = {
+        ...skill.source,
+        type: 'skillssh',
+        repo: entry.source,
+        skillFolderHash: entry.skillFolderHash,
+        installedAt: entry.installedAt,
+      };
+    }
+
+    // Pass 2: hydrate remaining skills from skillpack.lock (GitHub installs)
     if (this.globalLock) {
-      const entries = this.globalLock.getEntries();
+      const lockEntries = this.globalLock.getEntries();
+      const scannedNames = new Set(allSkills.map((s) => s.name));
+      let pruned = false;
+
       for (const skill of allSkills) {
-        const lockEntry = entries[skill.name];
-        if (lockEntry) {
-          skill.source = {
-            ...skill.source,
-            type: (lockEntry.source as 'github' | 'skillssh') || skill.source?.type || 'local',
-            repo: lockEntry.repo ?? lockEntry.identifier,
-            installedAt: lockEntry.installedAt,
-          };
+        if (hydratedBySkillsLock.has(skill.name)) continue;
+        const lockEntry = lockEntries[skill.name];
+        if (!lockEntry || lockEntry.source !== 'github') continue;
+        skill.source = {
+          ...skill.source,
+          type: 'github',
+          repo: lockEntry.repo ?? lockEntry.identifier,
+          ref: lockEntry.ref ?? skill.source?.ref,
+          commit: lockEntry.commit ?? skill.source?.commit,
+          installedAt: lockEntry.installedAt,
+        };
+      }
+
+      // Prune stale entries from skillpack.lock
+      for (const name of Object.keys(lockEntries)) {
+        if (!scannedNames.has(name)) {
+          this.globalLock.removeEntry(name);
+          pruned = true;
         }
       }
+      // Remove skillssh entries that should no longer be tracked by skillpack.lock
+      for (const name of Object.keys(lockEntries)) {
+        if (lockEntries[name].source === 'skillssh') {
+          this.globalLock.removeEntry(name);
+          pruned = true;
+        }
+      }
+      if (pruned) await this.globalLock.save();
     }
 
     this.skills = allSkills;
@@ -122,6 +171,23 @@ export class SkillManager {
   }
 
   async uninstallSkill(skill: Skill): Promise<void> {
+    if (skill.source?.type === 'skillssh') {
+      const source = this.sources.get('skillssh') as import('./sources/skillssh.js').SkillsShSource | undefined;
+      if (source) {
+        await source.removeViaCli(skill.name);
+      } else {
+        await rm(skill.path, { recursive: true, force: true });
+      }
+      return;
+    }
+
+    if (skill.source?.type === 'github') {
+      await rm(skill.path, { recursive: true, force: true });
+      this.globalLock?.removeEntry(skill.name);
+      await this.globalLock?.save();
+      return;
+    }
+
     const provider = this.providers.get(skill.provider);
     if (provider?.capabilities.canUninstall) {
       await provider.uninstall(path.basename(skill.path));
@@ -187,10 +253,13 @@ export class SkillManager {
       await this.scanAll();
     }
 
-    if (this.globalLock) {
+    if (this.globalLock && sourceId === 'github') {
       this.globalLock.setEntry(result.skillName, {
-        source: sourceId,
+        source: 'github',
         identifier,
+        repo: identifier.replace(/@.*$/, ''),
+        ref: result.ref,
+        commit: result.commit,
         installedAt: new Date().toISOString(),
         integrity: '',
       });
@@ -201,12 +270,36 @@ export class SkillManager {
   async checkUpdates(): Promise<Array<{ skill: Skill; update: UpdateInfo }>> {
     const updates: Array<{ skill: Skill; update: UpdateInfo }> = [];
     for (const skill of this.skills) {
-      if (!skill.source || skill.source.type === 'local') continue;
-      for (const source of this.sources.values()) {
-        const update = await source.checkUpdate(skill);
-        if (update?.hasUpdate) { updates.push({ skill, update }); break; }
-      }
+      const update = await this.checkSkillUpdate(skill);
+      if (update) updates.push({ skill, update });
     }
     return updates;
+  }
+
+  async checkSkillUpdate(skill: Skill): Promise<UpdateInfo | null> {
+    if (!skill.source || skill.source.type === 'local') return null;
+    for (const source of this.sources.values()) {
+      const update = await source.checkUpdate(skill);
+      if (update?.hasUpdate) return update;
+    }
+    return null;
+  }
+
+  async updateSkill(skill: Skill): Promise<void> {
+    if (!skill.source || skill.source.type === 'local') {
+      throw new Error('Cannot update a locally-created skill');
+    }
+
+    if (skill.source.type === 'skillssh') {
+      const source = this.sources.get('skillssh') as import('./sources/skillssh.js').SkillsShSource | undefined;
+      if (!source) throw new Error('skills.sh source not registered');
+      await source.updateViaCli(skill.name);
+      return;
+    }
+
+    const lockEntry = this.globalLock?.getEntry(skill.name);
+    const identifier = lockEntry?.identifier ?? skill.source.repo ?? skill.name;
+    await this.uninstallSkill(skill);
+    await this.installFromSource('github', identifier, skill.provider);
   }
 }

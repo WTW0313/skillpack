@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { Spinner } from '@inkjs/ui';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { useAppContext } from '../context/app-context.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { StatusBar } from '../components/status-bar.js';
+import type { UpdateInfo } from '@skillpack/core';
 
 function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -29,6 +31,12 @@ export function DetailView() {
   const [descScroll, setDescScroll] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  const sourceType = selectedSkill?.source?.type;
+  const isUpdatable = sourceType === 'skillssh' || sourceType === 'github';
 
   const duplicate = selectedSkill
     ? manager.getDuplicates().find((d) => d.skillName === selectedSkill.name)
@@ -49,6 +57,7 @@ export function DetailView() {
     used += 3;    // agent, path, status
     if (selectedSkill.version) used += 1;
     if (selectedSkill.source) used += 1;
+    if (isUpdatable) used += 1; // update row
     if (addedAt) used += 1;
     if (duplicate) used += 1 + 1 + duplicate.instances.length; // gap + heading + instances
     used += 1;    // gap before description
@@ -57,7 +66,7 @@ export function DetailView() {
     used += 1;    // status bar
     if (error) used += 1;
     return Math.max(0, rows - used);
-  }, [selectedSkill, duplicate, error, rows]);
+  }, [selectedSkill, duplicate, error, rows, isUpdatable]);
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
@@ -89,6 +98,28 @@ export function DetailView() {
     if (input === 'd' && selectedSkill) {
       setError(null);
       setConfirming(true);
+    }
+    if (input === 'u' && selectedSkill && isUpdatable && !busy && !checkingUpdate && !updating) {
+      setError(null);
+      if (updateInfo?.hasUpdate) {
+        setUpdating(true);
+        manager.updateSkill(selectedSkill)
+          .then(() => refresh())
+          .then(() => {
+            setUpdateInfo(null);
+            setUpdating(false);
+          })
+          .catch((err: Error) => {
+            setError(err.message);
+            setUpdating(false);
+          });
+      } else if (!updateInfo) {
+        setCheckingUpdate(true);
+        manager.checkSkillUpdate(selectedSkill)
+          .then((info) => setUpdateInfo(info ?? { hasUpdate: false }))
+          .catch((err: Error) => setError(err.message))
+          .finally(() => setCheckingUpdate(false));
+      }
     }
     if (key.downArrow) {
       setDescScroll((s) => Math.min(s + 1, Math.max(0, descLines.length - visibleDescRows)));
@@ -155,6 +186,41 @@ export function DetailView() {
           <Box gap={1}>
             <Text dimColor>{'source'.padEnd(10)}</Text>
             <Text>{selectedSkill.source.type}{selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}</Text>
+            {selectedSkill.source.type === 'github' && selectedSkill.source.commit && (
+              <Text dimColor> @{selectedSkill.source.commit.slice(0, 7)}</Text>
+            )}
+            {selectedSkill.source.type === 'skillssh' && selectedSkill.source.skillFolderHash && (
+              <Text dimColor> #{selectedSkill.source.skillFolderHash.slice(0, 7)}</Text>
+            )}
+          </Box>
+        )}
+        {isUpdatable && (
+          <Box gap={1}>
+            <Text dimColor>{'update'.padEnd(10)}</Text>
+            {checkingUpdate && <Spinner label="" />}
+            {checkingUpdate && <Text dimColor>checking…</Text>}
+            {!checkingUpdate && updating && <Spinner label="" />}
+            {!checkingUpdate && updating && <Text color="magenta">updating…</Text>}
+            {!checkingUpdate && !updating && updateInfo?.hasUpdate && (
+              <>
+                <Text color="green">{updateInfo.currentVersion ?? '?'}</Text>
+                <Text color="magenta"> → </Text>
+                <Text color="green" bold>{updateInfo.latestVersion ?? '?'}</Text>
+                <Text dimColor>  press </Text>
+                <Text bold>u</Text>
+                <Text dimColor> to update</Text>
+              </>
+            )}
+            {!checkingUpdate && !updating && updateInfo && !updateInfo.hasUpdate && (
+              <Text dimColor>up to date ✓</Text>
+            )}
+            {!checkingUpdate && !updating && !updateInfo && (
+              <>
+                <Text dimColor>press </Text>
+                <Text bold>u</Text>
+                <Text dimColor> to check</Text>
+              </>
+            )}
           </Box>
         )}
         {addedAt && (

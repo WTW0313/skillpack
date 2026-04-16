@@ -44,6 +44,9 @@ export class GitHubSource implements IInstallSource {
     const repoUrl = `https://github.com/${parsed.owner}/${parsed.repo}.git`;
     await execFileAsync('git', ['clone', '--depth', '1', '--filter=blob:none', '--sparse', '--branch', parsed.ref, repoUrl, tempDir]);
 
+    const { stdout: commitOut } = await execFileAsync('git', ['-C', tempDir, 'rev-parse', 'HEAD']);
+    const commit = commitOut.trim();
+
     if (parsed.path !== '.') {
       const candidates = [parsed.path, `skills/${parsed.path}`];
       await execFileAsync('git', ['-C', tempDir, 'sparse-checkout', 'set', ...candidates]);
@@ -59,10 +62,10 @@ export class GitHubSource implements IInstallSource {
       }
 
       const skillName = path.basename(resolvedPath);
-      return { tempDir: path.join(tempDir, resolvedPath), skillName, files: [] };
+      return { tempDir: path.join(tempDir, resolvedPath), skillName, files: [], commit, ref: parsed.ref };
     }
 
-    return { tempDir, skillName: parsed.repo, files: [] };
+    return { tempDir, skillName: parsed.repo, files: [], commit, ref: parsed.ref };
   }
 
   async checkUpdate(skill: Skill): Promise<UpdateInfo | null> {

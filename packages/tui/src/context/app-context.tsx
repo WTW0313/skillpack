@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { SkillManager, Skill, DuplicateInfo, SkillpackConfig } from '@skillpack/core';
 
-export type ViewType = 'list' | 'detail' | 'install' | 'create' | 'update';
+export type ViewType = 'list' | 'detail' | 'install' | 'create';
 
 interface AppState {
   manager: SkillManager;

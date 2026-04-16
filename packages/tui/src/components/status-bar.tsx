@@ -15,7 +15,6 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
     { key: 'tab', label: 'tabs' },
     { key: 'i', label: 'install' },
     { key: 'c', label: 'create' },
-    { key: 'u', label: 'updates' },
     { key: 'q', label: 'quit' },
   ],
   install: [
@@ -27,23 +26,32 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
     { key: 'esc', label: 'back' },
     { key: 'enter', label: 'confirm' },
   ],
-  update: [
-    { key: 'esc', label: 'back' },
-    { key: '↑↓', label: 'navigate' },
-  ],
 };
 
-const DETAIL_SHORTCUTS: Shortcut[] = [
+const DETAIL_BASE: Shortcut[] = [
   { key: 'esc', label: 'back' },
   { key: 'space', label: 'toggle' },
+];
+
+const DETAIL_TAIL: Shortcut[] = [
   { key: 'e', label: 'edit' },
   { key: 'o', label: 'open folder' },
   { key: 'd', label: 'delete' },
 ];
 
 export function StatusBar() {
-  const { view } = useAppContext();
-  const shortcuts = view === 'detail' ? DETAIL_SHORTCUTS : (SHORTCUTS[view] ?? []);
+  const { view, selectedSkill } = useAppContext();
+
+  let shortcuts: Shortcut[];
+  if (view === 'detail') {
+    const sourceType = selectedSkill?.source?.type;
+    const isUpdatable = sourceType === 'skillssh' || sourceType === 'github';
+    shortcuts = isUpdatable
+      ? [...DETAIL_BASE, { key: 'u', label: 'check update' }, ...DETAIL_TAIL]
+      : [...DETAIL_BASE, ...DETAIL_TAIL];
+  } else {
+    shortcuts = SHORTCUTS[view] ?? [];
+  }
 
   return (
     <Box paddingX={1} paddingY={0}>

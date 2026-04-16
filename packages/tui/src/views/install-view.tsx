@@ -5,7 +5,7 @@ import { useAppContext } from '../context/app-context.js';
 import { StatusBar } from '../components/status-bar.js';
 import type { RemoteSkill } from '@skillpack/core';
 
-type InstallStep = 'source' | 'query' | 'results' | 'provider' | 'installing';
+type InstallStep = 'source' | 'query' | 'results' | 'installing';
 
 export function InstallView() {
   const { setView, manager, refresh } = useAppContext();
@@ -14,19 +14,15 @@ export function InstallView() {
   const [results, setResults] = useState<RemoteSkill[]>([]);
   const [cursor, setCursor] = useState(0);
   const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [selectedResult, setSelectedResult] = useState<RemoteSkill | null>(null);
   const [searching, setSearching] = useState(false);
 
   const sources = manager.getSources();
-  const providers = manager.getProviders().filter((p) => p.capabilities.canInstall);
 
   useInput((_input, key) => {
     if (key.escape) {
       if (step === 'source') { setView('list'); return; }
       if (step === 'query') { setStep('source'); return; }
       if (step === 'results') { setStep('query'); return; }
-      if (step === 'provider') { setStep('results'); return; }
       return;
     }
 
@@ -47,28 +43,12 @@ export function InstallView() {
       if (key.downArrow) setCursor((c) => Math.min(c + 1, results.length - 1));
       if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
       if (key.return && results[cursor]) {
-        setSelectedResult(results[cursor]);
-        setCursor(0);
-        if (providers.length === 1) {
-          doInstall(results[cursor].identifier, providers[0].id);
-        } else {
-          setStep('provider');
-        }
-      }
-      return;
-    }
-
-    if (step === 'provider') {
-      if (key.downArrow) setCursor((c) => Math.min(c + 1, providers.length - 1));
-      if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
-      if (key.return && providers[cursor]) {
-        doInstall(selectedResult?.identifier ?? query, providers[cursor].id);
+        doInstall(results[cursor].identifier);
       }
     }
   });
 
   const handleQuerySubmit = async (value: string) => {
-    setQuery(value);
     setError('');
     setSearching(true);
     try {
@@ -86,10 +66,10 @@ export function InstallView() {
     }
   };
 
-  const doInstall = async (identifier: string, providerId: string) => {
+  const doInstall = async (identifier: string) => {
     setStep('installing');
     try {
-      await manager.installFromSource(selectedSource, identifier, providerId);
+      await manager.installFromSource(selectedSource, identifier, 'global');
       await refresh();
       setView('list');
     } catch (err) {
@@ -98,8 +78,8 @@ export function InstallView() {
     }
   };
 
-  const stepLabels = ['source', 'query', 'results', 'provider'];
-  const currentStepIdx = stepLabels.indexOf(step === 'installing' ? 'provider' : step);
+  const stepLabels = ['source', 'query', 'results'];
+  const currentStepIdx = stepLabels.indexOf(step === 'installing' ? 'results' : step);
 
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
@@ -187,24 +167,6 @@ export function InstallView() {
                 </Box>
               ))
             )}
-          </Box>
-        </Box>
-      )}
-
-      {step === 'provider' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>Install to which provider?</Text>
-          <Box flexDirection="column" marginTop={1}>
-            {providers.map((p, i) => (
-              <Box key={p.id} gap={1}>
-                <Text color={i === cursor ? 'magenta' : undefined}>
-                  {i === cursor ? '❯' : ' '}
-                </Text>
-                <Text bold={i === cursor} color={i === cursor ? 'white' : undefined} dimColor={i !== cursor}>
-                  {p.displayName}
-                </Text>
-              </Box>
-            ))}
           </Box>
         </Box>
       )}

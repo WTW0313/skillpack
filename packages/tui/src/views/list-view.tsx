@@ -87,7 +87,7 @@ export function ListView() {
     if (input === '/') { setSearching(true); return; }
     if (input === 'i') { setView('install'); return; }
     if (input === 'c') { setView('create'); return; }
-    if (input === 'u') { setView('update'); return; }
+    
     if (input === ' ' && skills[cursor]) {
       manager.toggleSkill(skills[cursor]).then(() => refresh()).catch(() => {});
       return;

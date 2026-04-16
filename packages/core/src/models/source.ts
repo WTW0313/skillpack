@@ -25,4 +25,6 @@ export interface DownloadResult {
   tempDir: string;
   skillName: string;
   files: string[];
+  commit?: string;
+  ref?: string;
 }

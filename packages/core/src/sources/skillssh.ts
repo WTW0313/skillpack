@@ -86,12 +86,52 @@ export class SkillsShSource implements IInstallSource {
   async checkUpdate(skill: Skill): Promise<UpdateInfo | null> {
     if (skill.source?.type !== 'skillssh') return null;
     try {
-      const { stdout } = await execFileAsync('npx', ['skills', 'check'], { timeout: 30_000 });
-      const clean = stripAnsi(stdout);
-      if (clean.includes(skill.name)) {
-        return { currentVersion: skill.version, latestVersion: 'latest', hasUpdate: true };
+      const { stdout, stderr } = await execFileAsync('npx', ['skills', 'check'], {
+        timeout: 30_000,
+        env: { ...process.env, NO_COLOR: '1' },
+      });
+      const clean = stripAnsi(stdout || stderr);
+      const lines = clean.split('\n');
+      for (const line of lines) {
+        if (!line.includes(skill.name)) continue;
+        if (/update|available|outdated/i.test(line)) {
+          const hashPrefix = skill.source.skillFolderHash?.slice(0, 7);
+          return {
+            currentVersion: hashPrefix ?? skill.version,
+            latestVersion: 'latest',
+            hasUpdate: true,
+          };
+        }
+      }
+      if (clean.includes('up to date') || clean.includes('All')) {
+        return null;
       }
     } catch { /* skip */ }
     return null;
   }
+
+  async updateViaCli(skillName: string): Promise<void> {
+    try {
+      await execFileAsync('npx', ['skills', 'update', skillName, '-g', '-y'], {
+        timeout: 60_000,
+        env: { ...process.env, NO_COLOR: '1' },
+      });
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(`Update failed: ${detail}`);
+    }
+  }
+
+  async removeViaCli(skillName: string): Promise<void> {
+    try {
+      await execFileAsync('npx', ['skills', 'remove', skillName, '-g', '-y'], {
+        timeout: 60_000,
+        env: { ...process.env, NO_COLOR: '1' },
+      });
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(`Remove failed: ${detail}`);
+    }
+  }
+
 }

@@ -9,6 +9,7 @@ export interface SkillSource {
   repo?: string;
   ref?: string;
   commit?: string;
+  skillFolderHash?: string;
   createdAt?: string;
   installedAt?: string;
   forkedFrom?: {

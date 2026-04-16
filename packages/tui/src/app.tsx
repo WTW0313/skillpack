@@ -6,7 +6,6 @@ import { ListView } from './views/list-view.js';
 import { DetailView } from './views/detail-view.js';
 import { InstallView } from './views/install-view.js';
 import { CreateView } from './views/create-view.js';
-import { UpdateView } from './views/update-view.js';
 import { useTerminalSize } from './hooks/use-terminal-size.js';
 
 function Router() {
@@ -17,7 +16,6 @@ function Router() {
     case 'detail': return <DetailView />;
     case 'install': return <InstallView />;
     case 'create': return <CreateView />;
-    case 'update': return <UpdateView />;
   }
 }
 
