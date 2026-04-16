@@ -35,6 +35,12 @@ function parseSearchOutput(raw: string): RemoteSkill[] {
   return results;
 }
 
+export function parseSkillsShIdentifier(identifier: string): { repo: string; skill?: string } {
+  const atIdx = identifier.indexOf('@');
+  if (atIdx === -1) return { repo: identifier };
+  return { repo: identifier.slice(0, atIdx), skill: identifier.slice(atIdx + 1) };
+}
+
 export class SkillsShSource implements IInstallSource {
   readonly id = 'skillssh';
   readonly displayName = 'skills.sh';
@@ -56,8 +62,24 @@ export class SkillsShSource implements IInstallSource {
   }
 
   async fetch(identifier: string): Promise<DownloadResult> {
-    await execFileAsync('npx', ['skills', 'add', identifier, '-g', '-y'], { timeout: 60_000 });
-    const skillName = identifier.split('@').pop() ?? identifier;
+    const { repo, skill } = parseSkillsShIdentifier(identifier);
+    const args = ['skills', 'add', repo, '-g', '-y'];
+    if (skill) args.push('--skill', skill);
+
+    try {
+      await execFileAsync('npx', args, {
+        timeout: 60_000,
+        env: { ...process.env, NO_COLOR: '1' },
+      });
+    } catch (err: unknown) {
+      const stderr = err && typeof err === 'object' && 'stderr' in err
+        ? stripAnsi(String((err as { stderr: string }).stderr)).trim() : '';
+      const stdout = err && typeof err === 'object' && 'stdout' in err
+        ? stripAnsi(String((err as { stdout: string }).stdout)).trim() : '';
+      const detail = stderr || stdout || (err instanceof Error ? err.message : String(err));
+      throw new Error(`Install failed: ${detail}`);
+    }
+    const skillName = skill ?? repo.split('/').pop() ?? identifier;
     return { tempDir: '', skillName, files: [] };
   }
 

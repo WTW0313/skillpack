@@ -1,6 +1,6 @@
 import type { Skill, SkillTemplate } from '../models/index.js';
 import type { InstallRequest } from '../models/source.js';
-import { readdir, access, readFile, rename, stat } from 'node:fs/promises';
+import { readdir, access, readFile, rename, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { parseSkillMd } from '../parser.js';
 
@@ -52,15 +52,19 @@ export abstract class BaseProvider implements ISkillProvider {
         try {
           const content = await readFile(skillMdPath, 'utf-8');
           const parsed = parseSkillMd(content);
+          const resolved = await realpath(skillDir);
+          const dirStat = await stat(resolved);
           skills.push({
             name: parsed.name || skillDirName,
             description: parsed.description,
             provider: this.id,
             path: skillDir,
+            resolvedPath: resolved !== skillDir ? resolved : undefined,
             version: parsed.raw.version as string | undefined,
             enabled: !isDisabled,
             scope: 'global',
             metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
+            source: { type: 'local', createdAt: dirStat.birthtime.toISOString() },
           });
         } catch { /* no SKILL.md — skip */ }
       }

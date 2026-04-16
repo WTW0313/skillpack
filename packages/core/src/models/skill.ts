@@ -22,6 +22,7 @@ export interface Skill {
   description: string;
   provider: string;
   path: string;
+  resolvedPath?: string;
   version?: string;
   enabled: boolean;
   scope: 'global' | 'project';

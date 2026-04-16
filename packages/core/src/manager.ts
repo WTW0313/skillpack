@@ -41,6 +41,21 @@ export class SkillManager {
       allSkills = [...allSkills, ...projectSkills];
     }
 
+    if (this.globalLock) {
+      const entries = this.globalLock.getEntries();
+      for (const skill of allSkills) {
+        const lockEntry = entries[skill.name];
+        if (lockEntry) {
+          skill.source = {
+            ...skill.source,
+            type: (lockEntry.source as 'github' | 'skillssh') || skill.source?.type || 'local',
+            repo: lockEntry.repo ?? lockEntry.identifier,
+            installedAt: lockEntry.installedAt,
+          };
+        }
+      }
+    }
+
     this.skills = allSkills;
     this.duplicates = this.duplicateDetector.detect(this.skills);
   }

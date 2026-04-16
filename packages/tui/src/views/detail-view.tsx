@@ -7,6 +7,21 @@ import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { StatusBar } from '../components/status-bar.js';
 
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(months / 12);
+  return `${years}y ago`;
+}
+
 export function DetailView() {
   const { selectedSkill, setView, refresh, manager } = useAppContext();
   const { rows } = useTerminalSize();
@@ -18,6 +33,8 @@ export function DetailView() {
   const duplicate = selectedSkill
     ? manager.getDuplicates().find((d) => d.skillName === selectedSkill.name)
     : undefined;
+
+  const addedAt = selectedSkill?.source?.installedAt ?? selectedSkill?.source?.createdAt;
 
   const descLines = useMemo(() => {
     if (!selectedSkill?.description) return [];
@@ -32,6 +49,7 @@ export function DetailView() {
     used += 3;    // agent, path, status
     if (selectedSkill.version) used += 1;
     if (selectedSkill.source) used += 1;
+    if (addedAt) used += 1;
     if (duplicate) used += 1 + 1 + duplicate.instances.length; // gap + heading + instances
     used += 1;    // gap before description
     used += 1;    // separator
@@ -125,7 +143,7 @@ export function DetailView() {
         </Box>
         <Box gap={1}>
           <Text dimColor>{'path'.padEnd(10)}</Text>
-          <Text dimColor>{selectedSkill.path}</Text>
+          <Text dimColor>{selectedSkill.path}{selectedSkill.resolvedPath ? ` → ${selectedSkill.resolvedPath}` : ''}</Text>
         </Box>
         {selectedSkill.version && (
           <Box gap={1}>
@@ -137,6 +155,13 @@ export function DetailView() {
           <Box gap={1}>
             <Text dimColor>{'source'.padEnd(10)}</Text>
             <Text>{selectedSkill.source.type}{selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}</Text>
+          </Box>
+        )}
+        {addedAt && (
+          <Box gap={1}>
+            <Text dimColor>{'added'.padEnd(10)}</Text>
+            <Text>{formatRelativeTime(addedAt)}</Text>
+            <Text dimColor> ({new Date(addedAt).toLocaleDateString()})</Text>
           </Box>
         )}
         <Box gap={1}>

@@ -36,7 +36,7 @@ node packages/tui/dist/bin/skillpack.js
 | `manager.ts` | `SkillManager` — central orchestrator for scan, toggle, install, uninstall |
 | `providers/provider.ts` | `ISkillProvider` interface + `BaseProvider` with `.disabled-` prefix toggle |
 | `providers/{codex,cursor,claude,global}.ts` | Per-agent provider implementations |
-| `duplicates.ts` | `DuplicateDetector` — finds same-name skills across providers |
+| `duplicates.ts` | `DuplicateDetector` — finds same-name skills across providers (symlink-aware) |
 | `models/skill.ts` | `Skill`, `SkillTemplate`, `SkillSource` types (no `readonly` flag — all skills are editable/deletable) |
 | `models/duplicate.ts` | `DuplicateInfo`, `DuplicateInstance` types |
 | `parser.ts` | SKILL.md YAML frontmatter parser |
@@ -51,7 +51,7 @@ node packages/tui/dist/bin/skillpack.js
 | `app.tsx` | App shell, router by `view` state |
 | `context/app-context.tsx` | Global state: skills, duplicates, selectedSkill, view, refresh |
 | `views/list-view.tsx` | Main list with tabs, search, scroll |
-| `views/detail-view.tsx` | Skill detail: metadata, duplicates, description, toggle/edit/delete |
+| `views/detail-view.tsx` | Skill detail: metadata (incl. added time, symlink indicator), duplicates, description, toggle/edit/delete |
 | `views/install-view.tsx` | Remote install flow |
 | `views/create-view.tsx` | Skill creation wizard |
 | `views/update-view.tsx` | Update checker |
@@ -83,6 +83,14 @@ All skills can be edited (`e` opens `$EDITOR`), opened in the system file manage
 
 The TUI runs in the terminal's alternate screen buffer (like lazygit, vim). The buffer switch-back must happen **after** Ink's `waitUntilExit()` resolves, not in a `process.on('exit')` handler — otherwise Ink's final render flush leaks onto the main screen.
 
+### Symlink-Aware Scanning
+
+The `skills` CLI (`skills.sh`) installs skill files to `~/.agents/skills/` and creates symlinks in each agent directory (e.g. `~/.claude/skills/foo → ../../.agents/skills/foo`). Providers resolve symlinks via `realpath()` during scan and store the result in `skill.resolvedPath`. The `DuplicateDetector` uses resolved paths to avoid false duplicates — two skills pointing to the same real path are **not** duplicates. The detail view shows symlinks with `→` notation on the path line.
+
+### skills.sh Install Identifiers
+
+The `skills find` output uses `owner/repo@skillName` format (e.g. `onmax/nuxt-skills@pnpm`), but `skills add` expects `owner/repo` with an optional `--skill` flag. The `SkillsShSource` splits the identifier via `parseSkillsShIdentifier()` and constructs the correct command: `npx skills add owner/repo -g -y --skill skillName`.
+
 ### State After Mutations
 
 After any mutation (toggle, edit, delete), `refresh()` must be called. The `refresh` function in `app-context.tsx` rescans all providers and also updates `selectedSkill` by matching on `name + provider` so the detail view reflects the new state.
@@ -100,3 +108,4 @@ After any mutation (toggle, edit, delete), `refresh()` must be called. The `refr
 - **Import extensions**: Must use `.js` in imports (`'./foo.js'`), not `.ts` — Node16 module resolution requires it
 - **Async in `useInput`**: Fire-and-forget promises must have `.catch()` to avoid unhandled rejections crashing Ink
 - **`.pnpm-store/`**: Never commit — it's in `.gitignore`
+- **ClaudeProvider custom scan**: `ClaudeProvider` overrides `scan()` with its own `scanFlat()` / `scanDeep()` — changes to `BaseProvider.scan()` don't apply to Claude skills. Any scan-level feature (symlink resolution, metadata enrichment) must also be added to both Claude scan methods.

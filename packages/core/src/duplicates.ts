@@ -12,6 +12,8 @@ export class DuplicateDetector {
     const duplicates: DuplicateInfo[] = [];
     for (const [name, group] of groups) {
       if (group.length < 2) continue;
+      const realPaths = new Set(group.map((s) => s.resolvedPath ?? s.path));
+      if (realPaths.size < 2) continue;
       duplicates.push({
         skillName: name,
         instances: group.map((s) => ({ provider: s.provider, path: s.path, version: s.version })),

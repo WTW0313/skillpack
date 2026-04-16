@@ -126,8 +126,8 @@ export function InstallView() {
       </Box>
 
       {error !== '' && (
-        <Box marginTop={1}>
-          <Text color="red">✗ {error}</Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text color="red">✗ {error.split('\n').slice(0, 4).join('\n')}</Text>
         </Box>
       )}
 

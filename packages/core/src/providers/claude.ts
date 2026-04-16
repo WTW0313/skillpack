@@ -1,6 +1,6 @@
 import { BaseProvider, type ProviderCapabilities } from './provider.js';
 import type { Skill } from '../models/index.js';
-import { readdir, readFile, access, rename, stat } from 'node:fs/promises';
+import { readdir, readFile, access, rename, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { parseSkillMd } from '../parser.js';
@@ -53,15 +53,19 @@ export class ClaudeProvider extends BaseProvider {
         try {
           const content = await readFile(skillMdPath, 'utf-8');
           const parsed = parseSkillMd(content);
+          const resolved = await realpath(skillDir);
+          const dirStat = await stat(resolved);
           skills.push({
             name: parsed.name || skillDirName,
             description: parsed.description,
             provider: this.id,
             path: skillDir,
+            resolvedPath: resolved !== skillDir ? resolved : undefined,
             version: parsed.raw.version as string | undefined,
             enabled: !isDisabled,
             scope: 'global',
             metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
+            source: { type: 'local', createdAt: dirStat.birthtime.toISOString() },
           });
         } catch { /* skip */ }
       }
@@ -92,16 +96,21 @@ export class ClaudeProvider extends BaseProvider {
               const isDisabled = entry.name.startsWith('.disabled-');
               const skillDirName = isDisabled ? entry.name.slice('.disabled-'.length) : entry.name;
               if (entry.name.startsWith('.') && !isDisabled) continue;
-              const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
+              const skillPath = path.join(skillsDir, entry.name);
+              const skillMdPath = path.join(skillPath, 'SKILL.md');
               try {
                 const content = await readFile(skillMdPath, 'utf-8');
                 const parsed = parseSkillMd(content);
+                const resolved = await realpath(skillPath);
+                const dirStat = await stat(resolved);
                 skills.push({
                   name: parsed.name || skillDirName, description: parsed.description,
-                  provider: this.id, path: path.join(skillsDir, entry.name),
+                  provider: this.id, path: skillPath,
+                  resolvedPath: resolved !== skillPath ? resolved : undefined,
                   version: ver.name !== 'unknown' ? ver.name : undefined,
                   enabled: !isDisabled, scope: 'global',
                   metadata: { license: parsed.metadata.license, author: parsed.metadata.author ?? pub.name, tags: parsed.metadata.tags },
+                  source: { type: 'local', createdAt: dirStat.birthtime.toISOString() },
                 });
               } catch { /* skip */ }
             }
