@@ -17,23 +17,26 @@ Unified TUI manager for agent skills across Codex, Cursor, Claude, and Global (`
 
 ## Installation
 
-```bash
-git clone <repo-url> && cd skillpack
-pnpm install
-pnpm run build
-```
-
-Run directly:
+### From npm (recommended)
 
 ```bash
-node packages/tui/dist/bin/skillpack.js
-```
-
-Or link globally:
-
-```bash
-cd packages/tui && pnpm link --global
+npm i -g skillpack-tui
 skillpack
+```
+
+Or run without installing:
+
+```bash
+npx skillpack-tui
+```
+
+### From source
+
+```bash
+git clone https://github.com/WTW0313/skillpack.git && cd skillpack
+pnpm install
+pnpm build
+node packages/tui/dist/skillpack.js
 ```
 
 ## Quick Start

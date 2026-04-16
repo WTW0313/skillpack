@@ -1,6 +1,6 @@
 # Releasing Skillpack
 
-Skillpack is published to npm as a single package `skillpack`. Users install it via `npx skillpack` or `npm i -g skillpack`.
+Skillpack is published to npm as a single package `skillpack-tui`. Users install it via `npx skillpack-tui` or `npm i -g skillpack-tui`.
 
 ## Build Architecture
 
@@ -23,10 +23,10 @@ npm login
 npm whoami  # verify login status
 ```
 
-2. Verify the `skillpack` package name is available (before first publish):
+2. Verify the `skillpack-tui` package name is available (before first publish):
 
 ```bash
-npm view skillpack
+npm view skillpack-tui
 ```
 
 ## Release Steps
@@ -89,8 +89,8 @@ git push && git push --tags
 ### 7. Verify the release
 
 ```bash
-npm view skillpack                      # confirm version is live
-npx skillpack                           # run directly from npm to verify
+npm view skillpack-tui                  # confirm version is live
+npx skillpack-tui                       # run directly from npm to verify
 ```
 
 ## Versioning
@@ -108,9 +108,9 @@ Follows [Semantic Versioning](https://semver.org/):
 If a problematic version was published:
 
 ```bash
-npm unpublish skillpack@<version>       # allowed within 72 hours
+npm unpublish skillpack-tui@<version>   # allowed within 72 hours
 # or
-npm deprecate skillpack@<version> "reason"  # mark as deprecated (preferred)
+npm deprecate skillpack-tui@<version> "reason"  # mark as deprecated (preferred)
 ```
 
 ## Quick Reference
