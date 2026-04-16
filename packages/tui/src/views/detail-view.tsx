@@ -52,6 +52,13 @@ export function DetailView() {
       refresh();
       return;
     }
+    if ((input === 'o' || input === 'O') && selectedSkill) {
+      const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
+      try {
+        execSync(`${opener} "${selectedSkill.path}"`, { stdio: 'ignore' });
+      } catch { /* opener failed */ }
+      return;
+    }
     if (input === ' ' && selectedSkill && !busy) {
       setError(null);
       setBusy(true);

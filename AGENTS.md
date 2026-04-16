@@ -77,7 +77,7 @@ Skills are toggled by renaming their directory with a `.disabled-` prefix. The `
 
 ### Edit and Delete
 
-All skills can be edited (`e` opens `$EDITOR`) and deleted (`d` with confirmation). There is no `readonly` flag — every skill is fully manageable. If the provider supports `canUninstall`, deletion delegates to the provider. Otherwise, the manager directly removes the skill directory.
+All skills can be edited (`e` opens `$EDITOR`), opened in the system file manager (`o` — uses `open` on macOS, `xdg-open` on Linux), and deleted (`d` with confirmation). There is no `readonly` flag — every skill is fully manageable. If the provider supports `canUninstall`, deletion delegates to the provider. Otherwise, the manager directly removes the skill directory.
 
 ### TUI Alternate Screen Buffer
 

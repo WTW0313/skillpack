@@ -37,6 +37,7 @@ const DETAIL_SHORTCUTS: Shortcut[] = [
   { key: 'esc', label: 'back' },
   { key: 'space', label: 'toggle' },
   { key: 'e', label: 'edit' },
+  { key: 'o', label: 'open folder' },
   { key: 'd', label: 'delete' },
 ];
 

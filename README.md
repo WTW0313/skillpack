@@ -66,6 +66,7 @@ Press `Space` to toggle a skill on or off, `Enter` to view its details, `i` to i
 | `Esc` | Back | Return to list view |
 | `Space` | Toggle | Enable or disable the skill |
 | `e` / `E` | Edit | Open SKILL.md in `$EDITOR` |
+| `o` / `O` | Open folder | Open skill directory in system file manager |
 | `d` | Delete | Uninstall skill with confirmation |
 | `↑` / `↓` | Scroll | Scroll the description when it overflows |
 
