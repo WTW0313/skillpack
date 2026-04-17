@@ -9,5 +9,5 @@ export default defineConfig({
   clean: true,
   sourcemap: false,
   noExternal: ['@skillpack/core'],
-  external: ['yaml', 'glob'],
+  external: ['yaml'],
 });
