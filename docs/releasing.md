@@ -11,7 +11,7 @@ packages/tui  (source)  ──┘
 ```
 
 - `@skillpack/core` source is inlined into the bundle — it is not published separately
-- npm dependencies (`yaml`, `glob`) remain external as runtime dependencies
+- npm dependencies (`yaml`) remain external as runtime dependencies
 - No sourcemaps in production; no minification (add `minify: true` in `tsup.config.ts` if needed)
 
 ## Prerequisites
