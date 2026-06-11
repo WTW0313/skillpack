@@ -56,7 +56,7 @@ cd packages/tui
 npm pack --dry-run      # preview files that will be published
 ```
 
-Expected output should contain only `dist/skillpack.js` and `package.json`.
+Expected output should contain `dist/skillpack.js`, `package.json`, and `README.md`.
 
 ### 4. Bump version
 
