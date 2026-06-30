@@ -36,6 +36,7 @@ export function DetailView() {
 
   const sourceType = selectedSkill?.source?.type;
   const isUpdatable = sourceType === 'skillssh';
+  const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
   const disableStrategy = selectedSkill
     ? manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill)
     : undefined;
@@ -89,7 +90,7 @@ export function DetailView() {
         .finally(() => setBusy(false));
       return;
     }
-    if (input === 'd' && selectedSkill) {
+    if (input === 'd' && selectedSkill && isRemovable) {
       setError(null);
       setConfirming(true);
     }

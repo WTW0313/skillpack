@@ -44,7 +44,6 @@ const DETAIL_BASE: Shortcut[] = [
 
 const DETAIL_TAIL: Shortcut[] = [
   { key: 'o', label: 'open folder' },
-  { key: 'd', label: 'delete' },
 ];
 
 export function StatusBar() {
@@ -54,9 +53,11 @@ export function StatusBar() {
   if (view === 'detail') {
     const sourceType = selectedSkill?.source?.type;
     const isUpdatable = sourceType === 'skillssh';
+    const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
+    const tail = isRemovable ? [...DETAIL_TAIL, { key: 'd', label: 'delete' }] : DETAIL_TAIL;
     shortcuts = isUpdatable
-      ? [...DETAIL_BASE, { key: 'u', label: 'check update' }, ...DETAIL_TAIL]
-      : [...DETAIL_BASE, ...DETAIL_TAIL];
+      ? [...DETAIL_BASE, { key: 'u', label: 'check update' }, ...tail]
+      : [...DETAIL_BASE, ...tail];
   } else {
     shortcuts = SHORTCUTS[view] ?? [];
   }

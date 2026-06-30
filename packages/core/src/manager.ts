@@ -1,4 +1,4 @@
-import { readdir, readFile, access, rm } from 'node:fs/promises';
+import { readdir, readFile, access } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import type { ISkillProvider } from './providers/provider.js';
@@ -213,29 +213,14 @@ export class SkillManager {
   }
 
   async uninstallSkill(skill: Skill): Promise<void> {
-    if (skill.source?.type === 'skillssh') {
+    if (skill.provider === 'global' && skill.source?.type === 'skillssh') {
       const source = this.sources.get('skillssh') as import('./sources/skillssh.js').SkillsShSource | undefined;
-      if (source) {
-        await source.removeViaCli(skill.name);
-      } else {
-        await rm(skill.path, { recursive: true, force: true });
-      }
+      if (!source) throw new Error('skills.sh source not registered');
+      await source.removeViaCli(skill.name);
       return;
     }
 
-    if (skill.source?.type === 'github') {
-      await rm(skill.path, { recursive: true, force: true });
-      this.globalLock?.removeEntry(skill.name);
-      await this.globalLock?.save();
-      return;
-    }
-
-    const provider = this.providers.get(skill.provider);
-    if (provider?.capabilities.canUninstall) {
-      await provider.uninstall(path.basename(skill.path));
-    } else {
-      await rm(skill.path, { recursive: true, force: true });
-    }
+    throw new Error('Only skills.sh-managed Global Skills can be removed');
   }
 
   async searchRemote(sourceId: string, query: string): Promise<RemoteSkill[]> {
