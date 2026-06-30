@@ -5,39 +5,24 @@ import { useAppContext } from '../context/app-context.js';
 import { StatusBar } from '../components/status-bar.js';
 import type { RemoteSkill } from '@skillpack/core';
 
-type InstallStep = 'source' | 'query' | 'results' | 'installing';
+type InstallStep = 'query' | 'results' | 'installing';
 
 export function InstallView() {
   const { setView, manager, refresh } = useAppContext();
-  const [step, setStep] = useState<InstallStep>('source');
-  const [selectedSource, setSelectedSource] = useState('');
+  const [step, setStep] = useState<InstallStep>('query');
   const [results, setResults] = useState<RemoteSkill[]>([]);
   const [cursor, setCursor] = useState(0);
   const [error, setError] = useState('');
   const [searching, setSearching] = useState(false);
 
-  const sources = manager.getSources();
-
   useInput((_input, key) => {
     if (key.escape) {
-      if (step === 'source') { setView('list'); return; }
-      if (step === 'query') { setStep('source'); return; }
+      if (step === 'query') { setView('list'); return; }
       if (step === 'results') { setStep('query'); return; }
       return;
     }
 
     if (step === 'query') return;
-
-    if (step === 'source') {
-      if (key.downArrow) setCursor((c) => Math.min(c + 1, sources.length - 1));
-      if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
-      if (key.return && sources[cursor]) {
-        setSelectedSource(sources[cursor].id);
-        setCursor(0);
-        setStep('query');
-      }
-      return;
-    }
 
     if (step === 'results') {
       if (key.downArrow) setCursor((c) => Math.min(c + 1, results.length - 1));
@@ -52,7 +37,7 @@ export function InstallView() {
     setError('');
     setSearching(true);
     try {
-      const found = await manager.searchRemote(selectedSource, value);
+      const found = await manager.searchRemote('skillssh', value);
       setResults(found);
       setCursor(0);
       if (found.length === 0) {
@@ -69,7 +54,7 @@ export function InstallView() {
   const doInstall = async (identifier: string) => {
     setStep('installing');
     try {
-      await manager.installFromSource(selectedSource, identifier, 'global');
+      await manager.installFromSource('skillssh', identifier, 'global');
       await refresh();
       setView('list');
     } catch (err) {
@@ -78,7 +63,7 @@ export function InstallView() {
     }
   };
 
-  const stepLabels = ['source', 'query', 'results'];
+  const stepLabels = ['query', 'results'];
   const currentStepIdx = stepLabels.indexOf(step === 'installing' ? 'results' : step);
 
   return (
@@ -108,24 +93,6 @@ export function InstallView() {
       {error !== '' && (
         <Box marginTop={1} flexDirection="column">
           <Text color="red">✗ {error.split('\n').slice(0, 4).join('\n')}</Text>
-        </Box>
-      )}
-
-      {step === 'source' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>Where to search?</Text>
-          <Box flexDirection="column" marginTop={1}>
-            {sources.map((source, i) => (
-              <Box key={source.id} gap={1}>
-                <Text color={i === cursor ? 'magenta' : undefined}>
-                  {i === cursor ? '❯' : ' '}
-                </Text>
-                <Text bold={i === cursor} color={i === cursor ? 'white' : undefined} dimColor={i !== cursor}>
-                  {source.displayName}
-                </Text>
-              </Box>
-            ))}
-          </Box>
         </Box>
       )}
 
