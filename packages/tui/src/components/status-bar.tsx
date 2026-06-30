@@ -13,6 +13,7 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
     { key: 'enter', label: 'detail' },
     { key: '/', label: 'search' },
     { key: 'tab', label: 'tabs' },
+    { key: 'p', label: 'project' },
     { key: 'i', label: 'install' },
     { key: 'c', label: 'create' },
     { key: 'q', label: 'quit' },
@@ -25,6 +26,11 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
   create: [
     { key: 'esc', label: 'back' },
     { key: 'enter', label: 'confirm' },
+  ],
+  project: [
+    { key: 'esc', label: 'back' },
+    { key: '↑↓', label: 'navigate' },
+    { key: 'q', label: 'quit' },
   ],
 };
 

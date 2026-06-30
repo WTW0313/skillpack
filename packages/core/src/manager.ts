@@ -127,22 +127,41 @@ export class SkillManager {
         const skillMdPath = path.join(skillDir, 'SKILL.md');
         try {
           const content = await readFile(skillMdPath, 'utf-8');
-          const parsed = parseSkillMd(content);
-          const name = parsed.name || entry.name;
-          if (seen.has(name)) continue;
-          seen.add(name);
-          skills.push({
-            name,
-            description: parsed.description,
-            provider: 'project',
-            path: skillDir,
-            version: parsed.raw.version as string | undefined,
-            enabled: true,
-            scope: 'project',
-            metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
-            source: { type: 'local' },
-          });
-        } catch { /* skip */ }
+          try {
+            const parsed = parseSkillMd(content);
+            const name = parsed.name || entry.name;
+            if (seen.has(name)) continue;
+            seen.add(name);
+            skills.push({
+              name,
+              description: parsed.description,
+              provider: 'project',
+              path: skillDir,
+              version: parsed.raw.version as string | undefined,
+              enabled: true,
+              scope: 'project',
+              metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
+              source: { type: 'local' },
+            });
+          } catch (err) {
+            if (seen.has(entry.name)) continue;
+            seen.add(entry.name);
+            skills.push({
+              name: entry.name,
+              description: '',
+              provider: 'project',
+              path: skillDir,
+              enabled: true,
+              scope: 'project',
+              metadata: {},
+              source: { type: 'local' },
+              scanIssues: [{
+                code: 'invalid-skill-md',
+                message: err instanceof Error ? err.message : 'Invalid SKILL.md',
+              }],
+            });
+          }
+        } catch { /* skip missing SKILL.md */ }
       }
     }
     return skills;
@@ -161,7 +180,10 @@ export class SkillManager {
       enabled: skill.enabled,
       source: skill.source,
       actions: [],
-      healthSignals: [],
+      healthSignals: (skill.scanIssues ?? []).map((issue) => ({
+        code: issue.code,
+        message: issue.message,
+      })),
     }));
   }
   getSkillsByProvider(providerId: string): Skill[] { return this.skills.filter((s) => s.provider === providerId); }

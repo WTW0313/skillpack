@@ -136,4 +136,22 @@ describe('Skill Inventory', () => {
     expect(global.instances[0].actions).toEqual(['disable']);
     expect(global.healthSignals.map((signal) => signal.code)).toContain('unmanaged-global-skill');
   });
+
+  it('keeps invalid Project Skills visible as read-only project inventory', async () => {
+    const projectDir = path.join(root, 'project');
+    const brokenProjectSkill = path.join(projectDir, '.agents', 'skills', 'broken-project');
+    await mkdir(brokenProjectSkill, { recursive: true });
+    await writeFile(path.join(brokenProjectSkill, 'SKILL.md'), '---\nname: [unterminated\n---\n');
+
+    const manager = new SkillManager();
+
+    await manager.scanAll(projectDir, ['.agents/skills']);
+
+    expect(manager.getInventory()).toHaveLength(0);
+    const projectSkills = manager.getProjectSkills();
+    expect(projectSkills).toHaveLength(1);
+    expect(projectSkills[0].name).toBe('broken-project');
+    expect(projectSkills[0].actions).toEqual([]);
+    expect(projectSkills[0].healthSignals.map((signal) => signal.code)).toContain('invalid-skill-md');
+  });
 });

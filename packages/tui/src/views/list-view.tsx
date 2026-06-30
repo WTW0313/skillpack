@@ -55,16 +55,15 @@ export function ListView() {
 
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = {};
+    const inventorySkills = allSkills.filter((s) => s.scope !== 'project');
     for (const tab of TABS) {
       if (tab === 'All') {
-        counts[tab] = allSkills.length;
-      } else if (tab === 'Project') {
-        counts[tab] = allSkills.filter((s) => s.scope === 'project').length;
+        counts[tab] = inventorySkills.length;
       } else {
         const providerMap: Record<string, string> = {
           Codex: 'codex', Cursor: 'cursor', Claude: 'claude', Global: 'global',
         };
-        counts[tab] = allSkills.filter((s) => s.provider === providerMap[tab]).length;
+        counts[tab] = inventorySkills.filter((s) => s.provider === providerMap[tab]).length;
       }
     }
     return counts;
@@ -85,6 +84,7 @@ export function ListView() {
       return;
     }
     if (input === '/') { setSearching(true); return; }
+    if (input === 'p') { setView('project'); return; }
     if (input === 'i') { setView('install'); return; }
     if (input === 'c') { setView('create'); return; }
     
@@ -181,8 +181,8 @@ export function ListView() {
                   <Text dimColor>  No skills found. Press </Text>
                   <Text bold>i</Text>
                   <Text dimColor> to install or </Text>
-                  <Text bold>c</Text>
-                  <Text dimColor> to create one.</Text>
+                  <Text bold>p</Text>
+                  <Text dimColor> for Project Skills.</Text>
                 </>
               )}
             </Box>
