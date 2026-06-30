@@ -17,6 +17,11 @@ export interface HealthSignal {
 
 export type SkillAction = 'enable' | 'disable' | 'update' | 'remove';
 
+export interface DisableStrategy {
+  type: 'disabled-directory' | 'provider-config';
+  description: string;
+}
+
 export interface SkillInventoryInstance {
   name: string;
   description: string;
@@ -26,6 +31,7 @@ export interface SkillInventoryInstance {
   version?: string;
   enabled: boolean;
   source?: SkillSource;
+  disableStrategy?: DisableStrategy;
   actions: SkillAction[];
   healthSignals: HealthSignal[];
 }
@@ -91,7 +97,11 @@ function healthSignalsFor(skill: Skill): HealthSignal[] {
   return signals;
 }
 
-function toInstance(skill: Skill): SkillInventoryInstance {
+export interface BuildSkillInventoryOptions {
+  getDisableStrategy?: (skill: Skill) => DisableStrategy | undefined;
+}
+
+function toInstance(skill: Skill, options: BuildSkillInventoryOptions): SkillInventoryInstance {
   return {
     name: skill.name,
     description: skill.description,
@@ -101,12 +111,13 @@ function toInstance(skill: Skill): SkillInventoryInstance {
     version: skill.version,
     enabled: skill.enabled,
     source: skill.source,
+    disableStrategy: options.getDisableStrategy?.(skill),
     actions: actionsFor(skill),
     healthSignals: healthSignalsFor(skill),
   };
 }
 
-export function buildSkillInventory(skills: Skill[]): SkillGroup[] {
+export function buildSkillInventory(skills: Skill[], options: BuildSkillInventoryOptions = {}): SkillGroup[] {
   const inventorySkills = skills.filter((s) => s.scope !== 'project');
   const strongGroups = new Map<string, { reason: string; skills: Skill[] }>();
   for (const skill of inventorySkills) {
@@ -140,7 +151,7 @@ export function buildSkillInventory(skills: Skill[]): SkillGroup[] {
   }
 
   return [...groups.entries()].map(([id, group]) => {
-    const instances = group.skills.map(toInstance);
+    const instances = group.skills.map((skill) => toInstance(skill, options));
     const healthSignals = instances.flatMap((instance) => instance.healthSignals);
     if (instances.length > 1) {
       healthSignals.push({

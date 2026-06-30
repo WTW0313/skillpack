@@ -1,4 +1,4 @@
-import type { Skill, SkillTemplate } from '../models/index.js';
+import type { DisableStrategy, Skill, SkillTemplate } from '../models/index.js';
 import type { InstallRequest } from '../models/source.js';
 import { readdir, access, readFile, rename, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,6 +12,8 @@ export interface ProviderCapabilities {
   canCreate: boolean;
 }
 
+export type SkillToggleTarget = Pick<Skill, 'name' | 'path' | 'enabled'>;
+
 export interface ISkillProvider {
   readonly id: string;
   readonly displayName: string;
@@ -24,6 +26,8 @@ export interface ISkillProvider {
   update(name: string): Promise<void>;
   enable(name: string): Promise<void>;
   disable(name: string): Promise<void>;
+  setEnabled(skill: SkillToggleTarget, enabled: boolean): Promise<void>;
+  getDisableStrategy(skill: SkillToggleTarget): DisableStrategy | undefined;
   create(template: SkillTemplate): Promise<Skill>;
 }
 
@@ -117,6 +121,32 @@ export abstract class BaseProvider implements ISkillProvider {
   async install(_name: string, _request: InstallRequest): Promise<void> { throw new Error(`${this.displayName} does not support install`); }
   async uninstall(_name: string): Promise<void> { throw new Error(`${this.displayName} does not support uninstall`); }
   async update(_name: string): Promise<void> { throw new Error(`${this.displayName} does not support update`); }
+  getDisableStrategy(_skill: SkillToggleTarget): DisableStrategy | undefined {
+    if (!this.capabilities.canToggle) return undefined;
+    return {
+      type: 'disabled-directory',
+      description: 'Renames the skill directory with a .disabled- prefix',
+    };
+  }
+
+  async setEnabled(skill: SkillToggleTarget, enabled: boolean): Promise<void> {
+    if (!this.capabilities.canToggle) {
+      throw new Error(`${this.displayName} does not support toggle`);
+    }
+    if (skill.enabled === enabled) return;
+
+    const currentName = path.basename(skill.path);
+    const bareName = currentName.replace(/^\.disabled-/, '');
+    const destName = enabled ? bareName : `.disabled-${bareName}`;
+    const dest = path.join(path.dirname(skill.path), destName);
+    if (dest === skill.path) return;
+    await access(dest).then(
+      () => { throw new Error(`Target ${dest} already exists`); },
+      () => { /* dest doesn't exist, good */ },
+    );
+    await rename(skill.path, dest);
+  }
+
   async enable(name: string): Promise<void> {
     for (const basePath of this.basePaths) {
       const src = path.join(basePath, `.disabled-${name}`);

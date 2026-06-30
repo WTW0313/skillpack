@@ -36,6 +36,9 @@ export function DetailView() {
 
   const sourceType = selectedSkill?.source?.type;
   const isUpdatable = sourceType === 'skillssh';
+  const disableStrategy = selectedSkill
+    ? manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill)
+    : undefined;
 
   const duplicate = selectedSkill
     ? manager.getDuplicates().find((d) => d.skillName === selectedSkill.name)
@@ -56,6 +59,7 @@ export function DetailView() {
     used += 3;    // agent, path, status
     if (selectedSkill.version) used += 1;
     if (selectedSkill.source) used += 1;
+    if (disableStrategy) used += 1;
     if (isUpdatable) used += 1; // update row
     if (addedAt) used += 1;
     if (duplicate) used += 1 + 1 + duplicate.instances.length; // gap + heading + instances
@@ -65,7 +69,7 @@ export function DetailView() {
     used += 1;    // status bar
     if (error) used += 1;
     return Math.max(0, rows - used);
-  }, [selectedSkill, duplicate, error, rows, isUpdatable]);
+  }, [selectedSkill, duplicate, error, rows, isUpdatable, disableStrategy]);
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
@@ -182,6 +186,12 @@ export function DetailView() {
             {selectedSkill.source.type === 'skillssh' && selectedSkill.source.skillFolderHash && (
               <Text dimColor> #{selectedSkill.source.skillFolderHash.slice(0, 7)}</Text>
             )}
+          </Box>
+        )}
+        {disableStrategy && (
+          <Box gap={1}>
+            <Text dimColor>{'toggle'.padEnd(10)}</Text>
+            <Text>{disableStrategy.description}</Text>
           </Box>
         )}
         {isUpdatable && (

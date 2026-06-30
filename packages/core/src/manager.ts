@@ -168,7 +168,11 @@ export class SkillManager {
   }
 
   getAllSkills(): Skill[] { return this.skills; }
-  getInventory(): SkillGroup[] { return buildSkillInventory(this.skills); }
+  getInventory(): SkillGroup[] {
+    return buildSkillInventory(this.skills, {
+      getDisableStrategy: (skill) => this.providers.get(skill.provider)?.getDisableStrategy(skill),
+    });
+  }
   getProjectSkills(): SkillInventoryInstance[] {
     return this.projectSkills.map((skill) => ({
       name: skill.name,
@@ -196,12 +200,16 @@ export class SkillManager {
     if (!provider.capabilities.canToggle) {
       throw new Error(`${provider.displayName} does not support toggle`);
     }
-    const dirName = path.basename(skill.path).replace(/^\.disabled-/, '');
-    if (skill.enabled) {
-      await provider.disable(dirName);
-    } else {
-      await provider.enable(dirName);
+    await provider.setEnabled(skill, !skill.enabled);
+  }
+
+  async toggleInventoryInstance(instance: SkillInventoryInstance): Promise<void> {
+    const provider = this.providers.get(instance.provider);
+    if (!provider) throw new Error(`Provider not found: ${instance.provider}`);
+    if (!provider.capabilities.canToggle) {
+      throw new Error(`${provider.displayName} does not support toggle`);
     }
+    await provider.setEnabled(instance, !instance.enabled);
   }
 
   async uninstallSkill(skill: Skill): Promise<void> {

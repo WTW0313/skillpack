@@ -137,6 +137,43 @@ describe('Skill Inventory', () => {
     expect(global.healthSignals.map((signal) => signal.code)).toContain('unmanaged-global-skill');
   });
 
+  it('exposes the provider Disable Strategy for mutable inventory instances', async () => {
+    const codexDir = path.join(root, 'codex');
+    await writeSkill(path.join(codexDir, 'toggle-me'), 'toggle-me');
+
+    const manager = new SkillManager();
+    manager.registerProvider(new CodexProvider([codexDir]));
+
+    await manager.scanAll();
+
+    const instance = manager.getInventory()[0].instances[0];
+    expect(instance.disableStrategy).toEqual({
+      type: 'disabled-directory',
+      description: 'Renames the skill directory with a .disabled- prefix',
+    });
+  });
+
+  it('toggles the selected inventory instance path without changing same-name siblings', async () => {
+    const firstCodexDir = path.join(root, 'codex-one');
+    const secondCodexDir = path.join(root, 'codex-two');
+    await writeSkill(path.join(firstCodexDir, 'shared'), 'shared');
+    await writeSkill(path.join(secondCodexDir, 'shared'), 'shared');
+
+    const manager = new SkillManager();
+    manager.registerProvider(new CodexProvider([firstCodexDir, secondCodexDir]));
+
+    await manager.scanAll();
+    const before = manager.getInventory()[0].instances;
+    const target = before.find((instance) => instance.path.startsWith(secondCodexDir))!;
+
+    await manager.toggleInventoryInstance(target);
+    await manager.scanAll();
+
+    const after = manager.getInventory()[0].instances;
+    expect(after.find((instance) => instance.path.startsWith(firstCodexDir))?.enabled).toBe(true);
+    expect(after.find((instance) => instance.path.includes(`${path.sep}.disabled-shared`))?.enabled).toBe(false);
+  });
+
   it('keeps invalid Project Skills visible as read-only project inventory', async () => {
     const projectDir = path.join(root, 'project');
     const brokenProjectSkill = path.join(projectDir, '.agents', 'skills', 'broken-project');
