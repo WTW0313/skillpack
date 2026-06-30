@@ -131,16 +131,14 @@ export function InstallView() {
 
       {step === 'query' && (
         <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>
-            {selectedSource === 'github' ? 'Enter owner/repo or owner/repo@path' : 'Search skills.sh'}
-          </Text>
+          <Text dimColor>Search skills.sh</Text>
           {searching ? (
             <Box marginTop={1}><Spinner label="Searching…" /></Box>
           ) : (
             <Box marginTop={1}>
               <Text color="magenta" bold>❯ </Text>
               <TextInput
-                placeholder={selectedSource === 'github' ? 'owner/repo@skill-path' : 'search keyword…'}
+                placeholder="search keyword…"
                 onSubmit={handleQuerySubmit}
               />
             </Box>

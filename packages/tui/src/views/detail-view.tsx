@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { execSync } from 'node:child_process';
-import path from 'node:path';
 import { useAppContext } from '../context/app-context.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { ConfirmDialog } from '../components/confirm-dialog.js';
@@ -36,7 +35,7 @@ export function DetailView() {
   const [updating, setUpdating] = useState(false);
 
   const sourceType = selectedSkill?.source?.type;
-  const isUpdatable = sourceType === 'skillssh' || sourceType === 'github';
+  const isUpdatable = sourceType === 'skillssh';
 
   const duplicate = selectedSkill
     ? manager.getDuplicates().find((d) => d.skillName === selectedSkill.name)
@@ -70,15 +69,6 @@ export function DetailView() {
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
-    if ((input === 'e' || input === 'E') && selectedSkill) {
-      const editor = process.env.EDITOR || 'vi';
-      const skillMd = path.join(selectedSkill.path, 'SKILL.md');
-      try {
-        execSync(`${editor} "${skillMd}"`, { stdio: 'inherit' });
-      } catch { /* editor exited non-zero */ }
-      refresh();
-      return;
-    }
     if ((input === 'o' || input === 'O') && selectedSkill) {
       const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
       try {

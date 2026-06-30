@@ -1,9 +1,9 @@
-import { cp, readdir, readFile, access, rm } from 'node:fs/promises';
+import { readdir, readFile, access, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import type { ISkillProvider } from './providers/provider.js';
 import type { IInstallSource } from './sources/source.js';
-import type { Skill, SkillTemplate } from './models/index.js';
+import type { Skill } from './models/index.js';
 import type { DuplicateInfo } from './models/duplicate.js';
 import type { RemoteSkill, UpdateInfo } from './models/source.js';
 import type { SkillGroup, SkillInventoryInstance } from './models/inventory.js';
@@ -190,13 +190,6 @@ export class SkillManager {
   getDuplicates(): DuplicateInfo[] { return this.duplicates; }
   isDuplicate(skillName: string): boolean { return this.duplicates.some((d) => d.skillName === skillName); }
 
-  async createSkill(providerId: string, template: SkillTemplate): Promise<Skill> {
-    const provider = this.providers.get(providerId);
-    if (!provider) throw new Error(`Provider not found: ${providerId}`);
-    if (!provider.capabilities.canCreate) throw new Error(`Provider ${providerId} does not support creating skills`);
-    return provider.create(template);
-  }
-
   async toggleSkill(skill: Skill): Promise<void> {
     const provider = this.providers.get(skill.provider);
     if (!provider) throw new Error(`Provider not found: ${skill.provider}`);
@@ -241,28 +234,6 @@ export class SkillManager {
     const source = this.sources.get(sourceId);
     if (!source) throw new Error(`Source not found: ${sourceId}`);
     return source.search(query);
-  }
-
-  async forkToLocal(skill: Skill, targetProviderId: string): Promise<Skill> {
-    const provider = this.providers.get(targetProviderId);
-    if (!provider) throw new Error(`Provider not found: ${targetProviderId}`);
-    if (!provider.capabilities.canCreate) {
-      throw new Error(`Provider ${targetProviderId} does not support creating skills`);
-    }
-    const destDir = path.join(provider.basePaths[0], skill.name);
-    await cp(skill.path, destDir, { recursive: true });
-    return {
-      ...skill,
-      provider: targetProviderId,
-      path: destDir,
-      source: {
-        type: 'local',
-        createdAt: new Date().toISOString(),
-        forkedFrom: skill.source?.type !== 'local'
-          ? { source: skill.source!.type as 'github' | 'skillssh', identifier: skill.source!.repo ?? skill.name }
-          : undefined,
-      },
-    };
   }
 
   async installFromSource(sourceId: string, identifier: string, providerId: string): Promise<void> {

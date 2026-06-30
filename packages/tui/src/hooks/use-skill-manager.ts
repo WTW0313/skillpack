@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   SkillManager, ConfigManager,
   CodexProvider, CursorProvider, ClaudeProvider, GlobalProvider,
-  GitHubSource, SkillsShSource,
+  SkillsShSource,
   type SkillpackConfig,
 } from '@skillpack/core';
 
@@ -47,7 +47,6 @@ export function useSkillManager(): SkillManagerResult {
           }
         }
 
-        if (cfg.sources.github?.enabled) mgr.registerSource(new GitHubSource());
         if (cfg.sources.skillssh?.enabled) mgr.registerSource(new SkillsShSource());
 
         await mgr.init();

@@ -40,11 +40,4 @@ describe('SkillManager', () => {
     expect(manager.getDuplicates()[0].skillName).toBe('same-skill');
     await rm(dir2, { recursive: true, force: true });
   });
-
-  it('creates a skill', async () => {
-    const skill = await manager.createSkill('codex', { name: 'new', description: 'New skill' });
-    expect(skill.name).toBe('new');
-    await manager.scanAll();
-    expect(manager.getAllSkills()).toHaveLength(1);
-  });
 });

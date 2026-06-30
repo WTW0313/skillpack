@@ -15,17 +15,12 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
     { key: 'tab', label: 'tabs' },
     { key: 'p', label: 'project' },
     { key: 'i', label: 'install' },
-    { key: 'c', label: 'create' },
     { key: 'q', label: 'quit' },
   ],
   install: [
     { key: 'esc', label: 'back' },
     { key: '↑↓', label: 'navigate' },
     { key: 'enter', label: 'select' },
-  ],
-  create: [
-    { key: 'esc', label: 'back' },
-    { key: 'enter', label: 'confirm' },
   ],
   project: [
     { key: 'esc', label: 'back' },
@@ -40,7 +35,6 @@ const DETAIL_BASE: Shortcut[] = [
 ];
 
 const DETAIL_TAIL: Shortcut[] = [
-  { key: 'e', label: 'edit' },
   { key: 'o', label: 'open folder' },
   { key: 'd', label: 'delete' },
 ];
@@ -51,7 +45,7 @@ export function StatusBar() {
   let shortcuts: Shortcut[];
   if (view === 'detail') {
     const sourceType = selectedSkill?.source?.type;
-    const isUpdatable = sourceType === 'skillssh' || sourceType === 'github';
+    const isUpdatable = sourceType === 'skillssh';
     shortcuts = isUpdatable
       ? [...DETAIL_BASE, { key: 'u', label: 'check update' }, ...DETAIL_TAIL]
       : [...DETAIL_BASE, ...DETAIL_TAIL];
