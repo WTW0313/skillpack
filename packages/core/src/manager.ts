@@ -8,7 +8,6 @@ import type { DuplicateInfo } from './models/duplicate.js';
 import type { RemoteSkill, UpdateInfo } from './models/source.js';
 import type { SkillGroup, SkillInventoryInstance } from './models/inventory.js';
 import { DuplicateDetector } from './duplicates.js';
-import { LockfileManager } from './lockfile.js';
 import { SkillsLockReader } from './skills-lock.js';
 import { parseSkillMd } from './parser.js';
 import { buildSkillInventory } from './models/inventory.js';
@@ -21,7 +20,6 @@ export class SkillManager {
   private scanPathDiagnostics: ScanPathDiagnostic[] = [];
   private duplicates: DuplicateInfo[] = [];
   private duplicateDetector = new DuplicateDetector();
-  private globalLock?: LockfileManager;
   private skillsLock = new SkillsLockReader();
   private globalSkillsDir = path.join(os.homedir(), '.agents', 'skills');
 
@@ -31,13 +29,8 @@ export class SkillManager {
   getProviders(): ISkillProvider[] { return [...this.providers.values()]; }
   getSources(): IInstallSource[] { return [...this.sources.values()]; }
 
-  async init(configDir?: string): Promise<void> {
-    const lockPath = path.join(configDir ?? path.join(os.homedir(), '.config', 'skillpack'), 'skillpack.lock');
-    this.globalLock = new LockfileManager(lockPath);
-    await Promise.all([
-      this.globalLock.load(),
-      this.skillsLock.load(),
-    ]);
+  async init(_configDir?: string): Promise<void> {
+    await this.skillsLock.load();
   }
 
   async scanAll(cwd?: string, projectSkillsDirs?: string[]): Promise<void> {
@@ -56,15 +49,11 @@ export class SkillManager {
     await this.skillsLock.load();
 
     const skillsLockEntries = this.skillsLock.getEntries();
-    const hydratedBySkillsLock = new Set<string>();
-
-    // Pass 1: hydrate skills whose real path lives under ~/.agents/skills/ from .skill-lock.json
     for (const skill of allSkills) {
       const realPath = skill.resolvedPath ?? skill.path;
       if (!realPath.startsWith(this.globalSkillsDir + path.sep)) continue;
       const entry = skillsLockEntries[skill.name];
       if (!entry) continue;
-      hydratedBySkillsLock.add(skill.name);
       skill.source = {
         ...skill.source,
         type: 'skillssh',
@@ -72,43 +61,6 @@ export class SkillManager {
         skillFolderHash: entry.skillFolderHash,
         installedAt: entry.installedAt,
       };
-    }
-
-    // Pass 2: hydrate remaining skills from skillpack.lock (GitHub installs)
-    if (this.globalLock) {
-      const lockEntries = this.globalLock.getEntries();
-      const scannedNames = new Set(allSkills.map((s) => s.name));
-      let pruned = false;
-
-      for (const skill of allSkills) {
-        if (hydratedBySkillsLock.has(skill.name)) continue;
-        const lockEntry = lockEntries[skill.name];
-        if (!lockEntry || lockEntry.source !== 'github') continue;
-        skill.source = {
-          ...skill.source,
-          type: 'github',
-          repo: lockEntry.repo ?? lockEntry.identifier,
-          ref: lockEntry.ref ?? skill.source?.ref,
-          commit: lockEntry.commit ?? skill.source?.commit,
-          installedAt: lockEntry.installedAt,
-        };
-      }
-
-      // Prune stale entries from skillpack.lock
-      for (const name of Object.keys(lockEntries)) {
-        if (!scannedNames.has(name)) {
-          this.globalLock.removeEntry(name);
-          pruned = true;
-        }
-      }
-      // Remove skillssh entries that should no longer be tracked by skillpack.lock
-      for (const name of Object.keys(lockEntries)) {
-        if (lockEntries[name].source === 'skillssh') {
-          this.globalLock.removeEntry(name);
-          pruned = true;
-        }
-      }
-      if (pruned) await this.globalLock.save();
     }
 
     this.skills = allSkills;
@@ -233,46 +185,16 @@ export class SkillManager {
   }
 
   async installFromSource(sourceId: string, identifier: string, providerId: string): Promise<void> {
+    if (sourceId !== 'skillssh' || providerId !== 'global') {
+      throw new Error('Only skills.sh installs into Global Skills are supported');
+    }
+
     const source = this.sources.get(sourceId);
     if (!source) throw new Error(`Source not found: ${sourceId}`);
-    const provider = this.providers.get(providerId);
-    if (!provider) throw new Error(`Provider not found: ${providerId}`);
-    const result = await source.fetch(identifier);
+    if (!this.providers.has(providerId)) throw new Error(`Provider not found: ${providerId}`);
 
-    if (sourceId === 'skillssh' && providerId === 'global') {
-      // npx skills add already placed it in ~/.agents/skills/, just rescan
-      await this.scanAll();
-    } else if (sourceId === 'skillssh') {
-      // Installed to ~/.agents/skills/ by npx, but user wants it in a different provider.
-      // Find the newly installed skill and copy it to the target.
-      const globalProvider = this.providers.get('global');
-      if (globalProvider) {
-        const srcDir = path.join(globalProvider.basePaths[0], result.skillName);
-        try {
-          await access(srcDir);
-          await provider.install(result.skillName, { sourceType: 'skillssh', identifier, tempDir: srcDir });
-        } catch {
-          // Fallback: skill name might differ from identifier, just rescan
-        }
-      }
-      await this.scanAll();
-    } else {
-      await provider.install(result.skillName, { sourceType: sourceId as 'github' | 'skillssh', identifier, tempDir: result.tempDir });
-      await this.scanAll();
-    }
-
-    if (this.globalLock && sourceId === 'github') {
-      this.globalLock.setEntry(result.skillName, {
-        source: 'github',
-        identifier,
-        repo: identifier.replace(/@.*$/, ''),
-        ref: result.ref,
-        commit: result.commit,
-        installedAt: new Date().toISOString(),
-        integrity: '',
-      });
-      await this.globalLock.save();
-    }
+    await source.fetch(identifier);
+    await this.scanAll();
   }
 
   async checkUpdates(): Promise<Array<{ skill: Skill; update: UpdateInfo }>> {
@@ -295,20 +217,16 @@ export class SkillManager {
 
   async updateSkill(skill: Skill): Promise<void> {
     if (!skill.source || skill.source.type === 'local') {
-      throw new Error('Cannot update a locally-created skill');
+      throw new Error('Cannot update an unmanaged on-disk skill');
     }
 
-    if (skill.source.type === 'skillssh') {
-      const source = this.sources.get('skillssh') as import('./sources/skillssh.js').SkillsShSource | undefined;
-      if (!source) throw new Error('skills.sh source not registered');
-      await source.updateViaCli(skill.name);
-      return;
+    if (skill.source.type !== 'skillssh') {
+      throw new Error('Only skills.sh-managed Global Skills can be updated');
     }
 
-    const lockEntry = this.globalLock?.getEntry(skill.name);
-    const identifier = lockEntry?.identifier ?? skill.source.repo ?? skill.name;
-    await this.uninstallSkill(skill);
-    await this.installFromSource('github', identifier, skill.provider);
+    const source = this.sources.get('skillssh') as import('./sources/skillssh.js').SkillsShSource | undefined;
+    if (!source) throw new Error('skills.sh source not registered');
+    await source.updateViaCli(skill.name);
   }
 
   private async collectScanPathDiagnostics(cwd?: string, projectSkillsDirs?: string[]): Promise<ScanPathDiagnostic[]> {

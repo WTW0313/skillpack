@@ -36,6 +36,10 @@ _Avoid_: Global Skill, managed skill
 The external skill ecosystem and CLI used for installing, updating, and removing Global Skills.
 _Avoid_: GitHub install source, package manager
 
+**Unmanaged On-Disk Skill**:
+A discovered skill whose source is not identified from skills.sh metadata. These skills may live in Codex, Claude, Global, or Project skill directories, but Skillpack treats their content as provider-owned or repository-owned.
+_Avoid_: Installed skill, Skillpack-created skill
+
 **Skill Inventory**:
 The cross-provider view of discovered skills, their provenance, availability, and health.
 _Avoid_: Skill editor, authoring workspace

@@ -44,6 +44,21 @@ describe('ClaudeProvider', () => {
     expect(skills.find((skill) => skill.name === 'legacy-context')?.enabled).toBe(true);
   });
 
+  it('keys flat skillOverrides by parsed Claude skill name, not directory name', async () => {
+    const skillDir = path.join(flatDir, 'deploy-dir');
+    await writeSkill(skillDir, 'deploy');
+    await writeFile(settingsPath, JSON.stringify({
+      skillOverrides: {
+        deploy: 'off',
+      },
+    }, null, 2));
+
+    const [skill] = await provider.scan();
+
+    expect(skill.name).toBe('deploy');
+    expect(skill.enabled).toBe(false);
+  });
+
   it('toggles flat skills through skillOverrides without renaming directories', async () => {
     const skillDir = path.join(flatDir, 'deploy');
     await writeSkill(skillDir, 'deploy');
@@ -60,6 +75,19 @@ describe('ClaudeProvider', () => {
 
     expect(JSON.parse(await readFile(settingsPath, 'utf-8')).skillOverrides.deploy).toBe('on');
     expect((await provider.scan())[0].enabled).toBe(true);
+  });
+
+  it('writes flat skillOverrides with the parsed Claude skill name', async () => {
+    const skillDir = path.join(flatDir, 'deploy-dir');
+    await writeSkill(skillDir, 'deploy');
+
+    const [skill] = await provider.scan();
+    await provider.setEnabled(skill, false);
+
+    const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+    expect(settings.skillOverrides.deploy).toBe('off');
+    expect(settings.skillOverrides['deploy-dir']).toBeUndefined();
+    expect((await provider.scan())[0].enabled).toBe(false);
   });
 
   it('reads plugin skill availability from enabledPlugins', async () => {

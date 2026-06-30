@@ -62,6 +62,27 @@ describe('CodexProvider', () => {
     expect(skills[0].enabled).toBe(false);
   });
 
+  it('does not let later TOML tables overwrite Codex skill config state', async () => {
+    const skillDir = path.join(dir, 'my-skill');
+    await mkdir(skillDir);
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: my-skill\ndescription: Toggle me\n---\n');
+    await writeFile(configPath, [
+      '[[skills.config]]',
+      `path = "${path.join(skillDir, 'SKILL.md')}"`,
+      'enabled = false',
+      '',
+      '[mcp_servers.example]',
+      'command = "example"',
+      'enabled = true',
+      '',
+    ].join('\n'));
+
+    const skills = await provider.scan();
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].enabled).toBe(false);
+  });
+
   it('disables a skill by writing Codex config without renaming the directory', async () => {
     const skillDir = path.join(dir, 'my-skill');
     await mkdir(skillDir);

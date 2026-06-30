@@ -80,7 +80,7 @@ export class ClaudeProvider extends BaseProvider {
 
     const flatSkillName = this.getFlatSkillName(skill.path);
     if (flatSkillName) {
-      await setClaudeSkillOverride(this.settingsPath, flatSkillName, enabled ? 'on' : 'off');
+      await setClaudeSkillOverride(this.settingsPath, skill.name, enabled ? 'on' : 'off');
       return;
     }
 
@@ -115,9 +115,10 @@ export class ClaudeProvider extends BaseProvider {
           const parsed = parseSkillMd(content);
           const resolved = await realpath(skillDir);
           const dirStat = await stat(resolved);
-          const override = skillOverrides[skillDirName];
+          const skillName = parsed.name || skillDirName;
+          const override = skillOverrides[skillName];
           skills.push({
-            name: parsed.name || skillDirName,
+            name: skillName,
             description: parsed.description,
             provider: this.id,
             path: skillDir,

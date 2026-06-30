@@ -6,6 +6,7 @@ import { SkillManager } from '../src/manager.js';
 import { CodexProvider } from '../src/providers/codex.js';
 import { SkillsShSource } from '../src/sources/skillssh.js';
 import type { Skill } from '../src/models/index.js';
+import type { IInstallSource } from '../src/sources/source.js';
 
 describe('SkillManager', () => {
   let dir: string;
@@ -76,6 +77,42 @@ describe('SkillManager', () => {
       command: 'npx',
       args: ['skills', 'remove', 'managed-skill', '-g', '-y'],
     }]);
+  });
+
+  it('rejects installs to non-Global providers before fetching from a source', async () => {
+    let fetchCount = 0;
+    const source: IInstallSource = {
+      id: 'skillssh',
+      displayName: 'skills.sh',
+      search: async () => [],
+      fetch: async () => {
+        fetchCount += 1;
+        return { tempDir: dir, skillName: 'managed-skill', files: [] };
+      },
+      checkUpdate: async () => null,
+    };
+    manager.registerSource(source);
+
+    await expect(manager.installFromSource('skillssh', 'owner/repo', 'codex')).rejects.toThrow('Global Skills');
+    expect(fetchCount).toBe(0);
+  });
+
+  it('rejects non-skills.sh install sources before fetching', async () => {
+    let fetchCount = 0;
+    const source: IInstallSource = {
+      id: 'github',
+      displayName: 'GitHub',
+      search: async () => [],
+      fetch: async () => {
+        fetchCount += 1;
+        return { tempDir: dir, skillName: 'github-skill', files: [] };
+      },
+      checkUpdate: async () => null,
+    };
+    manager.registerSource(source);
+
+    await expect(manager.installFromSource('github', 'owner/repo/path', 'global')).rejects.toThrow('skills.sh');
+    expect(fetchCount).toBe(0);
   });
 
   it('reports provider and project scan paths while scanning custom paths and skipping missing paths', async () => {

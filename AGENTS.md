@@ -55,9 +55,8 @@ node packages/tui/dist/bin/skillpack.js
 | `models/duplicate.ts` | `DuplicateInfo`, `DuplicateInstance` types |
 | `parser.ts` | SKILL.md YAML frontmatter parser |
 | `config.ts` | Configuration manager (`~/.config/skillpack/config.json`) |
-| `lockfile.ts` | `LockfileManager` — `~/.config/skillpack/skillpack.lock` for GitHub-installed skills |
 | `skills-lock.ts` | `SkillsLockReader` — read-only reader for skills.sh's `~/.agents/.skill-lock.json` |
-| `sources/` | Remote install sources (GitHub, skills.sh) |
+| `sources/` | Remote install sources (skills.sh only in v1) |
 
 ### TUI (`packages/tui/src/`)
 
@@ -99,7 +98,7 @@ Delete is available only for skills.sh-managed Global Skills and delegates to `n
 **Update** is available only for `skillssh` sources. In the detail view, press `u` to first check for updates, then `u` again to apply. The Updates view performs manual bulk checks. Update routing:
 - `skillssh`: delegates to `npx skills update <name> -g -y`
 
-Skills with `local` or other source types show no update UI.
+Skills with `source.type === 'local'` are unmanaged on-disk skills: Skillpack found them in a provider/project directory but did not match them to skills.sh metadata. They are not necessarily created by Skillpack. They show no update or remove UI.
 
 ### TUI Alternate Screen Buffer
 
@@ -109,17 +108,11 @@ The TUI runs in the terminal's alternate screen buffer (like lazygit, vim). The 
 
 The `skills` CLI (`skills.sh`) installs skill files to `~/.agents/skills/` and creates symlinks in each agent directory (e.g. `~/.claude/skills/foo → ../../.agents/skills/foo`). Providers resolve symlinks via `realpath()` during scan and store the result in `skill.resolvedPath`. The `DuplicateDetector` uses resolved paths to avoid false duplicates — two skills pointing to the same real path are **not** duplicates. The detail view shows symlinks with `→` notation on the path line.
 
-### Two Lock Systems
+### skills.sh Lock Metadata
 
-Skillpack reads from two separate lock systems on startup:
+Skillpack reads **`~/.agents/.skill-lock.json`** (skills.sh, read-only) on startup. The file is maintained by the `skills` CLI and contains `source`, `sourceUrl`, `skillFolderHash`, `installedAt`, and `updatedAt` per skill. `SkillsLockReader` in `skills-lock.ts` hydrates `source.type = 'skillssh'` for skills whose resolved path lives under `~/.agents/skills/`.
 
-1. **`~/.agents/.skill-lock.json`** (skills.sh, read-only) — maintained by the `skills` CLI. Contains `source`, `sourceUrl`, `skillFolderHash`, `installedAt`, `updatedAt` per skill. Read by `SkillsLockReader` in `skills-lock.ts`. Used to hydrate `source.type = 'skillssh'` for skills whose resolved path lives under `~/.agents/skills/`.
-
-2. **`~/.config/skillpack/skillpack.lock`** (skillpack, read-write) — maintained by `LockfileManager`. Only stores GitHub-installed skills (`source: 'github'`). Contains `repo`, `commit`, `ref`, `identifier`, `installedAt`. Stale entries (skills no longer on disk) and leftover `skillssh` entries are pruned on each scan.
-
-During `scanAll()`, hydration happens in two passes:
-- **Pass 1**: Skills under `~/.agents/skills/` are hydrated from `.skill-lock.json` (skillssh source info)
-- **Pass 2**: Remaining skills are hydrated from `skillpack.lock` (GitHub source info)
+All other discovered skills use `source.type = 'local'`, meaning unmanaged on-disk provenance.
 
 ### skills.sh Install Identifiers
 
@@ -127,7 +120,7 @@ The `skills find` output uses `owner/repo@skillName` format (e.g. `onmax/nuxt-sk
 
 ### Install Flow
 
-Install is global-only (to `~/.agents/skills/`). The install view has 3 steps: source → query → results. On result select, `installFromSource()` is called with `providerId = 'global'`. For skillssh, the skills CLI handles placement; for GitHub, skills are sparse-cloned and copied. GitHub installs record `commit`/`ref`/`repo` to `skillpack.lock` for update tracking.
+Install is global-only (to `~/.agents/skills/`). The install view has 3 steps: source → query → results. On result select, `installFromSource()` is called with `providerId = 'global'`. The skills CLI handles placement. GitHub installs are not supported in v1.
 
 ### Project Skills (Read-Only)
 

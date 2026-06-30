@@ -5,7 +5,7 @@ export interface SkillMetadata {
 }
 
 export interface SkillSource {
-  type: 'github' | 'skillssh' | 'local';
+  type: 'skillssh' | 'local';
   repo?: string;
   ref?: string;
   commit?: string;
@@ -13,7 +13,7 @@ export interface SkillSource {
   createdAt?: string;
   installedAt?: string;
   forkedFrom?: {
-    source: 'github' | 'skillssh';
+    source: 'skillssh';
     identifier: string;
   };
 }

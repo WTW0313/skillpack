@@ -181,9 +181,6 @@ export function DetailView() {
           <Box gap={1}>
             <Text dimColor>{'source'.padEnd(10)}</Text>
             <Text>{selectedSkill.source.type}{selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}</Text>
-            {selectedSkill.source.type === 'github' && selectedSkill.source.commit && (
-              <Text dimColor> @{selectedSkill.source.commit.slice(0, 7)}</Text>
-            )}
             {selectedSkill.source.type === 'skillssh' && selectedSkill.source.skillFolderHash && (
               <Text dimColor> #{selectedSkill.source.skillFolderHash.slice(0, 7)}</Text>
             )}

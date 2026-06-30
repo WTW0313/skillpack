@@ -59,12 +59,19 @@ function parseCodexSkillConfigEntries(text: string): CodexSkillConfigEntry[] {
   let current: CodexSkillConfigEntry | undefined;
 
   for (const [index, line] of lines.entries()) {
-    if (line.trim() === '[[skills.config]]') {
+    const trimmed = line.trim();
+    if (trimmed === '[[skills.config]]') {
       if (current) {
         current.endLine = index;
         entries.push(current);
       }
       current = { startLine: index, endLine: lines.length };
+      continue;
+    }
+    if (current && /^\[{1,2}[^\]]+\]{1,2}$/.test(trimmed)) {
+      current.endLine = index;
+      entries.push(current);
+      current = undefined;
       continue;
     }
     if (!current) continue;

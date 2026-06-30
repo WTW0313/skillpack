@@ -94,8 +94,6 @@ Skillpack stores its configuration at `~/.config/skillpack/config.json`. On firs
 }
 ```
 
-The lock file lives at `~/.config/skillpack/skillpack.lock` and records the source, identifier, and install timestamp for each remotely installed skill.
-
 ## Adding a Provider
 
 Extend the `BaseProvider` class from `@skillpack/core` (which implements `ISkillProvider` with default scanning and a fallback `.disabled-` prefix rename strategy). Providers with native availability config should override `scan`, `setEnabled`, and `getDisableStrategy` so Skillpack reflects the provider's own loading rules.
