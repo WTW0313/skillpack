@@ -85,6 +85,7 @@ export function ListView() {
     }
     if (input === '/') { setSearching(true); return; }
     if (input === 'p') { setView('project'); return; }
+    if (input === 'u') { setView('updates'); return; }
     if (input === 'i') { setView('install'); return; }
     
     if (input === ' ' && skills[cursor]) {
