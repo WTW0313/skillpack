@@ -108,7 +108,7 @@ Known v1 strategies:
 - Codex: read/write `[[skills.config]]` entries in `~/.codex/config.toml`, keyed by absolute `SKILL.md` path.
 - Claude regular skills: read/write `skillOverrides` in Claude `settings.json`, keyed by skill name.
 - Claude plugin skills: read/write `enabledPlugins` in Claude `settings.json`, keyed by `plugin-name@marketplace-name`, when the plugin ID is inferable from the cache path.
-- Global / skills.sh: use the default `.disabled-` directory strategy unless skills.sh exposes a native toggle later.
+- Global / skills.sh: no enable/disable strategy. Global Skills are Shared Skill Content and expose install, update, and remove lifecycle actions only.
 
 ## Provider Capabilities
 
@@ -116,7 +116,7 @@ Known v1 strategies:
 | --- | --- | --- | --- | --- | --- | --- |
 | Codex | yes | yes | no | no | no | no |
 | Claude | yes | yes | no | no | no | no |
-| Global / skills.sh | yes | yes | yes | yes | yes | no |
+| Global / skills.sh | yes | no | yes | yes | yes | no |
 | Project Skills | yes | no | no | no | no | no |
 
 ## TUI Behavior

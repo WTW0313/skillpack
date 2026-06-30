@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { SkillManager } from '../src/manager.js';
+import { buildSkillInventory } from '../src/models/inventory.js';
 import { CodexProvider } from '../src/providers/codex.js';
 import { GlobalProvider } from '../src/providers/global.js';
 
@@ -132,8 +133,24 @@ describe('Skill Inventory', () => {
     const global = inventory.find((group) => group.name === 'local-global')!;
 
     expect(codex.instances[0].actions).toEqual(['disable']);
-    expect(global.instances[0].actions).toEqual(['disable']);
+    expect(global.instances[0].actions).toEqual([]);
     expect(global.healthSignals.map((signal) => signal.code)).toContain('unmanaged-global-skill');
+  });
+
+  it('does not expose enable or disable actions for skills.sh-managed Global Skills', () => {
+    const inventory = buildSkillInventory([{
+      name: 'managed-global',
+      description: '',
+      provider: 'global',
+      path: path.join(root, 'global', 'managed-global'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      source: { type: 'skillssh' },
+    }]);
+
+    expect(inventory).toHaveLength(1);
+    expect(inventory[0].instances[0].actions).toEqual(['update', 'remove']);
   });
 
   it('exposes the provider Disable Strategy for mutable inventory instances', async () => {

@@ -105,7 +105,11 @@ export function ListView() {
     if (input === 'i') { setView('install'); return; }
     
     if (input === ' ' && skills[cursor]) {
-      manager.toggleSkill(skills[cursor]).then(() => refresh()).catch(() => {});
+      const selected = skills[cursor];
+      const canToggle = manager.getProvider(selected.provider)?.capabilities.canToggle ?? false;
+      if (canToggle) {
+        manager.toggleSkill(selected).then(() => refresh()).catch(() => {});
+      }
       return;
     }
     if (key.return && skills[cursor]) {

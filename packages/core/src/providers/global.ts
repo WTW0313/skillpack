@@ -11,7 +11,7 @@ export class GlobalProvider extends BaseProvider {
   readonly displayName = 'Global';
   readonly basePaths: string[];
   readonly capabilities: ProviderCapabilities = {
-    canInstall: true, canUninstall: true, canUpdate: true, canToggle: true, canCreate: true,
+    canInstall: true, canUninstall: true, canUpdate: true, canToggle: false, canCreate: true,
   };
   constructor(basePaths?: string[]) {
     super();

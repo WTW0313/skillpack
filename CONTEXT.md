@@ -28,6 +28,10 @@ _Avoid_: Skill Provider, registry
 A skill in the shared global skills location managed through the skills.sh ecosystem.
 _Avoid_: Universal skill, Skill Library entry
 
+**Shared Skill Content**:
+A skill directory that may be referenced by more than one Skill Provider. Availability for one provider must not be expressed by moving or renaming shared content.
+_Avoid_: Provider toggle target, per-agent state
+
 **Project Skill**:
 A skill stored inside a project repository and maintained by that repository's authors through git.
 _Avoid_: Global Skill, managed skill

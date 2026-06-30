@@ -37,6 +37,9 @@ export function DetailView() {
   const sourceType = selectedSkill?.source?.type;
   const isUpdatable = sourceType === 'skillssh';
   const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
+  const canToggle = selectedSkill
+    ? manager.getProvider(selectedSkill.provider)?.capabilities.canToggle ?? false
+    : false;
   const disableStrategy = selectedSkill
     ? manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill)
     : undefined;
@@ -81,7 +84,7 @@ export function DetailView() {
       } catch { /* opener failed */ }
       return;
     }
-    if (input === ' ' && selectedSkill && !busy) {
+    if (input === ' ' && selectedSkill && canToggle && !busy) {
       setError(null);
       setBusy(true);
       manager.toggleSkill(selectedSkill)

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { SkillManager } from '../src/manager.js';
 import { CodexProvider } from '../src/providers/codex.js';
+import { GlobalProvider } from '../src/providers/global.js';
 import { SkillsShSource } from '../src/sources/skillssh.js';
 import type { Skill } from '../src/models/index.js';
 import type { IInstallSource } from '../src/sources/source.js';
@@ -77,6 +78,21 @@ describe('SkillManager', () => {
       command: 'npx',
       args: ['skills', 'remove', 'managed-skill', '-g', '-y'],
     }]);
+  });
+
+  it('does not toggle Global Skills by renaming shared content', async () => {
+    const globalDir = path.join(dir, 'global');
+    const skillDir = path.join(globalDir, 'shared-skill');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: shared-skill\ndescription: shared\n---\n');
+
+    const customManager = new SkillManager();
+    customManager.registerProvider(new GlobalProvider([globalDir]));
+    await customManager.scanAll();
+
+    const [skill] = customManager.getAllSkills();
+    await expect(customManager.toggleSkill(skill)).rejects.toThrow('does not support toggle');
+    await expect(access(skillDir)).resolves.toBeUndefined();
   });
 
   it('rejects installs to non-Global providers before fetching from a source', async () => {

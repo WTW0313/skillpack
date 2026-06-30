@@ -79,10 +79,11 @@ function inferredIdentityFor(skill: Skill): { key: string; confidence: SkillIden
 
 function actionsFor(skill: Skill): SkillAction[] {
   const toggleAction: SkillAction = skill.enabled ? 'disable' : 'enable';
-  if (skill.provider === 'global' && skill.source?.type === 'skillssh') {
-    return [toggleAction, 'update', 'remove'];
-  }
   if (skill.scope === 'project') return [];
+  if (skill.provider === 'global' && skill.source?.type === 'skillssh') {
+    return ['update', 'remove'];
+  }
+  if (skill.provider === 'global') return [];
   return [toggleAction];
 }
 

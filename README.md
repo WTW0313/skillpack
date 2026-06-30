@@ -41,7 +41,7 @@ node packages/tui/dist/skillpack.js
 
 Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to switch between provider tabs (All, Codex, Claude, Global), and `/` to search.
 
-Press `Space` to toggle a provider instance on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a skills.sh Global Skill, or `u` to open manual updates.
+Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a skills.sh Global Skill, or `u` to open manual updates.
 
 ## Keyboard Shortcuts
 
@@ -50,7 +50,7 @@ Press `Space` to toggle a provider instance on or off, `Enter` to view details, 
 | Key | Action | Description |
 |-----|--------|-------------|
 | `↑` / `↓` | Navigate | Move selection up / down |
-| `Space` | Toggle | Enable or disable the selected skill |
+| `Space` | Toggle | Enable or disable a selected Codex or Claude skill |
 | `Enter` | Detail | Open skill detail view |
 | `Tab` / `Shift+Tab` | Switch tab | Cycle through All / Codex / Claude / Global |
 | `/` | Search | Fuzzy match on name + description |
@@ -65,7 +65,7 @@ Press `Space` to toggle a provider instance on or off, `Enter` to view details, 
 | Key | Action | Description |
 |-----|--------|-------------|
 | `Esc` | Back | Return to list view |
-| `Space` | Toggle | Enable or disable the skill |
+| `Space` | Toggle | Enable or disable a Codex or Claude skill |
 | `o` / `O` | Open folder | Open skill directory in system file manager |
 | `d` | Delete | Remove a skills.sh-managed Global Skill with confirmation |
 | `↑` / `↓` | Scroll | Scroll the description when it overflows |

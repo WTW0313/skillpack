@@ -21,7 +21,7 @@ npx skillpack-tui
 
 - Multi-platform scanning for Codex, Claude, Global, and project-level skills
 - Symlink-aware duplicate detection
-- Enable and disable skills through provider-native availability mechanisms, with `.disabled-` as a fallback
+- Enable and disable Codex and Claude skills through provider-native availability mechanisms
 - Install Global Skills through the skills.sh registry
 - Check and apply manual updates for skills.sh-managed Global Skills
 - Fuzzy search by name and description
@@ -30,7 +30,7 @@ npx skillpack-tui
 
 Launch `skillpack` to see discovered skills grouped by provider. Use the arrow keys to navigate, `Tab` / `Shift+Tab` to switch provider tabs, and `/` to search.
 
-Press `Space` to toggle a skill on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a Global Skill, or `u` to open manual updates.
+Press `Space` to toggle a Codex or Claude skill on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a Global Skill, or `u` to open manual updates.
 
 ## Keyboard Shortcuts
 
@@ -39,7 +39,7 @@ Press `Space` to toggle a skill on or off, `Enter` to view details, `p` to inspe
 | Key | Action |
 | --- | --- |
 | `↑` / `↓` | Navigate skills |
-| `Space` | Enable or disable selected skill |
+| `Space` | Enable or disable selected Codex or Claude skill |
 | `Enter` | Open skill detail view |
 | `Tab` / `Shift+Tab` | Switch provider tab |
 | `/` | Search |
@@ -54,7 +54,7 @@ Press `Space` to toggle a skill on or off, `Enter` to view details, `p` to inspe
 | Key | Action |
 | --- | --- |
 | `Esc` | Return to list view |
-| `Space` | Enable or disable skill |
+| `Space` | Enable or disable Codex or Claude skill |
 | `o` / `O` | Open skill folder |
 | `d` | Remove a skills.sh-managed Global Skill |
 | `↑` / `↓` | Scroll description |
@@ -73,12 +73,6 @@ It auto-detects provider directories on first run and can scan project-level ski
 .codex/skills
 .claude/skills
 .agents/skills
-```
-
-Remote install provenance is stored in:
-
-```text
-~/.config/skillpack/skillpack.lock
 ```
 
 ## Requirements

@@ -9,7 +9,7 @@ interface Shortcut {
 const SHORTCUTS: Record<string, Shortcut[]> = {
   list: [
     { key: '↑↓', label: 'navigate' },
-    { key: 'space', label: 'toggle' },
+    { key: 'space', label: 'toggle when supported' },
     { key: 'enter', label: 'detail' },
     { key: '/', label: 'search' },
     { key: 'tab', label: 'tabs' },
@@ -47,17 +47,23 @@ const DETAIL_TAIL: Shortcut[] = [
 ];
 
 export function StatusBar() {
-  const { view, selectedSkill } = useAppContext();
+  const { view, selectedSkill, manager } = useAppContext();
 
   let shortcuts: Shortcut[];
   if (view === 'detail') {
     const sourceType = selectedSkill?.source?.type;
     const isUpdatable = sourceType === 'skillssh';
     const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
+    const canToggle = selectedSkill
+      ? manager.getProvider(selectedSkill.provider)?.capabilities.canToggle ?? false
+      : false;
+    const detailBase = canToggle
+      ? [...DETAIL_BASE]
+      : DETAIL_BASE.filter((shortcut) => shortcut.key !== 'space');
     const tail = isRemovable ? [...DETAIL_TAIL, { key: 'd', label: 'delete' }] : DETAIL_TAIL;
     shortcuts = isUpdatable
-      ? [...DETAIL_BASE, { key: 'u', label: 'check update' }, ...tail]
-      : [...DETAIL_BASE, ...tail];
+      ? [...detailBase, { key: 'u', label: 'check update' }, ...tail]
+      : [...detailBase, ...tail];
   } else {
     shortcuts = SHORTCUTS[view] ?? [];
   }
