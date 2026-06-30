@@ -18,6 +18,13 @@ export interface SkillSource {
   };
 }
 
+export type SkillScanIssueCode = 'invalid-skill-md' | 'broken-symlink';
+
+export interface SkillScanIssue {
+  code: SkillScanIssueCode;
+  message: string;
+}
+
 export interface Skill {
   name: string;
   description: string;
@@ -29,6 +36,7 @@ export interface Skill {
   scope: 'global' | 'project';
   metadata: SkillMetadata;
   source?: SkillSource;
+  scanIssues?: SkillScanIssue[];
 }
 
 export interface SkillTemplate {

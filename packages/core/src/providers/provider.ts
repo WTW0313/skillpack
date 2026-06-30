@@ -39,18 +39,42 @@ export abstract class BaseProvider implements ISkillProvider {
       try { await access(basePath); } catch { continue; }
       const entries = await readdir(basePath, { withFileTypes: true });
       for (const entry of entries) {
-        let isDir = entry.isDirectory();
-        if (!isDir && entry.isSymbolicLink()) {
-          try { isDir = (await stat(path.join(basePath, entry.name))).isDirectory(); } catch { /* broken symlink */ }
-        }
-        if (!isDir) continue;
         const isDisabled = entry.name.startsWith('.disabled-');
         const skillDirName = isDisabled ? entry.name.slice('.disabled-'.length) : entry.name;
         if (entry.name.startsWith('.') && !isDisabled) continue;
+        let isDir = entry.isDirectory();
+        if (!isDir && entry.isSymbolicLink()) {
+          try {
+            isDir = (await stat(path.join(basePath, entry.name))).isDirectory();
+          } catch (err) {
+            const skillDir = path.join(basePath, entry.name);
+            skills.push({
+              name: skillDirName,
+              description: '',
+              provider: this.id,
+              path: skillDir,
+              enabled: !isDisabled,
+              scope: 'global',
+              metadata: {},
+              source: { type: 'local' },
+              scanIssues: [{
+                code: 'broken-symlink',
+                message: err instanceof Error ? err.message : 'Broken skill symlink',
+              }],
+            });
+            continue;
+          }
+        }
+        if (!isDir) continue;
         const skillDir = path.join(basePath, entry.name);
         const skillMdPath = path.join(skillDir, 'SKILL.md');
+        let content: string;
         try {
-          const content = await readFile(skillMdPath, 'utf-8');
+          content = await readFile(skillMdPath, 'utf-8');
+        } catch {
+          continue;
+        }
+        try {
           const parsed = parseSkillMd(content);
           const resolved = await realpath(skillDir);
           const dirStat = await stat(resolved);
@@ -66,7 +90,25 @@ export abstract class BaseProvider implements ISkillProvider {
             metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
             source: { type: 'local', createdAt: dirStat.birthtime.toISOString() },
           });
-        } catch { /* no SKILL.md — skip */ }
+        } catch (err) {
+          const resolved = await realpath(skillDir).catch(() => skillDir);
+          const dirStat = await stat(resolved).catch(() => undefined);
+          skills.push({
+            name: skillDirName,
+            description: '',
+            provider: this.id,
+            path: skillDir,
+            resolvedPath: resolved !== skillDir ? resolved : undefined,
+            enabled: !isDisabled,
+            scope: 'global',
+            metadata: {},
+            source: { type: 'local', createdAt: dirStat?.birthtime.toISOString() },
+            scanIssues: [{
+              code: 'invalid-skill-md',
+              message: err instanceof Error ? err.message : 'Invalid SKILL.md',
+            }],
+          });
+        }
       }
     }
     return skills;

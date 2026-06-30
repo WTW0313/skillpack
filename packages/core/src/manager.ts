@@ -6,15 +6,18 @@ import type { IInstallSource } from './sources/source.js';
 import type { Skill, SkillTemplate } from './models/index.js';
 import type { DuplicateInfo } from './models/duplicate.js';
 import type { RemoteSkill, UpdateInfo } from './models/source.js';
+import type { SkillGroup, SkillInventoryInstance } from './models/inventory.js';
 import { DuplicateDetector } from './duplicates.js';
 import { LockfileManager } from './lockfile.js';
 import { SkillsLockReader } from './skills-lock.js';
 import { parseSkillMd } from './parser.js';
+import { buildSkillInventory } from './models/inventory.js';
 
 export class SkillManager {
   private providers = new Map<string, ISkillProvider>();
   private sources = new Map<string, IInstallSource>();
   private skills: Skill[] = [];
+  private projectSkills: Skill[] = [];
   private duplicates: DuplicateInfo[] = [];
   private duplicateDetector = new DuplicateDetector();
   private globalLock?: LockfileManager;
@@ -42,9 +45,10 @@ export class SkillManager {
 
     if (cwd && projectSkillsDirs?.length) {
       const projectSkills = await this.scanProjectSkills(cwd, projectSkillsDirs);
-      const projectNames = new Set(projectSkills.map((s) => s.name));
-      allSkills = allSkills.filter((s) => !projectNames.has(s.name));
       allSkills = [...allSkills, ...projectSkills];
+      this.projectSkills = projectSkills;
+    } else {
+      this.projectSkills = [];
     }
 
     await this.skillsLock.load();
@@ -145,6 +149,21 @@ export class SkillManager {
   }
 
   getAllSkills(): Skill[] { return this.skills; }
+  getInventory(): SkillGroup[] { return buildSkillInventory(this.skills); }
+  getProjectSkills(): SkillInventoryInstance[] {
+    return this.projectSkills.map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      provider: skill.provider,
+      path: skill.path,
+      resolvedPath: skill.resolvedPath,
+      version: skill.version,
+      enabled: skill.enabled,
+      source: skill.source,
+      actions: [],
+      healthSignals: [],
+    }));
+  }
   getSkillsByProvider(providerId: string): Skill[] { return this.skills.filter((s) => s.provider === providerId); }
   getDuplicates(): DuplicateInfo[] { return this.duplicates; }
   isDuplicate(skillName: string): boolean { return this.duplicates.some((d) => d.skillName === skillName); }

@@ -7,3 +7,4 @@ export * from './providers/index.js';
 export { DuplicateDetector } from './duplicates.js';
 export * from './sources/index.js';
 export { SkillManager } from './manager.js';
+export { buildSkillInventory, normalizeSkillName } from './models/inventory.js';
