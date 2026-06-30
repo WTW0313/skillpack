@@ -33,15 +33,13 @@ export function createDefaultConfig(homeDir = os.homedir()): SkillpackConfig {
   return {
     editor: process.env.EDITOR || 'vi',
     autoCheckUpdates: true,
-    projectSkillsDirs: ['.codex/skills', '.cursor/skills-cursor', '.claude/skills', '.agents/skills'],
+    projectSkillsDirs: ['.codex/skills', '.claude/skills', '.agents/skills'],
     providers: {
       codex: { enabled: true, paths: [path.join(homeDir, '.codex', 'skills')] },
-      cursor: { enabled: true, paths: [path.join(homeDir, '.cursor', 'skills-cursor')] },
       claude: { enabled: true, paths: [path.join(homeDir, '.claude', 'plugins', 'cache'), path.join(homeDir, '.claude', 'skills')] },
       global: { enabled: true, paths: [path.join(homeDir, '.agents', 'skills')] },
     },
     sources: {
-      github: { enabled: true },
       skillssh: { enabled: true },
     },
   };

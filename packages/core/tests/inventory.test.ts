@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { SkillManager } from '../src/manager.js';
 import { CodexProvider } from '../src/providers/codex.js';
-import { CursorProvider } from '../src/providers/cursor.js';
 import { GlobalProvider } from '../src/providers/global.js';
 
 async function writeSkill(dir: string, name: string, description = 'Test skill'): Promise<void> {
@@ -26,16 +25,16 @@ describe('Skill Inventory', () => {
   it('groups provider instances that resolve to the same skill path as confirmed', async () => {
     const canonicalSkill = path.join(root, 'shared', 'figma');
     const codexDir = path.join(root, 'codex');
-    const cursorDir = path.join(root, 'cursor');
+    const globalDir = path.join(root, 'global');
     await writeSkill(canonicalSkill, 'figma');
     await mkdir(codexDir);
-    await mkdir(cursorDir);
+    await mkdir(globalDir);
     await symlink(canonicalSkill, path.join(codexDir, 'figma'));
-    await symlink(canonicalSkill, path.join(cursorDir, 'figma'));
+    await symlink(canonicalSkill, path.join(globalDir, 'figma'));
 
     const manager = new SkillManager();
     manager.registerProvider(new CodexProvider([codexDir]));
-    manager.registerProvider(new CursorProvider([cursorDir]));
+    manager.registerProvider(new GlobalProvider([globalDir]));
 
     await manager.scanAll();
 
@@ -43,18 +42,18 @@ describe('Skill Inventory', () => {
     expect(inventory).toHaveLength(1);
     expect(inventory[0].name).toBe('figma');
     expect(inventory[0].identity.confidence).toBe('confirmed');
-    expect(inventory[0].instances.map((instance) => instance.provider).sort()).toEqual(['codex', 'cursor']);
+    expect(inventory[0].instances.map((instance) => instance.provider).sort()).toEqual(['codex', 'global']);
   });
 
   it('groups provider instances by normalized name as inferred when provenance is unavailable', async () => {
     const codexDir = path.join(root, 'codex');
-    const cursorDir = path.join(root, 'cursor');
+    const globalDir = path.join(root, 'global');
     await writeSkill(path.join(codexDir, 'figma-tool'), 'figma-tool');
-    await writeSkill(path.join(cursorDir, 'figma_tool'), 'Figma Tool');
+    await writeSkill(path.join(globalDir, 'figma_tool'), 'Figma Tool');
 
     const manager = new SkillManager();
     manager.registerProvider(new CodexProvider([codexDir]));
-    manager.registerProvider(new CursorProvider([cursorDir]));
+    manager.registerProvider(new GlobalProvider([globalDir]));
 
     await manager.scanAll();
 
@@ -139,28 +138,30 @@ describe('Skill Inventory', () => {
 
   it('exposes the provider Disable Strategy for mutable inventory instances', async () => {
     const codexDir = path.join(root, 'codex');
+    const codexConfig = path.join(root, 'codex-config.toml');
     await writeSkill(path.join(codexDir, 'toggle-me'), 'toggle-me');
 
     const manager = new SkillManager();
-    manager.registerProvider(new CodexProvider([codexDir]));
+    manager.registerProvider(new CodexProvider([codexDir], codexConfig));
 
     await manager.scanAll();
 
     const instance = manager.getInventory()[0].instances[0];
     expect(instance.disableStrategy).toEqual({
-      type: 'disabled-directory',
-      description: 'Renames the skill directory with a .disabled- prefix',
+      type: 'provider-config',
+      description: 'Writes [[skills.config]] in Codex config.toml',
     });
   });
 
-  it('toggles the selected inventory instance path without changing same-name siblings', async () => {
+  it('toggles the selected inventory instance through provider config without changing same-name siblings', async () => {
     const firstCodexDir = path.join(root, 'codex-one');
     const secondCodexDir = path.join(root, 'codex-two');
+    const codexConfig = path.join(root, 'codex-config.toml');
     await writeSkill(path.join(firstCodexDir, 'shared'), 'shared');
     await writeSkill(path.join(secondCodexDir, 'shared'), 'shared');
 
     const manager = new SkillManager();
-    manager.registerProvider(new CodexProvider([firstCodexDir, secondCodexDir]));
+    manager.registerProvider(new CodexProvider([firstCodexDir, secondCodexDir], codexConfig));
 
     await manager.scanAll();
     const before = manager.getInventory()[0].instances;
@@ -171,7 +172,7 @@ describe('Skill Inventory', () => {
 
     const after = manager.getInventory()[0].instances;
     expect(after.find((instance) => instance.path.startsWith(firstCodexDir))?.enabled).toBe(true);
-    expect(after.find((instance) => instance.path.includes(`${path.sep}.disabled-shared`))?.enabled).toBe(false);
+    expect(after.find((instance) => instance.path.startsWith(secondCodexDir))?.enabled).toBe(false);
   });
 
   it('keeps invalid Project Skills visible as read-only project inventory', async () => {

@@ -30,7 +30,7 @@ describe('ConfigManager', () => {
 
     expect(config.providers.codex.paths).toEqual([customCodexPath]);
     expect(config.providers.codex.enabled).toBe(true);
-    expect(config.providers.cursor.paths[0]).toContain(path.join('.cursor', 'skills-cursor'));
+    expect(Object.keys(config.providers).sort()).toEqual(['claude', 'codex', 'global']);
     expect(config.providers.claude.paths).toEqual(
       expect.arrayContaining([
         expect.stringContaining(path.join('.claude', 'plugins', 'cache')),
@@ -38,6 +38,7 @@ describe('ConfigManager', () => {
       ]),
     );
     expect(config.providers.global.paths[0]).toContain(path.join('.agents', 'skills'));
+    expect(config.sources.github).toBeUndefined();
     expect(config.sources.skillssh.enabled).toBe(true);
   });
 
@@ -56,8 +57,7 @@ describe('ConfigManager', () => {
       enabled: true,
       paths: [path.join(homeDir, '.agents', 'skills')],
     });
-    expect(config.providers.cursor.enabled).toBe(false);
     expect(config.providers.claude.enabled).toBe(false);
-    expect(config.projectSkillsDirs).toEqual(['.codex/skills', '.cursor/skills-cursor', '.claude/skills', '.agents/skills']);
+    expect(config.projectSkillsDirs).toEqual(['.codex/skills', '.claude/skills', '.agents/skills']);
   });
 });

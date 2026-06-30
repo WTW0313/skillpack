@@ -6,7 +6,6 @@ import type { Skill } from '@skillpack/core';
 const TAB_PROVIDER_MAP: Record<string, string | null> = {
   All: null,
   Codex: 'codex',
-  Cursor: 'cursor',
   Claude: 'claude',
   Global: 'global',
 };

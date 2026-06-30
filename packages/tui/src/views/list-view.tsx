@@ -72,7 +72,7 @@ export function ListView() {
         counts[tab] = inventorySkills.length;
       } else {
         const providerMap: Record<string, string> = {
-          Codex: 'codex', Cursor: 'cursor', Claude: 'claude', Global: 'global',
+          Codex: 'codex', Claude: 'claude', Global: 'global',
         };
         counts[tab] = inventorySkills.filter((s) => s.provider === providerMap[tab]).length;
       }
