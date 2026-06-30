@@ -1,17 +1,15 @@
 # Skillpack
 
-Unified TUI manager for agent skills across Codex, Cursor, Claude, and Global (`~/.agents/skills`).
+Unified TUI manager for agent skills across Codex, Claude, and Global (`~/.agents/skills`).
 
 ## Features
 
-- **Multi-platform scanning** — discovers skills from Codex, Cursor, Claude, and Global provider directories automatically, with symlink support
-- **Project-level skills** — scans per-project skill directories (`.codex/skills`, `.cursor/skills-cursor`, `.claude/skills`, `.agents/skills`) with override priority over global skills
-- **Enable / disable toggle** — disable any skill via `.disabled-` directory prefix rename; re-enable restores it instantly
-- **Install from remote sources** — fetch skills from GitHub repos or skills.sh registry
-- **Fork to local** — copy any read-only skill into a writable provider for customization
-- **Duplicate detection** — highlights skills with the same name across different providers
-- **Create skills** — scaffold new SKILL.md templates with frontmatter and structure
-- **Lock file tracking** — records installed skill provenance in `skillpack.lock`
+- **Multi-platform scanning** — discovers skills from Codex, Claude, and Global provider locations automatically, with symlink support
+- **Project Skills** — scans read-only project skill directories (`.codex/skills`, `.claude/skills`, `.agents/skills`) in a separate view
+- **Provider-native availability** — reads provider config when available and uses `.disabled-` renaming only as a fallback
+- **Skill Inventory** — groups provider instances by Skill Identity and surfaces deterministic Health Signals
+- **skills.sh installs** — installs, updates, and removes Global Skills through the skills.sh CLI
+- **Manual updates** — checks updates only when requested
 - **Fuzzy search** — filter skills by name or description
 - **Keyboard-driven** — full TUI navigation without a mouse
 
@@ -41,9 +39,9 @@ node packages/tui/dist/skillpack.js
 
 ## Quick Start
 
-Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to switch between provider tabs (All, Codex, Cursor, Claude, Global, Project), and `/` to search.
+Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to switch between provider tabs (All, Codex, Claude, Global), and `/` to search.
 
-Press `Space` to toggle a skill on or off, `Enter` to view its details, `i` to install from a remote source, or `c` to create one from scratch.
+Press `Space` to toggle a provider instance on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a skills.sh Global Skill, or `u` to open manual updates.
 
 ## Keyboard Shortcuts
 
@@ -54,12 +52,12 @@ Press `Space` to toggle a skill on or off, `Enter` to view its details, `i` to i
 | `↑` / `↓` | Navigate | Move selection up / down |
 | `Space` | Toggle | Enable or disable the selected skill |
 | `Enter` | Detail | Open skill detail view |
-| `Tab` / `Shift+Tab` | Switch tab | Cycle through All / Codex / Cursor / Claude / Global / Project |
+| `Tab` / `Shift+Tab` | Switch tab | Cycle through All / Codex / Claude / Global |
 | `/` | Search | Fuzzy match on name + description |
 | `Esc` | Clear search | Clear the active search filter |
-| `i` | Install | Install from GitHub or skills.sh |
-| `c` | Create | Scaffold a new skill |
-| `u` | Update | Check for updates |
+| `p` | Project Skills | Open read-only Project Skills view |
+| `i` | Install | Install a Global Skill through skills.sh |
+| `u` | Updates | Open manual skills.sh updates |
 | `q` | Quit | Exit skillpack |
 
 ### Detail View
@@ -68,9 +66,8 @@ Press `Space` to toggle a skill on or off, `Enter` to view its details, `i` to i
 |-----|--------|-------------|
 | `Esc` | Back | Return to list view |
 | `Space` | Toggle | Enable or disable the skill |
-| `e` / `E` | Edit | Open SKILL.md in `$EDITOR` |
 | `o` / `O` | Open folder | Open skill directory in system file manager |
-| `d` | Delete | Uninstall skill with confirmation |
+| `d` | Delete | Remove a skills.sh-managed Global Skill with confirmation |
 | `↑` / `↓` | Scroll | Scroll the description when it overflows |
 
 ## Configuration
@@ -83,18 +80,15 @@ Skillpack stores its configuration at `~/.config/skillpack/config.json`. On firs
   "autoCheckUpdates": true,
   "projectSkillsDirs": [
     ".codex/skills",
-    ".cursor/skills-cursor",
     ".claude/skills",
     ".agents/skills"
   ],
   "providers": {
     "codex":  { "enabled": true, "paths": ["~/.codex/skills"] },
-    "cursor": { "enabled": true, "paths": ["~/.cursor/skills-cursor"] },
     "claude": { "enabled": true, "paths": ["~/.claude/plugins/cache", "~/.claude/skills"] },
     "global": { "enabled": true, "paths": ["~/.agents/skills"] }
   },
   "sources": {
-    "github":   { "enabled": true },
     "skillssh": { "enabled": true }
   }
 }
@@ -104,7 +98,7 @@ The lock file lives at `~/.config/skillpack/skillpack.lock` and records the sour
 
 ## Adding a Provider
 
-Extend the `BaseProvider` class from `@skillpack/core` (which implements `ISkillProvider` with default `scan`, `enable`, `disable` via `.disabled-` prefix rename):
+Extend the `BaseProvider` class from `@skillpack/core` (which implements `ISkillProvider` with default scanning and a fallback `.disabled-` prefix rename strategy). Providers with native availability config should override `scan`, `setEnabled`, and `getDisableStrategy` so Skillpack reflects the provider's own loading rules.
 
 ```typescript
 import { BaseProvider, type ProviderCapabilities } from '@skillpack/core';
@@ -140,8 +134,8 @@ skillpack/
 │   ├── core/                  # @skillpack/core — platform-agnostic library
 │   │   ├── src/
 │   │   │   ├── models/        # Skill, DuplicateInfo, RemoteSkill, etc.
-│   │   │   ├── providers/     # Codex, Cursor, Claude, Global providers + BaseProvider
-│   │   │   ├── sources/       # GitHub and skills.sh install sources
+│   │   │   ├── providers/     # Codex, Claude, Global providers + BaseProvider
+│   │   │   ├── sources/       # skills.sh install source
 │   │   │   ├── config.ts      # Configuration manager
 │   │   │   ├── duplicates.ts  # Duplicate detection logic
 │   │   │   ├── lockfile.ts    # Lock file manager
@@ -150,7 +144,7 @@ skillpack/
 │   │   └── tests/
 │   └── tui/                   # @skillpack/tui — Ink-based terminal UI
 │       └── src/
-│           ├── views/         # ListView, DetailView, InstallView, CreateView, UpdateView
+│           ├── views/         # ListView, DetailView, InstallView, ProjectSkillsView, UpdatesView
 │           ├── components/    # StatusBar, ConfirmDialog, SearchInput, SkillRow, TabBar
 │           ├── context/       # React context for app state
 │           ├── hooks/         # useSkillManager, useSkills, useSearch, useTerminalSize

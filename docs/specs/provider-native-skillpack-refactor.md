@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Refactor Skillpack into an understanding-first TUI for managing agent skills across Codex, Cursor, Claude, Global skills from skills.sh, and read-only Project Skills.
+Refactor Skillpack into an understanding-first TUI for managing agent skills across Codex, Claude, Global skills from skills.sh, and read-only Project Skills.
 
 Skillpack should not become the canonical owner of skill content. Each Skill Provider keeps its provider-native state. Skillpack scans that state, groups related instances into a Skill Inventory, exposes deterministic Health Signals, and allows only the lifecycle actions that are safe for each provider.
 
@@ -10,7 +10,7 @@ Skillpack should not become the canonical owner of skill content. Each Skill Pro
 
 The TUI has four top-level sections:
 
-- **Inventory**: grouped view of provider-native skills from Codex, Cursor, Claude, and Global.
+- **Inventory**: grouped view of provider-native skills from Codex, Claude, and Global.
 - **Project Skills**: read-only inventory of skills stored in the current project repository.
 - **Install**: skills.sh search and install into Global Skills only.
 - **Updates**: manual update checks and updates for skills.sh-managed Global Skills.
@@ -27,11 +27,11 @@ The main experience is Inventory. It should answer:
 
 In scope:
 
-- Scan Codex, Cursor, Claude, Global, and Project Skill locations using provider-specific rules.
+- Scan Codex, Claude, Global, and Project Skill locations using provider-specific rules.
 - Build Skill Groups from provider instances using provenance-aware Skill Identity.
 - Show provider badges, Health Signals, and provenance summaries in the main Inventory.
 - Show Project Skills in a separate read-only view.
-- Enable or disable Codex, Cursor, Claude, and Global provider instances through provider-specific Disable Strategies.
+- Enable or disable Codex, Claude, and Global provider instances through provider-specific Disable Strategies.
 - Use `.disabled-` renaming only when no known provider config or native disable mechanism exists.
 - Install Global Skills through skills.sh only.
 - Remove and update skills.sh-managed Global Skills through skills.sh only.
@@ -44,7 +44,7 @@ Out of scope:
 - Creating new skills.
 - Arbitrary GitHub installs.
 - Copying, importing, or forking skills between providers.
-- Removing provider-local Codex, Cursor, or Claude skills.
+- Removing provider-local Codex or Claude skills.
 - LLM-generated advisory guidance or security scoring.
 - Automatic update checks on startup.
 - Controlling Project Skills.
@@ -56,7 +56,6 @@ Out of scope:
 A provider-native source of skill state. V1 providers:
 
 - Codex
-- Cursor
 - Claude
 - Global / skills.sh
 - Project Skills
@@ -102,14 +101,20 @@ Security/risk scoring is out of scope.
 
 ### Disable Strategy
 
-Each provider adapter owns enable/disable behavior. A strategy should prefer known provider-native config mechanisms. `.disabled-` directory renaming is a fallback only when no provider-specific mechanism is known.
+Each provider adapter owns enable/disable behavior. A strategy should prefer known provider-native config mechanisms. Provider config determines Skill Availability when a provider has a known config file or native disable mechanism. `.disabled-` directory renaming is a fallback only when a scanned location has no provider-specific mechanism.
+
+Known v1 strategies:
+
+- Codex: read/write `[[skills.config]]` entries in `~/.codex/config.toml`, keyed by absolute `SKILL.md` path.
+- Claude regular skills: read/write `skillOverrides` in Claude `settings.json`, keyed by skill name.
+- Claude plugin skills: read/write `enabledPlugins` in Claude `settings.json`, keyed by `plugin-name@marketplace-name`, when the plugin ID is inferable from the cache path.
+- Global / skills.sh: use the default `.disabled-` directory strategy unless skills.sh exposes a native toggle later.
 
 ## Provider Capabilities
 
 | Provider | Scan | Enable/disable | Install | Update | Remove | Edit/Create |
 | --- | --- | --- | --- | --- | --- | --- |
 | Codex | yes | yes | no | no | no | no |
-| Cursor | yes | yes | no | no | no | no |
 | Claude | yes | yes | no | no | no | no |
 | Global / skills.sh | yes | yes | yes | yes | yes | no |
 | Project Skills | yes | no | no | no | no | no |
@@ -131,7 +136,6 @@ Provider filters can exist inside Inventory:
 
 - All
 - Codex
-- Cursor
 - Claude
 - Global
 
@@ -201,12 +205,12 @@ The current core model is provider-centric and action-heavy. The refactor should
 
 Use core tests as the primary seam. The most valuable external behavior tests are:
 
-- provider scanning returns provider instances with enabled state and paths
-- disable strategies toggle through provider-supported behavior
+- provider scanning returns provider instances with availability state and paths
+- disable strategies toggle through provider-supported config behavior, falling back to `.disabled-` only when no provider config mechanism is known
 - Skill Identity groups confirmed and inferred instances correctly
 - Project Skills are excluded from controllable Inventory and appear in read-only Project Skills output
 - skills.sh-managed Global Skills expose install/update/remove actions
-- provider-local Codex/Cursor/Claude skills do not expose remove/update/install/edit/create actions
+- provider-local Codex/Claude skills do not expose remove/update/install/edit/create actions
 - invalid skills and broken symlinks produce Health Signals instead of silently disappearing
 
 TUI tests do not exist yet. V1 can keep TUI verification manual unless a test harness is introduced, but the core should expose enough derived state that the TUI remains thin.

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Skillpack is a unified TUI manager for agent skills across Codex, Cursor, Claude, and Global (`~/.agents/skills`). It's a pnpm monorepo with two packages:
+Skillpack is a unified TUI manager for agent skills across Codex, Claude, and Global (`~/.agents/skills`). It's a pnpm monorepo with two packages:
 
 - `packages/core` (`@skillpack/core`) — platform-agnostic library: skill scanning, providers, install sources, parser, lockfile
 - `packages/tui` (`@skillpack/tui`) — Ink (React) terminal UI with keyboard-driven navigation
@@ -48,10 +48,10 @@ node packages/tui/dist/bin/skillpack.js
 | File | Purpose |
 |------|---------|
 | `manager.ts` | `SkillManager` — central orchestrator for scan, toggle, install, uninstall, update |
-| `providers/provider.ts` | `ISkillProvider` interface + `BaseProvider` with `.disabled-` prefix toggle |
-| `providers/{codex,cursor,claude,global}.ts` | Per-agent provider implementations |
+| `providers/provider.ts` | `ISkillProvider` interface + `BaseProvider` with fallback `.disabled-` prefix toggle |
+| `providers/{codex,claude,global}.ts` | Default provider implementations |
 | `duplicates.ts` | `DuplicateDetector` — finds same-name skills across providers (symlink-aware) |
-| `models/skill.ts` | `Skill`, `SkillTemplate`, `SkillSource` types (no `readonly` flag — all skills are editable/deletable) |
+| `models/skill.ts` | `Skill`, `SkillTemplate`, `SkillSource` types |
 | `models/duplicate.ts` | `DuplicateInfo`, `DuplicateInstance` types |
 | `parser.ts` | SKILL.md YAML frontmatter parser |
 | `config.ts` | Configuration manager (`~/.config/skillpack/config.json`) |
@@ -65,16 +65,17 @@ node packages/tui/dist/bin/skillpack.js
 |------|---------|
 | `app.tsx` | App shell, router by `view` state |
 | `context/app-context.tsx` | Global state: skills, duplicates, selectedSkill, view, refresh |
-| `views/list-view.tsx` | Main list with tabs, search, scroll |
-| `views/detail-view.tsx` | Skill detail: metadata, source info, update check (`u`), toggle/edit/delete |
-| `views/install-view.tsx` | Remote install flow (source → query → results → install to Global) |
-| `views/create-view.tsx` | Skill creation wizard |
+| `views/list-view.tsx` | Main inventory with tabs, search, scroll |
+| `views/detail-view.tsx` | Skill detail: metadata, source info, toggle, skills.sh update/remove |
+| `views/project-skills-view.tsx` | Read-only Project Skills view |
+| `views/install-view.tsx` | skills.sh install flow (query → results → install to Global) |
+| `views/updates-view.tsx` | Manual skills.sh update checks |
 | `components/` | StatusBar (context-aware shortcuts), ConfirmDialog, SkillRow, TabBar, SearchInput |
 | `bin/skillpack.ts` | CLI entry point with alternate screen buffer |
 
 ### Routing
 
-The TUI uses a `view` state (`'list' | 'detail' | 'install' | 'create'`) in `app-context.tsx`, not a router library. The `Router` component in `app.tsx` switches on this state.
+The TUI uses a `view` state (`'list' | 'detail' | 'install' | 'project' | 'updates'`) in `app-context.tsx`, not a router library. The `Router` component in `app.tsx` switches on this state.
 
 ## Conventions
 
@@ -85,22 +86,18 @@ The TUI uses a `view` state (`'list' | 'detail' | 'install' | 'create'`) in `app
 - Prefer `useMemo` for derived state in React components
 - Use `useInput` from Ink for keyboard handling with `isActive` to scope input
 
-### Skill Toggle Mechanism
+### Skill Availability And Toggle
 
-Skills are toggled by renaming their directory with a `.disabled-` prefix. The `enable`/`disable` methods on providers handle this. When calling toggle from the manager, always use the actual directory name from `skill.path` (via `path.basename()`), never `skill.name`, because the SKILL.md `name` field can differ from the directory name.
+Skill discovery and Skill Availability are separate facts. A skill can exist on disk while a provider config marks it unavailable. Providers should read their provider-native config files to decide `skill.enabled` and should toggle by editing provider config when a known config mechanism exists. Codex uses `[[skills.config]]` entries in `~/.codex/config.toml` keyed by absolute `SKILL.md` path. Claude regular skills use `skillOverrides` in Claude `settings.json`, and Claude plugin skills use `enabledPlugins` for the owning plugin. Use `.disabled-` directory renaming only as a fallback when a scanned location has no known config or native disable mechanism. When a fallback rename is used, target the actual directory from `skill.path`, never `skill.name`, because the `SKILL.md` `name` field can differ from the directory name.
 
-### Edit, Delete, and Update
+### Delete And Update
 
-All skills can be edited (`e` opens `$EDITOR`), opened in the system file manager (`o` — uses `open` on macOS, `xdg-open` on Linux), and deleted (`d` with confirmation). There is no `readonly` flag — every skill is fully manageable.
+Skills can be opened in the system file manager (`o` — uses `open` on macOS, `xdg-open` on Linux). Skillpack v1 does not edit or create skills.
 
-**Delete routing** depends on source type:
-- `skillssh`: delegates to `npx skills remove <name> -g -y` (skills CLI manages its own lock)
-- `github`: removes the skill directory + removes the entry from `skillpack.lock`
-- `local` / other: delegates to the provider's `uninstall` or directly removes the directory
+Delete is available only for skills.sh-managed Global Skills and delegates to `npx skills remove <name> -g -y` so the skills CLI manages its own lock state.
 
-**Update** is available only for `skillssh` and `github` sources. In the detail view, press `u` to first check for updates, then `u` again to apply. Update routing:
+**Update** is available only for `skillssh` sources. In the detail view, press `u` to first check for updates, then `u` again to apply. The Updates view performs manual bulk checks. Update routing:
 - `skillssh`: delegates to `npx skills update <name> -g -y`
-- `github`: uninstalls then re-installs via `installFromSource`
 
 Skills with `local` or other source types show no update UI.
 
@@ -134,7 +131,7 @@ Install is global-only (to `~/.agents/skills/`). The install view has 3 steps: s
 
 ### Project Skills (Read-Only)
 
-Project-level skills are scanned from `projectSkillsDirs` (configured in `config.ts`, defaults: `.codex/skills`, `.cursor/skills-cursor`, `.claude/skills`, `.agents/skills`) relative to `cwd`. They appear with `scope: 'project'` and `provider: 'project'` in the TUI's "Project" tab. Project skills are read-only in v1 — no install, update, or lockfile management. Same-name project skills take priority over global skills during scan.
+Project-level skills are scanned from `projectSkillsDirs` (configured in `config.ts`, defaults: `.codex/skills`, `.claude/skills`, `.agents/skills`) relative to `cwd`. They appear with `scope: 'project'` and `provider: 'project'` in the TUI's "Project" tab. Project skills are read-only in v1 — no install, update, toggle, or lockfile management.
 
 ### State After Mutations
 
@@ -153,4 +150,4 @@ After any mutation (toggle, edit, delete, update), `refresh()` must be called. T
 - **Import extensions**: Must use `.js` in imports (`'./foo.js'`), not `.ts` — Node16 module resolution requires it
 - **Async in `useInput`**: Fire-and-forget promises must have `.catch()` to avoid unhandled rejections crashing Ink
 - **`.pnpm-store/`**: Never commit — it's in `.gitignore`
-- **ClaudeProvider custom scan**: `ClaudeProvider` overrides `scan()` with its own `scanFlat()` / `scanDeep()` — changes to `BaseProvider.scan()` don't apply to Claude skills. Any scan-level feature (symlink resolution, metadata enrichment) must also be added to both Claude scan methods.
+- **ClaudeProvider custom scan**: `ClaudeProvider` overrides `scan()` with its own `scanFlat()` / `scanDeep()` — changes to `BaseProvider.scan()` don't apply to Claude skills. Any scan-level feature (symlink resolution, metadata enrichment, provider-native availability) must also be added to both Claude scan methods.

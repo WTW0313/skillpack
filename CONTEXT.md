@@ -16,6 +16,10 @@ _Avoid_: Skill Library, projection target
 The skill inventory and availability state as represented by a Skill Provider's own files, metadata, and conventions.
 _Avoid_: Skillpack state, canonical state
 
+**Skill Availability**:
+Whether a discovered skill is currently loadable by a specific Skill Provider according to that provider's own configuration, metadata, and loading rules.
+_Avoid_: Directory exists, installed state
+
 **Install Source**:
 A place Skillpack can search or fetch skills from before placing them into a Skill Provider.
 _Avoid_: Skill Provider, registry

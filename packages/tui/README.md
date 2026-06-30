@@ -1,6 +1,6 @@
 # Skillpack
 
-Unified TUI manager for agent skills across Codex, Cursor, Claude, and Global (`~/.agents/skills`).
+Unified TUI manager for agent skills across Codex, Claude, and Global (`~/.agents/skills`).
 
 ## Installation
 
@@ -19,21 +19,18 @@ npx skillpack-tui
 
 ## Features
 
-- Multi-platform scanning for Codex, Cursor, Claude, Global, and project-level skills
+- Multi-platform scanning for Codex, Claude, Global, and project-level skills
 - Symlink-aware duplicate detection
-- Enable and disable skills with the `.disabled-` directory prefix
-- Install skills from GitHub repos or the skills.sh registry
-- Create new skills from a TUI wizard
-- Edit skill files in `$EDITOR`
-- Delete skills with confirmation
-- Check and apply updates for supported remote sources
+- Enable and disable skills through provider-native availability mechanisms, with `.disabled-` as a fallback
+- Install Global Skills through the skills.sh registry
+- Check and apply manual updates for skills.sh-managed Global Skills
 - Fuzzy search by name and description
 
 ## Quick Start
 
 Launch `skillpack` to see discovered skills grouped by provider. Use the arrow keys to navigate, `Tab` / `Shift+Tab` to switch provider tabs, and `/` to search.
 
-Press `Space` to toggle a skill on or off, `Enter` to view details, `i` to install from a remote source, or `c` to create a new skill.
+Press `Space` to toggle a skill on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a Global Skill, or `u` to open manual updates.
 
 ## Keyboard Shortcuts
 
@@ -47,9 +44,9 @@ Press `Space` to toggle a skill on or off, `Enter` to view details, `i` to insta
 | `Tab` / `Shift+Tab` | Switch provider tab |
 | `/` | Search |
 | `Esc` | Clear search |
-| `i` | Install from remote |
-| `c` | Create skill |
-| `u` | Check for updates |
+| `p` | Open Project Skills |
+| `i` | Install through skills.sh |
+| `u` | Open manual updates |
 | `q` | Quit |
 
 ### Detail View
@@ -58,9 +55,8 @@ Press `Space` to toggle a skill on or off, `Enter` to view details, `i` to insta
 | --- | --- |
 | `Esc` | Return to list view |
 | `Space` | Enable or disable skill |
-| `e` / `E` | Edit `SKILL.md` in `$EDITOR` |
 | `o` / `O` | Open skill folder |
-| `d` | Delete skill |
+| `d` | Remove a skills.sh-managed Global Skill |
 | `↑` / `↓` | Scroll description |
 
 ## Configuration
@@ -75,7 +71,6 @@ It auto-detects provider directories on first run and can scan project-level ski
 
 ```text
 .codex/skills
-.cursor/skills-cursor
 .claude/skills
 .agents/skills
 ```
