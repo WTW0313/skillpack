@@ -19,37 +19,56 @@ export interface SkillpackConfig {
   sources: Record<string, SourceConfig>;
 }
 
-const DEFAULT_CONFIG: SkillpackConfig = {
-  editor: process.env.EDITOR || 'vi',
-  autoCheckUpdates: true,
-  projectSkillsDirs: ['.codex/skills', '.cursor/skills-cursor', '.claude/skills', '.agents/skills'],
-  providers: {
-    codex: { enabled: true, paths: [path.join(os.homedir(), '.codex', 'skills')] },
-    cursor: { enabled: true, paths: [path.join(os.homedir(), '.cursor', 'skills-cursor')] },
-    claude: { enabled: true, paths: [path.join(os.homedir(), '.claude', 'plugins', 'cache'), path.join(os.homedir(), '.claude', 'skills')] },
-    global: { enabled: true, paths: [path.join(os.homedir(), '.agents', 'skills')] },
-  },
-  sources: {
-    github: { enabled: true },
-    skillssh: { enabled: true },
-  },
+type PartialSkillpackConfig = Partial<Omit<SkillpackConfig, 'providers' | 'sources'>> & {
+  providers?: Record<string, Partial<ProviderConfig>>;
+  sources?: Record<string, Partial<SourceConfig>>;
 };
+
+export interface ConfigManagerOptions {
+  configDir?: string;
+  homeDir?: string;
+}
+
+export function createDefaultConfig(homeDir = os.homedir()): SkillpackConfig {
+  return {
+    editor: process.env.EDITOR || 'vi',
+    autoCheckUpdates: true,
+    projectSkillsDirs: ['.codex/skills', '.cursor/skills-cursor', '.claude/skills', '.agents/skills'],
+    providers: {
+      codex: { enabled: true, paths: [path.join(homeDir, '.codex', 'skills')] },
+      cursor: { enabled: true, paths: [path.join(homeDir, '.cursor', 'skills-cursor')] },
+      claude: { enabled: true, paths: [path.join(homeDir, '.claude', 'plugins', 'cache'), path.join(homeDir, '.claude', 'skills')] },
+      global: { enabled: true, paths: [path.join(homeDir, '.agents', 'skills')] },
+    },
+    sources: {
+      github: { enabled: true },
+      skillssh: { enabled: true },
+    },
+  };
+}
 
 export class ConfigManager {
   private configPath: string;
-  private config: SkillpackConfig = { ...DEFAULT_CONFIG };
+  private defaultConfig: SkillpackConfig;
+  private config: SkillpackConfig;
 
-  constructor(configDir?: string) {
-    const dir = configDir ?? path.join(os.homedir(), '.config', 'skillpack');
+  constructor(configDirOrOptions?: string | ConfigManagerOptions) {
+    const options = typeof configDirOrOptions === 'string'
+      ? { configDir: configDirOrOptions }
+      : (configDirOrOptions ?? {});
+    const homeDir = options.homeDir ?? os.homedir();
+    this.defaultConfig = createDefaultConfig(homeDir);
+    this.config = cloneConfig(this.defaultConfig);
+    const dir = options.configDir ?? path.join(homeDir, '.config', 'skillpack');
     this.configPath = path.join(dir, 'config.json');
   }
 
   async load(): Promise<SkillpackConfig> {
     try {
       const raw = await readFile(this.configPath, 'utf-8');
-      this.config = { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+      this.config = mergeConfig(this.defaultConfig, JSON.parse(raw) as PartialSkillpackConfig);
     } catch {
-      this.config = { ...DEFAULT_CONFIG };
+      this.config = cloneConfig(this.defaultConfig);
       await this.autoDetectProviders();
     }
     return this.config;
@@ -77,4 +96,49 @@ export class ConfigManager {
       this.config.providers[id].enabled = found;
     }
   }
+}
+
+function cloneConfig(config: SkillpackConfig): SkillpackConfig {
+  return {
+    editor: config.editor,
+    autoCheckUpdates: config.autoCheckUpdates,
+    projectSkillsDirs: [...config.projectSkillsDirs],
+    providers: Object.fromEntries(
+      Object.entries(config.providers).map(([id, provider]) => [
+        id,
+        { enabled: provider.enabled, paths: [...provider.paths] },
+      ]),
+    ),
+    sources: Object.fromEntries(
+      Object.entries(config.sources).map(([id, source]) => [
+        id,
+        { enabled: source.enabled },
+      ]),
+    ),
+  };
+}
+
+function mergeConfig(defaultConfig: SkillpackConfig, userConfig: PartialSkillpackConfig): SkillpackConfig {
+  const config = cloneConfig(defaultConfig);
+
+  if (userConfig.editor !== undefined) config.editor = userConfig.editor;
+  if (userConfig.autoCheckUpdates !== undefined) config.autoCheckUpdates = userConfig.autoCheckUpdates;
+  if (userConfig.projectSkillsDirs !== undefined) config.projectSkillsDirs = [...userConfig.projectSkillsDirs];
+
+  for (const [id, override] of Object.entries(userConfig.providers ?? {})) {
+    const base = config.providers[id] ?? { enabled: true, paths: [] };
+    config.providers[id] = {
+      enabled: override.enabled ?? base.enabled,
+      paths: override.paths ? [...override.paths] : [...base.paths],
+    };
+  }
+
+  for (const [id, override] of Object.entries(userConfig.sources ?? {})) {
+    const base = config.sources[id] ?? { enabled: true };
+    config.sources[id] = {
+      enabled: override.enabled ?? base.enabled,
+    };
+  }
+
+  return config;
 }

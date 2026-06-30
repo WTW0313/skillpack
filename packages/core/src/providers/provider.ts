@@ -1,4 +1,4 @@
-import type { DisableStrategy, Skill, SkillTemplate } from '../models/index.js';
+import type { DisableStrategy, ProviderScanPath, Skill, SkillTemplate } from '../models/index.js';
 import type { InstallRequest } from '../models/source.js';
 import { readdir, access, readFile, rename, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
@@ -28,6 +28,7 @@ export interface ISkillProvider {
   disable(name: string): Promise<void>;
   setEnabled(skill: SkillToggleTarget, enabled: boolean): Promise<void>;
   getDisableStrategy(skill: SkillToggleTarget): DisableStrategy | undefined;
+  getScanPaths(): ProviderScanPath[];
   create(template: SkillTemplate): Promise<Skill>;
 }
 
@@ -127,6 +128,14 @@ export abstract class BaseProvider implements ISkillProvider {
       type: 'disabled-directory',
       description: 'Renames the skill directory with a .disabled- prefix',
     };
+  }
+
+  getScanPaths(): ProviderScanPath[] {
+    return this.basePaths.map((basePath) => ({
+      path: basePath,
+      kind: 'skill-root',
+      label: `${this.displayName} skill root`,
+    }));
   }
 
   async setEnabled(skill: SkillToggleTarget, enabled: boolean): Promise<void> {

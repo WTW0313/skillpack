@@ -77,4 +77,28 @@ describe('SkillManager', () => {
       args: ['skills', 'remove', 'managed-skill', '-g', '-y'],
     }]);
   });
+
+  it('reports provider and project scan paths while scanning custom paths and skipping missing paths', async () => {
+    const missingProviderPath = path.join(dir, 'missing-provider');
+    const customProviderPath = path.join(dir, 'custom-provider');
+    const projectRoot = path.join(dir, 'repo');
+    await mkdir(path.join(customProviderPath, 'custom-skill'), { recursive: true });
+    await writeFile(path.join(customProviderPath, 'custom-skill', 'SKILL.md'), '---\nname: custom-skill\ndescription: custom\n---\n');
+    await mkdir(path.join(projectRoot, '.custom', 'skills', 'project-skill'), { recursive: true });
+    await writeFile(path.join(projectRoot, '.custom', 'skills', 'project-skill', 'SKILL.md'), '---\nname: project-skill\ndescription: project\n---\n');
+
+    const customManager = new SkillManager();
+    customManager.registerProvider(new CodexProvider([missingProviderPath, customProviderPath]));
+
+    await customManager.scanAll(projectRoot, ['missing-project-skills', '.custom/skills']);
+
+    expect(customManager.getAllSkills().map((skill) => skill.name)).toContain('custom-skill');
+    expect(customManager.getProjectSkills().map((skill) => skill.name)).toEqual(['project-skill']);
+    expect(customManager.getScanPathDiagnostics()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ scope: 'provider', provider: 'codex', path: missingProviderPath, exists: false }),
+      expect.objectContaining({ scope: 'provider', provider: 'codex', path: customProviderPath, exists: true }),
+      expect.objectContaining({ scope: 'project', path: path.join(projectRoot, 'missing-project-skills'), exists: false }),
+      expect.objectContaining({ scope: 'project', path: path.join(projectRoot, '.custom', 'skills'), exists: true }),
+    ]));
+  });
 });

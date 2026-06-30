@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
+import path from 'node:path';
 import { useAppContext } from '../context/app-context.js';
 import { useFilteredSkills, TABS } from '../hooks/use-skills.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
@@ -9,13 +10,23 @@ import { SkillRow, COL_NAME_WIDTH, COL_AGENT_WIDTH } from '../components/skill-r
 import { SearchInput } from '../components/search-input.js';
 import { StatusBar } from '../components/status-bar.js';
 
-const CHROME_LINES = 7;
+const CHROME_LINES = 8;
+
+function formatScanPath(scanPath: { provider?: string; path: string; exists: boolean }): string {
+  const relativePath = path.relative(process.cwd(), scanPath.path);
+  const homeDir = process.env.HOME;
+  const homePath = homeDir && scanPath.path.startsWith(`${homeDir}${path.sep}`)
+    ? scanPath.path.replace(homeDir, '~')
+    : scanPath.path;
+  const displayPath = relativePath && !relativePath.startsWith('..') ? relativePath : homePath;
+  return `${scanPath.provider ?? 'project'}:${displayPath}${scanPath.exists ? '' : ' (missing)'}`;
+}
 
 export function ListView() {
   const { exit } = useApp();
   const {
     loading, activeTab, setActiveTab, setView, setSelectedSkill,
-    searchQuery, setSearchQuery, refresh, manager, skills: allSkills,
+    searchQuery, setSearchQuery, refresh, manager, skills: allSkills, scanPaths,
   } = useAppContext();
   const { skills, tabs } = useFilteredSkills();
   const { rows } = useTerminalSize();
@@ -68,6 +79,11 @@ export function ListView() {
     }
     return counts;
   }, [allSkills]);
+
+  const providerRoots = useMemo(
+    () => scanPaths.filter((scanPath) => scanPath.scope === 'provider').map(formatScanPath).join('  '),
+    [scanPaths],
+  );
 
   useInput((input, key) => {
     if (input === 'q') { exit(); return; }
@@ -131,6 +147,13 @@ export function ListView() {
       <Box>
         <TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} counts={tabCounts} />
       </Box>
+
+      {providerRoots && (
+        <Box paddingX={1}>
+          <Text dimColor>roots </Text>
+          <Text dimColor wrap="truncate">{providerRoots}</Text>
+        </Box>
+      )}
 
       {/* Search input (active) */}
       {searching && (

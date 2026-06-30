@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import type { ISkillProvider } from './providers/provider.js';
 import type { IInstallSource } from './sources/source.js';
-import type { Skill } from './models/index.js';
+import type { ScanPathDiagnostic, Skill } from './models/index.js';
 import type { DuplicateInfo } from './models/duplicate.js';
 import type { RemoteSkill, UpdateInfo } from './models/source.js';
 import type { SkillGroup, SkillInventoryInstance } from './models/inventory.js';
@@ -18,6 +18,7 @@ export class SkillManager {
   private sources = new Map<string, IInstallSource>();
   private skills: Skill[] = [];
   private projectSkills: Skill[] = [];
+  private scanPathDiagnostics: ScanPathDiagnostic[] = [];
   private duplicates: DuplicateInfo[] = [];
   private duplicateDetector = new DuplicateDetector();
   private globalLock?: LockfileManager;
@@ -40,6 +41,7 @@ export class SkillManager {
   }
 
   async scanAll(cwd?: string, projectSkillsDirs?: string[]): Promise<void> {
+    this.scanPathDiagnostics = await this.collectScanPathDiagnostics(cwd, projectSkillsDirs);
     const results = await Promise.all([...this.providers.values()].map((p) => p.scan()));
     let allSkills = results.flat();
 
@@ -117,7 +119,7 @@ export class SkillManager {
     const skills: Skill[] = [];
     const seen = new Set<string>();
     for (const dir of projectSkillsDirs) {
-      const projectPath = path.join(cwd, dir);
+      const projectPath = resolveProjectSkillsPath(cwd, dir);
       try { await access(projectPath); } catch { continue; }
       const entries = await readdir(projectPath, { withFileTypes: true });
       for (const entry of entries) {
@@ -168,6 +170,7 @@ export class SkillManager {
   }
 
   getAllSkills(): Skill[] { return this.skills; }
+  getScanPathDiagnostics(): ScanPathDiagnostic[] { return this.scanPathDiagnostics; }
   getInventory(): SkillGroup[] {
     return buildSkillInventory(this.skills, {
       getDisableStrategy: (skill) => this.providers.get(skill.provider)?.getDisableStrategy(skill),
@@ -307,4 +310,45 @@ export class SkillManager {
     await this.uninstallSkill(skill);
     await this.installFromSource('github', identifier, skill.provider);
   }
+
+  private async collectScanPathDiagnostics(cwd?: string, projectSkillsDirs?: string[]): Promise<ScanPathDiagnostic[]> {
+    const providerDiagnostics = await Promise.all(
+      [...this.providers.values()].flatMap((provider) => provider.getScanPaths().map(async (scanPath) => ({
+        scope: 'provider' as const,
+        provider: provider.id,
+        path: scanPath.path,
+        exists: await pathExists(scanPath.path),
+        kind: scanPath.kind,
+        label: scanPath.label,
+      }))),
+    );
+
+    const projectDiagnostics = cwd && projectSkillsDirs?.length
+      ? await Promise.all(projectSkillsDirs.map(async (dir) => {
+        const projectPath = resolveProjectSkillsPath(cwd, dir);
+        return {
+          scope: 'project' as const,
+          path: projectPath,
+          exists: await pathExists(projectPath),
+          kind: 'project-root' as const,
+          label: 'Project Skills root',
+        };
+      }))
+      : [];
+
+    return [...providerDiagnostics, ...projectDiagnostics];
+  }
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveProjectSkillsPath(cwd: string, dir: string): string {
+  return path.isAbsolute(dir) ? dir : path.join(cwd, dir);
 }

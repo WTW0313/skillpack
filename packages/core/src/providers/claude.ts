@@ -1,5 +1,5 @@
 import { BaseProvider, type ProviderCapabilities } from './provider.js';
-import type { Skill } from '../models/index.js';
+import type { ProviderScanPath, Skill } from '../models/index.js';
 import { readdir, readFile, access, rename, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -32,6 +32,21 @@ export class ClaudeProvider extends BaseProvider {
     const flatSkills = await this.scanFlat();
     const deepSkills = await this.scanDeep();
     return [...flatSkills, ...deepSkills];
+  }
+
+  override getScanPaths(): ProviderScanPath[] {
+    return [
+      ...this.flatPaths.map((flatPath) => ({
+        path: flatPath,
+        kind: 'skill-root' as const,
+        label: 'Claude skill root',
+      })),
+      ...this.basePaths.map((basePath) => ({
+        path: basePath,
+        kind: 'plugin-cache' as const,
+        label: 'Claude plugin cache',
+      })),
+    ];
   }
 
   private async scanFlat(): Promise<Skill[]> {
