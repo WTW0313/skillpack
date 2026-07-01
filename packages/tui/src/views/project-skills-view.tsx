@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
-import path from 'node:path';
 import { useAppContext } from '../context/app-context.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { StatusBar } from '../components/status-bar.js';
+import { formatDisplayPath } from '../lib/format-path.js';
 
-const CHROME_LINES = 6;
+const CHROME_LINES = 5;
 const NAME_WIDTH = 30;
 const PATH_WIDTH = 54;
 
@@ -14,19 +14,9 @@ function truncate(value: string, max: number): string {
   return value.slice(0, max - 1) + '…';
 }
 
-function formatScanPath(scanPath: { path: string; exists: boolean }): string {
-  const relativePath = path.relative(process.cwd(), scanPath.path);
-  const homeDir = process.env.HOME;
-  const homePath = homeDir && scanPath.path.startsWith(`${homeDir}${path.sep}`)
-    ? scanPath.path.replace(homeDir, '~')
-    : scanPath.path;
-  const displayPath = relativePath && !relativePath.startsWith('..') ? relativePath : homePath;
-  return `${displayPath}${scanPath.exists ? '' : ' (missing)'}`;
-}
-
 export function ProjectSkillsView() {
   const { exit } = useApp();
-  const { projectSkills, scanPaths, setView } = useAppContext();
+  const { projectSkills, setView } = useAppContext();
   const { rows } = useTerminalSize();
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -56,11 +46,6 @@ export function ProjectSkillsView() {
     () => projectSkills.slice(scrollOffset, scrollOffset + visibleRows),
     [projectSkills, scrollOffset, visibleRows],
   );
-  const projectRoots = useMemo(
-    () => scanPaths.filter((scanPath) => scanPath.scope === 'project').map(formatScanPath).join('  '),
-    [scanPaths],
-  );
-
   const showScroll = projectSkills.length > visibleRows;
 
   return (
@@ -73,13 +58,6 @@ export function ProjectSkillsView() {
           <Text dimColor>  {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, projectSkills.length)} of {projectSkills.length}</Text>
         )}
       </Box>
-
-      {projectRoots && (
-        <Box paddingX={1}>
-          <Text dimColor>roots </Text>
-          <Text dimColor wrap="truncate">{projectRoots}</Text>
-        </Box>
-      )}
 
       <Box paddingX={1} marginTop={1}>
         <Box gap={1}>
@@ -98,7 +76,6 @@ export function ProjectSkillsView() {
         ) : (
           visibleSkills.map((skill, index) => {
             const selected = scrollOffset + index === cursor;
-            const relativePath = path.relative(process.cwd(), skill.path) || skill.path;
             const hasIssues = skill.healthSignals.length > 0;
             return (
               <Box key={skill.path} gap={1}>
@@ -108,7 +85,7 @@ export function ProjectSkillsView() {
                 <Text bold={selected} color={selected ? 'white' : undefined}>
                   {truncate(skill.name, NAME_WIDTH)}
                 </Text>
-                <Text dimColor>{truncate(relativePath, PATH_WIDTH)}</Text>
+                <Text dimColor>{truncate(formatDisplayPath(skill.path), PATH_WIDTH)}</Text>
                 <Text color={hasIssues ? 'yellow' : 'green'}>
                   {hasIssues ? 'needs attention' : 'read-only'}
                 </Text>

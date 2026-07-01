@@ -41,7 +41,7 @@ node packages/tui/dist/skillpack.js
 
 Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to switch between provider tabs (All, Codex, Claude, Global), and `/` to search.
 
-Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a skills.sh Global Skill, or `u` to open manual updates. Plugin-owned skills require confirmation because the action toggles the owning plugin and affects sibling skills from the same plugin.
+Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a skills.sh Global Skill, or `u` to open manual updates. Plugin-owned skills require confirmation because the action toggles the owning plugin and affects sibling skills from the same plugin.
 
 ## Keyboard Shortcuts
 
@@ -56,6 +56,7 @@ Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` t
 | `/` | Search | Fuzzy match on name + description |
 | `Esc` | Clear search | Clear the active search filter |
 | `p` | Project Skills | Open read-only Project Skills view |
+| `s` | Settings | Open read-only Settings and Scan Roots view |
 | `i` | Install | Install a Global Skill through skills.sh |
 | `u` | Updates | Open manual skills.sh updates |
 | `q` | Quit | Exit skillpack |
@@ -142,7 +143,7 @@ skillpack/
 │   │   └── tests/
 │   └── tui/                   # @skillpack/tui — Ink-based terminal UI
 │       └── src/
-│           ├── views/         # ListView, DetailView, InstallView, ProjectSkillsView, UpdatesView
+│           ├── views/         # ListView, DetailView, InstallView, ProjectSkillsView, SettingsView, UpdatesView
 │           ├── components/    # StatusBar, ConfirmDialog, SearchInput, SkillRow, TabBar
 │           ├── context/       # React context for app state
 │           ├── hooks/         # useSkillManager, useSkills, useSearch, useTerminalSize

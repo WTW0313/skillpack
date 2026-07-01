@@ -14,6 +14,7 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
     { key: '/', label: 'search' },
     { key: 'tab', label: 'tabs' },
     { key: 'p', label: 'project' },
+    { key: 's', label: 'settings' },
     { key: 'u', label: 'updates' },
     { key: 'i', label: 'install' },
     { key: 'q', label: 'quit' },
@@ -26,6 +27,11 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
   project: [
     { key: 'esc', label: 'back' },
     { key: '↑↓', label: 'navigate' },
+    { key: 'q', label: 'quit' },
+  ],
+  settings: [
+    { key: 'esc', label: 'back' },
+    { key: '↑↓', label: 'scroll' },
     { key: 'q', label: 'quit' },
   ],
   updates: [

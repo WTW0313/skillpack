@@ -52,6 +52,10 @@ _Avoid_: Installed skill, Skillpack-created skill
 The cross-provider view of discovered skills, their provenance, availability, and health.
 _Avoid_: Skill editor, authoring workspace
 
+**Scan Root**:
+A directory Skillpack inspects to discover provider, shared global, or project skills.
+_Avoid_: Skill, provider, install source
+
 **Health Signal**:
 A deterministic inventory finding that helps the user understand a skill's provider coverage, provenance, or loadability.
 _Avoid_: Security score, quality rating

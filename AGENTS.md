@@ -67,6 +67,7 @@ node packages/tui/dist/bin/skillpack.js
 | `views/list-view.tsx` | Main inventory with tabs, search, scroll |
 | `views/detail-view.tsx` | Skill detail: metadata, source info, toggle, skills.sh update/remove |
 | `views/project-skills-view.tsx` | Read-only Project Skills view |
+| `views/settings-view.tsx` | Read-only Settings view for Scan Roots, providers, and sources |
 | `views/install-view.tsx` | skills.sh install flow (query → results → install to Global) |
 | `views/updates-view.tsx` | Manual skills.sh update checks |
 | `components/` | StatusBar (context-aware shortcuts), ConfirmDialog, SkillRow, TabBar, SearchInput |
@@ -74,7 +75,7 @@ node packages/tui/dist/bin/skillpack.js
 
 ### Routing
 
-The TUI uses a `view` state (`'list' | 'detail' | 'install' | 'project' | 'updates'`) in `app-context.tsx`, not a router library. The `Router` component in `app.tsx` switches on this state.
+The TUI uses a `view` state (`'list' | 'detail' | 'install' | 'project' | 'settings' | 'updates'`) in `app-context.tsx`, not a router library. The `Router` component in `app.tsx` switches on this state.
 
 ## Conventions
 

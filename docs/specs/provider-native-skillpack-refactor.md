@@ -8,10 +8,11 @@ Skillpack should not become the canonical owner of skill content. Each Skill Pro
 
 ## Product Shape
 
-The TUI has four top-level sections:
+The TUI has five top-level sections:
 
 - **Inventory**: grouped view of provider-native skills from Codex, Claude, and Global.
 - **Project Skills**: read-only inventory of skills stored in the current project repository.
+- **Settings**: read-only configuration diagnostics, including Scan Roots, providers, and sources.
 - **Install**: skills.sh search and install into Global Skills only.
 - **Updates**: manual update checks and updates for skills.sh-managed Global Skills.
 
@@ -32,6 +33,7 @@ In scope:
 - Build Skill Groups from provider instances using provenance-aware Skill Identity.
 - Show provider badges, Health Signals, and provenance summaries in the main Inventory.
 - Show Project Skills in a separate read-only view.
+- Show Scan Roots in a separate read-only Settings view instead of inline in Inventory.
 - Enable or disable Codex and Claude provider instances through provider-specific Disable Strategies.
 - Use `.disabled-` renaming only when no known provider config or native disable mechanism exists.
 - Install Global Skills through skills.sh only.
@@ -76,6 +78,26 @@ A discovered skill in one provider. It includes:
 - source/provenance metadata
 - Health Signals
 - supported actions
+
+### Scan Root
+
+A configured or default directory Skillpack inspects during scan. Settings should show:
+
+- provider or project scope
+- path
+- exists/missing state
+- root kind
+- provider enabled state when applicable
+
+Settings is read-only in v1. Editing Scan Roots requires a separate design for validation, persistence, and reset-to-default behavior.
+
+Read-only Settings should show only configuration diagnostics already available in memory:
+
+- Scan Roots with scope, provider when present, kind, path, and exists/missing state
+- Providers with provider ID, enabled/disabled config state, and Scan Root count
+- Sources with source ID and enabled/disabled config state
+
+Settings should not show editable JSON, raw config file contents, or provider-native config internals in v1.
 
 ### Skill Group
 

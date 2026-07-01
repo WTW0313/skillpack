@@ -41,18 +41,21 @@ Skillpack will scan each Skill Provider according to that provider's own rules, 
 25. As a Skillpack user, I want broken symlinks surfaced as Health Signals, so that filesystem problems are visible.
 26. As a Skillpack user, I want provider paths auto-detected, so that Skillpack works without setup for common installations.
 27. As a Skillpack user, I want provider paths configurable, so that custom installations can still be scanned.
-28. As a Skillpack user, I want no skill editing UI, so that Skillpack stays focused on management and inventory.
-29. As a Skillpack user, I want no skill creation UI, so that authoring remains outside Skillpack.
-30. As a maintainer, I want core inventory derivation tested independently of the TUI, so that behavior remains stable as the interface changes.
-31. As a maintainer, I want provider lifecycle capabilities represented explicitly, so that unsupported actions cannot leak into the UI.
-32. As a maintainer, I want skills.sh interactions isolated, so that external CLI behavior is easy to test and mock.
-33. As a maintainer, I want Project Skill scanning separated from controllable inventory scanning, so that read-only ownership is enforced in code.
+28. As a Skillpack user, I want Scan Roots shown in a separate Settings section, so that Inventory stays focused on skills.
+29. As a Skillpack user, I want Settings to show provider and project Scan Roots with exists/missing status, so that I can diagnose why skills are or are not discovered.
+30. As a Skillpack user, I want Settings to be read-only in v1, so that configuration editing is not mixed with inventory operations before validation and persistence rules are designed.
+31. As a Skillpack user, I want no skill editing UI, so that Skillpack stays focused on management and inventory.
+32. As a Skillpack user, I want no skill creation UI, so that authoring remains outside Skillpack.
+33. As a maintainer, I want core inventory derivation tested independently of the TUI, so that behavior remains stable as the interface changes.
+34. As a maintainer, I want provider lifecycle capabilities represented explicitly, so that unsupported actions cannot leak into the UI.
+35. As a maintainer, I want skills.sh interactions isolated, so that external CLI behavior is easy to test and mock.
+36. As a maintainer, I want Project Skill scanning separated from controllable inventory scanning, so that read-only ownership is enforced in code.
 
 ## Implementation Decisions
 
 - Skillpack is a provider-native management console, not the canonical owner of skill content.
 - The primary TUI experience is the Skill Inventory.
-- The top-level TUI sections are Inventory, Project Skills, Install, and Updates.
+- The top-level TUI sections are Inventory, Project Skills, Settings, Install, and Updates.
 - Inventory rows are Skill Groups, not provider-instance rows.
 - Skill Groups are built from provenance-aware Skill Identity.
 - Normalized-name grouping is a fallback and should be marked as inferred.
@@ -68,6 +71,7 @@ Skillpack will scan each Skill Provider according to that provider's own rules, 
 - Enable/disable uses provider-specific Disable Strategies. Codex provider-local skills use `~/.codex/config.toml` `[[skills.config]]` entries keyed by absolute `SKILL.md` path. Codex plugin skills use the owning plugin's `[plugins."plugin-name@marketplace-name"]` entry, with availability determined by `plugin enabled AND skill config not false`. Claude regular skills use `skillOverrides` in Claude `settings.json`; Claude plugin skills use the owning plugin's `enabledPlugins` setting when Skillpack can infer the plugin ID. `.disabled-` renaming is fallback behavior only for provider-owned locations with no known provider mechanism; it is not used for Global Skills.
 - Update checks are manual and should not block startup.
 - Provider paths are auto-detected with configurable overrides.
+- Scan Roots are shown in read-only Settings, not inline in Inventory.
 - Detail views follow explain-before-action.
 
 ## Testing Decisions
