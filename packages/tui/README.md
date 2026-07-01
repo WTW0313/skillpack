@@ -19,7 +19,7 @@ npx skillpack-tui
 
 ## Features
 
-- Multi-platform scanning for Codex, Claude, Global, and project-level skills
+- Multi-platform scanning for Codex, Codex plugins, Claude, Global, and project-level skills
 - Symlink-aware duplicate detection
 - Enable and disable Codex and Claude skills through provider-native availability mechanisms
 - Install Global Skills through the skills.sh registry
@@ -30,7 +30,7 @@ npx skillpack-tui
 
 Launch `skillpack` to see discovered skills grouped by provider. Use the arrow keys to navigate, `Tab` / `Shift+Tab` to switch provider tabs, and `/` to search.
 
-Press `Space` to toggle a Codex or Claude skill on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a Global Skill, or `u` to open manual updates.
+Press `Space` to toggle a Codex or Claude skill on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a Global Skill, or `u` to open manual updates. Plugin-owned skills ask for confirmation because the toggle affects every skill from the owning plugin.
 
 ## Keyboard Shortcuts
 
@@ -39,7 +39,7 @@ Press `Space` to toggle a Codex or Claude skill on or off, `Enter` to view detai
 | Key | Action |
 | --- | --- |
 | `↑` / `↓` | Navigate skills |
-| `Space` | Enable or disable selected Codex or Claude skill |
+| `Space` | Enable or disable selected Codex or Claude skill; plugin-owned skills ask for confirmation |
 | `Enter` | Open skill detail view |
 | `Tab` / `Shift+Tab` | Switch provider tab |
 | `/` | Search |
@@ -54,7 +54,7 @@ Press `Space` to toggle a Codex or Claude skill on or off, `Enter` to view detai
 | Key | Action |
 | --- | --- |
 | `Esc` | Return to list view |
-| `Space` | Enable or disable Codex or Claude skill |
+| `Space` | Enable or disable Codex or Claude skill; plugin-owned skills ask for confirmation |
 | `o` / `O` | Open skill folder |
 | `d` | Remove a skills.sh-managed Global Skill |
 | `↑` / `↓` | Scroll description |

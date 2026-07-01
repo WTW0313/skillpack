@@ -4,7 +4,7 @@ Unified TUI manager for agent skills across Codex, Claude, and Global (`~/.agent
 
 ## Features
 
-- **Multi-platform scanning** — discovers skills from Codex, Claude, and Global provider locations automatically, with symlink support
+- **Multi-platform scanning** — discovers skills from Codex, Codex plugins, Claude, and Global provider locations automatically, with symlink support
 - **Project Skills** — scans read-only project skill directories (`.codex/skills`, `.claude/skills`, `.agents/skills`) in a separate view
 - **Provider-native availability** — reads provider config when available and uses `.disabled-` renaming only as a fallback
 - **Skill Inventory** — groups provider instances by Skill Identity and surfaces deterministic Health Signals
@@ -41,7 +41,7 @@ node packages/tui/dist/skillpack.js
 
 Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to switch between provider tabs (All, Codex, Claude, Global), and `/` to search.
 
-Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a skills.sh Global Skill, or `u` to open manual updates.
+Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `i` to install a skills.sh Global Skill, or `u` to open manual updates. Plugin-owned skills require confirmation because the action toggles the owning plugin and affects sibling skills from the same plugin.
 
 ## Keyboard Shortcuts
 
@@ -50,7 +50,7 @@ Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` t
 | Key | Action | Description |
 |-----|--------|-------------|
 | `↑` / `↓` | Navigate | Move selection up / down |
-| `Space` | Toggle | Enable or disable a selected Codex or Claude skill |
+| `Space` | Toggle | Enable or disable a selected Codex or Claude skill; plugin-owned skills ask for confirmation |
 | `Enter` | Detail | Open skill detail view |
 | `Tab` / `Shift+Tab` | Switch tab | Cycle through All / Codex / Claude / Global |
 | `/` | Search | Fuzzy match on name + description |
@@ -65,7 +65,7 @@ Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` t
 | Key | Action | Description |
 |-----|--------|-------------|
 | `Esc` | Back | Return to list view |
-| `Space` | Toggle | Enable or disable a Codex or Claude skill |
+| `Space` | Toggle | Enable or disable a Codex or Claude skill; plugin-owned skills ask for confirmation |
 | `o` / `O` | Open folder | Open skill directory in system file manager |
 | `d` | Delete | Remove a skills.sh-managed Global Skill with confirmation |
 | `↑` / `↓` | Scroll | Scroll the description when it overflows |
@@ -84,7 +84,7 @@ Skillpack stores its configuration at `~/.config/skillpack/config.json`. On firs
     ".agents/skills"
   ],
   "providers": {
-    "codex":  { "enabled": true, "paths": ["~/.codex/skills"] },
+    "codex":  { "enabled": true, "paths": ["~/.codex/skills", "~/.codex/plugins/cache"] },
     "claude": { "enabled": true, "paths": ["~/.claude/plugins/cache", "~/.claude/skills"] },
     "global": { "enabled": true, "paths": ["~/.agents/skills"] }
   },

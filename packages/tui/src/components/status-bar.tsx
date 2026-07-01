@@ -39,7 +39,6 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
 
 const DETAIL_BASE: Shortcut[] = [
   { key: 'esc', label: 'back' },
-  { key: 'space', label: 'toggle' },
 ];
 
 const DETAIL_TAIL: Shortcut[] = [
@@ -55,11 +54,11 @@ export function StatusBar() {
     const isUpdatable = sourceType === 'skillssh';
     const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
     const canToggle = selectedSkill
-      ? manager.getProvider(selectedSkill.provider)?.capabilities.canToggle ?? false
+      ? Boolean(manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill))
       : false;
     const detailBase = canToggle
-      ? [...DETAIL_BASE]
-      : DETAIL_BASE.filter((shortcut) => shortcut.key !== 'space');
+      ? [...DETAIL_BASE, { key: 'space', label: selectedSkill?.origin?.type === 'plugin' ? 'toggle plugin' : 'toggle' }]
+      : DETAIL_BASE;
     const tail = isRemovable ? [...DETAIL_TAIL, { key: 'd', label: 'delete' }] : DETAIL_TAIL;
     shortcuts = isUpdatable
       ? [...detailBase, { key: 'u', label: 'check update' }, ...tail]

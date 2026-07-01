@@ -9,6 +9,9 @@ import { TabBar } from '../components/tab-bar.js';
 import { SkillRow, COL_NAME_WIDTH, COL_AGENT_WIDTH } from '../components/skill-row.js';
 import { SearchInput } from '../components/search-input.js';
 import { StatusBar } from '../components/status-bar.js';
+import { ConfirmDialog } from '../components/confirm-dialog.js';
+import { formatPluginToggleMessage, isPluginOwnedSkill } from '../lib/plugin-toggle.js';
+import type { Skill } from '@skillpack/core';
 
 const CHROME_LINES = 8;
 
@@ -33,6 +36,7 @@ export function ListView() {
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [searching, setSearching] = useState(false);
+  const [confirmingPluginToggle, setConfirmingPluginToggle] = useState<Skill | null>(null);
 
   const prevSkillsLenRef = useRef(skills.length);
 
@@ -106,8 +110,12 @@ export function ListView() {
     
     if (input === ' ' && skills[cursor]) {
       const selected = skills[cursor];
-      const canToggle = manager.getProvider(selected.provider)?.capabilities.canToggle ?? false;
+      const canToggle = Boolean(manager.getProvider(selected.provider)?.getDisableStrategy(selected));
       if (canToggle) {
+        if (isPluginOwnedSkill(selected)) {
+          setConfirmingPluginToggle(selected);
+          return;
+        }
         manager.toggleSkill(selected).then(() => refresh()).catch(() => {});
       }
       return;
@@ -124,10 +132,27 @@ export function ListView() {
         : (idx + 1) % tabs.length;
       setActiveTab(tabs[next]);
     }
-  }, { isActive: !searching });
+  }, { isActive: !searching && !confirmingPluginToggle });
 
   if (loading) {
     return <Box><Spinner label="Scanning skills…" /></Box>;
+  }
+
+  if (confirmingPluginToggle) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <ConfirmDialog
+          message={formatPluginToggleMessage(confirmingPluginToggle, allSkills)}
+          onConfirm={() => {
+            manager.toggleSkill(confirmingPluginToggle)
+              .then(() => refresh())
+              .catch(() => {})
+              .finally(() => setConfirmingPluginToggle(null));
+          }}
+          onCancel={() => setConfirmingPluginToggle(null)}
+        />
+      </Box>
+    );
   }
 
   const showScroll = skills.length > visibleRows;
