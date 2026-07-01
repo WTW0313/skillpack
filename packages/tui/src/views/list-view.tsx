@@ -5,14 +5,13 @@ import { useAppContext } from '../context/app-context.js';
 import { useFilteredSkills, TABS } from '../hooks/use-skills.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { TabBar } from '../components/tab-bar.js';
-import { SkillRow, COL_NAME_WIDTH, COL_AGENT_WIDTH } from '../components/skill-row.js';
+import { SkillRow } from '../components/skill-row.js';
 import { SearchInput } from '../components/search-input.js';
 import { StatusBar } from '../components/status-bar.js';
 import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { formatPluginToggleMessage, isPluginOwnedSkill } from '../lib/plugin-toggle.js';
+import { fitCell, getGlyphSet, getInventoryLayout } from '../lib/responsive-layout.js';
 import type { Skill } from '@skillpack/core';
-
-const CHROME_LINES = 7;
 
 export function ListView() {
   const { exit } = useApp();
@@ -21,17 +20,22 @@ export function ListView() {
     searchQuery, setSearchQuery, refresh, manager, skills: allSkills,
   } = useAppContext();
   const { skills, tabs } = useFilteredSkills();
-  const { rows } = useTerminalSize();
+  const { columns, rows } = useTerminalSize();
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [searching, setSearching] = useState(false);
   const [confirmingPluginToggle, setConfirmingPluginToggle] = useState<Skill | null>(null);
+  const glyphs = getGlyphSet();
 
   const prevSkillsLenRef = useRef(skills.length);
 
-  const searchLines = searching ? 2 : 0;
-  const filterLines = (!searching && searchQuery) ? 1 : 0;
-  const visibleRows = Math.max(1, rows - CHROME_LINES - searchLines - filterLines);
+  const layout = getInventoryLayout({
+    size: { columns, rows },
+    searching,
+    hasSearchQuery: Boolean(searchQuery),
+    skillCount: skills.length,
+  });
+  const visibleRows = layout.visibleRows;
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { setCursor(0); setScrollOffset(0); }, [activeTab]);
@@ -141,7 +145,9 @@ export function ListView() {
   }
 
   const showScroll = skills.length > visibleRows;
-  const scrollBarHeight = Math.max(1, Math.round(visibleRows * (visibleRows / skills.length)));
+  const scrollBarHeight = showScroll
+    ? Math.max(1, Math.round(visibleRows * (visibleRows / skills.length)))
+    : 0;
   const scrollBarOffset = skills.length <= visibleRows
     ? 0
     : Math.round(scrollOffset / (skills.length - visibleRows) * (visibleRows - scrollBarHeight));
@@ -150,7 +156,7 @@ export function ListView() {
     <Box flexDirection="column" flexGrow={1}>
       {/* Header */}
       <Box paddingX={1}>
-        <Text bold color="magenta">◆ skillpack</Text>
+        <Text bold color="magenta">{glyphs.brand} skillpack</Text>
         <Text dimColor>  {skills.length} skill{skills.length !== 1 ? 's' : ''}</Text>
         {showScroll && (
           <Text dimColor>  {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, skills.length)} of {skills.length}</Text>
@@ -187,9 +193,9 @@ export function ListView() {
       <Box paddingX={1} marginTop={1}>
         <Box gap={1}>
           <Text>{' '}</Text>
-          <Text dimColor>{'NAME'.padEnd(COL_NAME_WIDTH)}</Text>
-          <Text dimColor>{'AGENT'.padEnd(COL_AGENT_WIDTH)}</Text>
-          <Text dimColor>{'⏻'}</Text>
+          <Text dimColor>{fitCell('NAME', layout.columns.name)}</Text>
+          <Text dimColor>{fitCell('AGENT', layout.columns.provider)}</Text>
+          <Text dimColor>{fitCell('STATE', layout.columns.status)}</Text>
         </Box>
       </Box>
 
@@ -223,6 +229,8 @@ export function ListView() {
                 skill={skill}
                 isSelected={scrollOffset + index === cursor}
                 isDuplicate={manager.isDuplicate(skill.name)}
+                columns={layout.columns}
+                statusVariant={layout.statusBarVariant === 'compact' ? 'compact' : 'full'}
               />
             ))
           )}
