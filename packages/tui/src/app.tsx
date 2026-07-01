@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Box, Text } from 'ink';
+import { useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { AppProvider, useAppContext } from './context/app-context.js';
 import { useSkillManager } from './hooks/use-skill-manager.js';
@@ -9,6 +11,8 @@ import { ProjectSkillsView } from './views/project-skills-view.js';
 import { SettingsView } from './views/settings-view.js';
 import { UpdatesView } from './views/updates-view.js';
 import { useTerminalSize } from './hooks/use-terminal-size.js';
+import { getTerminalMode } from './lib/responsive-layout.js';
+import { HelpOverlay } from './components/help-overlay.js';
 
 function Router() {
   const { view } = useAppContext();
@@ -23,9 +27,26 @@ function Router() {
   }
 }
 
+function AppFrame() {
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useInput((input, key) => {
+    if (input === '?') {
+      setHelpOpen((open) => !open);
+      return;
+    }
+    if (key.escape && helpOpen) {
+      setHelpOpen(false);
+    }
+  });
+
+  return helpOpen ? <HelpOverlay onClose={() => setHelpOpen(false)} /> : <Router />;
+}
+
 export function App() {
   const { manager, config, error } = useSkillManager();
-  const { rows } = useTerminalSize();
+  const { columns, rows } = useTerminalSize();
+  const terminalMode = getTerminalMode({ columns, rows });
 
   if (error) {
     return (
@@ -43,10 +64,22 @@ export function App() {
     );
   }
 
+  if (terminalMode === 'too-small') {
+    return (
+      <Box flexDirection="column" height={rows} paddingX={1}>
+        <Text bold>skillpack</Text>
+        <Text dimColor>Terminal too small</Text>
+        <Text dimColor>Resize to at least 60x18.</Text>
+        <Box flexGrow={1} />
+        <Text dimColor>q quit</Text>
+      </Box>
+    );
+  }
+
   return (
     <AppProvider manager={manager} config={config}>
       <Box flexDirection="column" height={rows}>
-        <Router />
+        <AppFrame />
       </Box>
     </AppProvider>
   );
