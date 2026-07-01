@@ -4,21 +4,11 @@ import { useAppContext } from '../context/app-context.js';
 import { StatusBar } from '../components/status-bar.js';
 import { formatDisplayPath } from '../lib/format-path.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
-
-const PROVIDER_WIDTH = 12;
-const KIND_WIDTH = 13;
-const STATUS_WIDTH = 8;
-const PATH_WIDTH = 64;
-const CHROME_LINES = 3;
+import { fitCell, getBoundedContentLayout, getSettingsColumns } from '../lib/responsive-layout.js';
 
 interface SettingsRow {
   key: string;
   element: ReactNode;
-}
-
-function truncate(value: string, max: number): string {
-  if (value.length <= max) return value.padEnd(max);
-  return value.slice(0, max - 1) + '…';
 }
 
 function formatEnabled(enabled: boolean): string {
@@ -28,8 +18,14 @@ function formatEnabled(enabled: boolean): string {
 export function SettingsView() {
   const { exit } = useApp();
   const { config, scanPaths, setView } = useAppContext();
-  const { rows } = useTerminalSize();
+  const { columns, rows } = useTerminalSize();
   const [scrollOffset, setScrollOffset] = useState(0);
+  const layout = getBoundedContentLayout({
+    size: { columns, rows },
+    fullChromeLines: 3,
+    compactChromeLines: 3,
+  });
+  const tableColumns = getSettingsColumns({ columns, rows });
 
   useInput((input, key) => {
     if (input === 'q') { exit(); return; }
@@ -60,10 +56,10 @@ export function SettingsView() {
         key: 'scan-header',
         element: (
           <Box gap={1}>
-            <Text dimColor>{truncate('SCOPE', PROVIDER_WIDTH)}</Text>
-            <Text dimColor>{truncate('KIND', KIND_WIDTH)}</Text>
-            <Text dimColor>{truncate('STATUS', STATUS_WIDTH)}</Text>
-            <Text dimColor>{truncate('PATH', PATH_WIDTH)}</Text>
+            <Text dimColor>{fitCell('SCOPE', tableColumns.scope)}</Text>
+            <Text dimColor>{fitCell('KIND', tableColumns.kind)}</Text>
+            <Text dimColor>{fitCell('STATUS', tableColumns.status)}</Text>
+            <Text dimColor>{fitCell('PATH', tableColumns.path)}</Text>
           </Box>
         ),
       },
@@ -78,12 +74,12 @@ export function SettingsView() {
           key: `scan:${scanPath.scope}:${scanPath.provider ?? 'project'}:${scanPath.path}`,
           element: (
             <Box gap={1}>
-              <Text>{truncate(scope, PROVIDER_WIDTH)}</Text>
-              <Text dimColor>{truncate(scanPath.kind, KIND_WIDTH)}</Text>
+              <Text>{fitCell(scope, tableColumns.scope)}</Text>
+              <Text dimColor>{fitCell(scanPath.kind, tableColumns.kind)}</Text>
               <Text color={scanPath.exists ? 'green' : 'yellow'}>
-                {truncate(scanPath.exists ? 'exists' : 'missing', STATUS_WIDTH)}
+                {fitCell(scanPath.exists ? 'exists' : 'missing', tableColumns.status)}
               </Text>
-              <Text dimColor>{truncate(formatDisplayPath(scanPath.path), PATH_WIDTH)}</Text>
+              <Text dimColor>{fitCell(formatDisplayPath(scanPath.path), tableColumns.path)}</Text>
             </Box>
           ),
         });
@@ -97,7 +93,7 @@ export function SettingsView() {
         key: `provider:${provider.id}`,
         element: (
           <Box gap={1}>
-            <Text>{truncate(provider.id, PROVIDER_WIDTH)}</Text>
+            <Text>{fitCell(provider.id, tableColumns.scope)}</Text>
             <Text color={provider.enabled ? 'green' : 'yellow'}>{formatEnabled(provider.enabled)}</Text>
             <Text dimColor>{provider.rootCount} root{provider.rootCount === 1 ? '' : 's'}</Text>
           </Box>
@@ -112,7 +108,7 @@ export function SettingsView() {
         key: `source:${source.id}`,
         element: (
           <Box gap={1}>
-            <Text>{truncate(source.id, PROVIDER_WIDTH)}</Text>
+            <Text>{fitCell(source.id, tableColumns.scope)}</Text>
             <Text color={source.enabled ? 'green' : 'yellow'}>{formatEnabled(source.enabled)}</Text>
           </Box>
         ),
@@ -120,9 +116,9 @@ export function SettingsView() {
     }
 
     return result;
-  }, [providerRows, scanPaths, sourceRows]);
+  }, [providerRows, scanPaths, sourceRows, tableColumns]);
 
-  const visibleRows = Math.max(1, rows - CHROME_LINES);
+  const visibleRows = layout.visibleRows;
   const visibleContent = contentRows.slice(scrollOffset, scrollOffset + visibleRows);
   const showScroll = contentRows.length > visibleRows;
 
