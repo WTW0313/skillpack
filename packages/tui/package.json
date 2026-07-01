@@ -1,7 +1,7 @@
 {
   "name": "skillpack-tui",
   "version": "0.1.2",
-  "description": "Unified TUI manager for agent skills across Codex, Cursor, Claude, and Global",
+  "description": "Unified TUI manager for agent skills across Codex, Claude, and Global",
   "type": "module",
   "bin": {
     "skillpack": "./dist/skillpack.js"
@@ -17,7 +17,6 @@
     "tui",
     "agent",
     "skills",
-    "cursor",
     "claude",
     "codex",
     "ink"

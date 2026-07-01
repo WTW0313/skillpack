@@ -6,10 +6,8 @@ import type { Skill } from '@skillpack/core';
 const TAB_PROVIDER_MAP: Record<string, string | null> = {
   All: null,
   Codex: 'codex',
-  Cursor: 'cursor',
   Claude: 'claude',
   Global: 'global',
-  Project: 'project',
 };
 
 export const TABS = Object.keys(TAB_PROVIDER_MAP);
@@ -19,9 +17,9 @@ export function useFilteredSkills(): { skills: Skill[]; tabs: string[] } {
 
   const tabFiltered = useMemo(() => {
     const provider = TAB_PROVIDER_MAP[activeTab];
-    if (provider === null) return skills;
-    if (provider === 'project') return skills.filter((s) => s.scope === 'project');
-    return skills.filter((s) => s.provider === provider);
+    const inventorySkills = skills.filter((s) => s.scope !== 'project');
+    if (provider === null) return inventorySkills;
+    return inventorySkills.filter((s) => s.provider === provider);
   }, [skills, activeTab]);
 
   const filtered = useSearch(tabFiltered, searchQuery);

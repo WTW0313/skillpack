@@ -1,5 +1,5 @@
 export interface InstallRequest {
-  sourceType: 'github' | 'skillssh';
+  sourceType: 'skillssh';
   identifier: string;
   tempDir: string;
 }
@@ -7,7 +7,7 @@ export interface InstallRequest {
 export interface RemoteSkill {
   name: string;
   description: string;
-  source: 'github' | 'skillssh';
+  source: 'skillssh';
   identifier: string;
   stars?: number;
   installs?: number;

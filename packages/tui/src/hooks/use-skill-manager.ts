@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   SkillManager, ConfigManager,
-  CodexProvider, CursorProvider, ClaudeProvider, GlobalProvider,
-  GitHubSource, SkillsShSource,
+  CodexProvider, ClaudeProvider, GlobalProvider,
+  SkillsShSource,
   type SkillpackConfig,
 } from '@skillpack/core';
 
@@ -26,9 +26,8 @@ export function useSkillManager(): SkillManagerResult {
         const cfg = await configManager.load();
         const mgr = new SkillManager();
 
-        const providerFactories: Record<string, () => InstanceType<typeof CodexProvider | typeof CursorProvider | typeof ClaudeProvider | typeof GlobalProvider>> = {
+        const providerFactories: Record<string, () => InstanceType<typeof CodexProvider | typeof ClaudeProvider | typeof GlobalProvider>> = {
           codex: () => new CodexProvider(cfg.providers.codex?.paths),
-          cursor: () => new CursorProvider(cfg.providers.cursor?.paths),
           claude: () => {
             const allPaths = cfg.providers.claude?.paths ?? [];
             const cachePaths = allPaths.filter((p) => p.includes('plugins') || p.includes('cache'));
@@ -47,7 +46,6 @@ export function useSkillManager(): SkillManagerResult {
           }
         }
 
-        if (cfg.sources.github?.enabled) mgr.registerSource(new GitHubSource());
         if (cfg.sources.skillssh?.enabled) mgr.registerSource(new SkillsShSource());
 
         await mgr.init();

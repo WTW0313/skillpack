@@ -2,11 +2,11 @@ import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { execSync } from 'node:child_process';
-import path from 'node:path';
 import { useAppContext } from '../context/app-context.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { StatusBar } from '../components/status-bar.js';
+import { formatPluginToggleMessage, isPluginOwnedSkill } from '../lib/plugin-toggle.js';
 import type { UpdateInfo } from '@skillpack/core';
 
 function formatRelativeTime(iso: string): string {
@@ -27,7 +27,7 @@ function formatRelativeTime(iso: string): string {
 export function DetailView() {
   const { selectedSkill, setView, refresh, manager } = useAppContext();
   const { rows } = useTerminalSize();
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState<'remove' | 'plugin-toggle' | null>(null);
   const [descScroll, setDescScroll] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,7 +36,14 @@ export function DetailView() {
   const [updating, setUpdating] = useState(false);
 
   const sourceType = selectedSkill?.source?.type;
-  const isUpdatable = sourceType === 'skillssh' || sourceType === 'github';
+  const isUpdatable = sourceType === 'skillssh';
+  const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
+  const canToggle = selectedSkill
+    ? Boolean(manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill))
+    : false;
+  const disableStrategy = selectedSkill
+    ? manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill)
+    : undefined;
 
   const duplicate = selectedSkill
     ? manager.getDuplicates().find((d) => d.skillName === selectedSkill.name)
@@ -57,6 +64,8 @@ export function DetailView() {
     used += 3;    // agent, path, status
     if (selectedSkill.version) used += 1;
     if (selectedSkill.source) used += 1;
+    if (selectedSkill.origin?.type === 'plugin') used += 2;
+    if (disableStrategy) used += 1;
     if (isUpdatable) used += 1; // update row
     if (addedAt) used += 1;
     if (duplicate) used += 1 + 1 + duplicate.instances.length; // gap + heading + instances
@@ -66,19 +75,10 @@ export function DetailView() {
     used += 1;    // status bar
     if (error) used += 1;
     return Math.max(0, rows - used);
-  }, [selectedSkill, duplicate, error, rows, isUpdatable]);
+  }, [selectedSkill, duplicate, error, rows, isUpdatable, disableStrategy]);
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
-    if ((input === 'e' || input === 'E') && selectedSkill) {
-      const editor = process.env.EDITOR || 'vi';
-      const skillMd = path.join(selectedSkill.path, 'SKILL.md');
-      try {
-        execSync(`${editor} "${skillMd}"`, { stdio: 'inherit' });
-      } catch { /* editor exited non-zero */ }
-      refresh();
-      return;
-    }
     if ((input === 'o' || input === 'O') && selectedSkill) {
       const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
       try {
@@ -86,7 +86,11 @@ export function DetailView() {
       } catch { /* opener failed */ }
       return;
     }
-    if (input === ' ' && selectedSkill && !busy) {
+    if (input === ' ' && selectedSkill && canToggle && !busy) {
+      if (isPluginOwnedSkill(selectedSkill)) {
+        setConfirming('plugin-toggle');
+        return;
+      }
       setError(null);
       setBusy(true);
       manager.toggleSkill(selectedSkill)
@@ -95,9 +99,9 @@ export function DetailView() {
         .finally(() => setBusy(false));
       return;
     }
-    if (input === 'd' && selectedSkill) {
+    if (input === 'd' && selectedSkill && isRemovable) {
       setError(null);
-      setConfirming(true);
+      setConfirming('remove');
     }
     if (input === 'u' && selectedSkill && isUpdatable && !busy && !checkingUpdate && !updating) {
       setError(null);
@@ -133,7 +137,7 @@ export function DetailView() {
     return <Box><Text color="red">No skill selected</Text></Box>;
   }
 
-  if (confirming) {
+  if (confirming === 'remove') {
     return (
       <Box flexDirection="column" padding={1}>
         <ConfirmDialog
@@ -144,11 +148,33 @@ export function DetailView() {
               await refresh();
               setView('list');
             } catch (err) {
-              setConfirming(false);
+              setConfirming(null);
               setError((err as Error).message);
             }
           }}
-          onCancel={() => setConfirming(false)}
+          onCancel={() => setConfirming(null)}
+        />
+      </Box>
+    );
+  }
+
+  if (confirming === 'plugin-toggle') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <ConfirmDialog
+          message={formatPluginToggleMessage(selectedSkill, manager.getAllSkills())}
+          onConfirm={() => {
+            setError(null);
+            setBusy(true);
+            manager.toggleSkill(selectedSkill)
+              .then(() => refresh())
+              .catch((err: Error) => setError(err.message))
+              .finally(() => {
+                setBusy(false);
+                setConfirming(null);
+              });
+          }}
+          onCancel={() => setConfirming(null)}
         />
       </Box>
     );
@@ -186,12 +212,34 @@ export function DetailView() {
           <Box gap={1}>
             <Text dimColor>{'source'.padEnd(10)}</Text>
             <Text>{selectedSkill.source.type}{selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}</Text>
-            {selectedSkill.source.type === 'github' && selectedSkill.source.commit && (
-              <Text dimColor> @{selectedSkill.source.commit.slice(0, 7)}</Text>
-            )}
             {selectedSkill.source.type === 'skillssh' && selectedSkill.source.skillFolderHash && (
               <Text dimColor> #{selectedSkill.source.skillFolderHash.slice(0, 7)}</Text>
             )}
+          </Box>
+        )}
+        {selectedSkill.origin?.type === 'plugin' && (
+          <>
+            <Box gap={1}>
+              <Text dimColor>{'plugin'.padEnd(10)}</Text>
+              <Text>{selectedSkill.origin.displayName ?? selectedSkill.origin.pluginName}</Text>
+              <Text dimColor> {selectedSkill.origin.pluginId}</Text>
+            </Box>
+            <Box gap={1}>
+              <Text dimColor>{'plugin on'.padEnd(10)}</Text>
+              <Text color={selectedSkill.origin.pluginEnabled ? 'green' : undefined} dimColor={!selectedSkill.origin.pluginEnabled}>
+                {selectedSkill.origin.pluginEnabled ? '● enabled' : '○ disabled'}
+              </Text>
+              <Text dimColor>skill override </Text>
+              <Text color={selectedSkill.origin.skillConfigEnabled === false ? 'yellow' : undefined}>
+                {selectedSkill.origin.skillConfigEnabled === false ? 'disabled' : 'default'}
+              </Text>
+            </Box>
+          </>
+        )}
+        {disableStrategy && (
+          <Box gap={1}>
+            <Text dimColor>{'toggle'.padEnd(10)}</Text>
+            <Text>{disableStrategy.description}</Text>
           </Box>
         )}
         {isUpdatable && (

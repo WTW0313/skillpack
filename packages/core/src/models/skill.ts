@@ -4,8 +4,22 @@ export interface SkillMetadata {
   tags?: string[];
 }
 
+export interface PluginSkillOrigin {
+  type: 'plugin';
+  pluginId: string;
+  pluginName: string;
+  marketplace: string;
+  version?: string;
+  displayName?: string;
+  pluginEnabled: boolean;
+  skillConfigEnabled?: boolean;
+  identityStatus?: 'confirmed' | 'mismatched';
+}
+
+export type SkillOrigin = PluginSkillOrigin;
+
 export interface SkillSource {
-  type: 'github' | 'skillssh' | 'local';
+  type: 'skillssh' | 'local';
   repo?: string;
   ref?: string;
   commit?: string;
@@ -13,9 +27,16 @@ export interface SkillSource {
   createdAt?: string;
   installedAt?: string;
   forkedFrom?: {
-    source: 'github' | 'skillssh';
+    source: 'skillssh';
     identifier: string;
   };
+}
+
+export type SkillScanIssueCode = 'invalid-skill-md' | 'broken-symlink' | 'plugin-identity-mismatch';
+
+export interface SkillScanIssue {
+  code: SkillScanIssueCode;
+  message: string;
 }
 
 export interface Skill {
@@ -28,7 +49,9 @@ export interface Skill {
   enabled: boolean;
   scope: 'global' | 'project';
   metadata: SkillMetadata;
+  origin?: SkillOrigin;
   source?: SkillSource;
+  scanIssues?: SkillScanIssue[];
 }
 
 export interface SkillTemplate {

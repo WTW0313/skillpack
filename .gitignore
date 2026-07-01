@@ -3,3 +3,5 @@ node_modules/
 dist/
 *.tsbuildinfo
 .pnpm-store/
+.agents
+skills-lock.json

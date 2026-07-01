@@ -5,7 +5,9 @@ import { useSkillManager } from './hooks/use-skill-manager.js';
 import { ListView } from './views/list-view.js';
 import { DetailView } from './views/detail-view.js';
 import { InstallView } from './views/install-view.js';
-import { CreateView } from './views/create-view.js';
+import { ProjectSkillsView } from './views/project-skills-view.js';
+import { SettingsView } from './views/settings-view.js';
+import { UpdatesView } from './views/updates-view.js';
 import { useTerminalSize } from './hooks/use-terminal-size.js';
 
 function Router() {
@@ -15,7 +17,9 @@ function Router() {
     case 'list': return <ListView />;
     case 'detail': return <DetailView />;
     case 'install': return <InstallView />;
-    case 'create': return <CreateView />;
+    case 'project': return <ProjectSkillsView />;
+    case 'settings': return <SettingsView />;
+    case 'updates': return <UpdatesView />;
   }
 }
 

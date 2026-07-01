@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { SkillManager } from '../src/manager.js';
 import { CodexProvider } from '../src/providers/codex.js';
+import { GlobalProvider } from '../src/providers/global.js';
+import { SkillsShSource } from '../src/sources/skillssh.js';
+import type { Skill } from '../src/models/index.js';
+import type { IInstallSource } from '../src/sources/source.js';
 
 describe('SkillManager', () => {
   let dir: string;
@@ -41,10 +45,113 @@ describe('SkillManager', () => {
     await rm(dir2, { recursive: true, force: true });
   });
 
-  it('creates a skill', async () => {
-    const skill = await manager.createSkill('codex', { name: 'new', description: 'New skill' });
-    expect(skill.name).toBe('new');
+  it('does not remove provider-local skills', async () => {
+    const skillDir = path.join(dir, 'local-skill');
+    await mkdir(skillDir);
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: local-skill\ndescription: local\n---\n');
     await manager.scanAll();
-    expect(manager.getAllSkills()).toHaveLength(1);
+
+    await expect(manager.uninstallSkill(manager.getAllSkills()[0])).rejects.toThrow('Only skills.sh-managed Global Skills can be removed');
+    await expect(access(skillDir)).resolves.toBeUndefined();
+  });
+
+  it('removes skills.sh-managed Global Skills through the skills CLI', async () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+    manager.registerSource(new SkillsShSource(async (command, args) => {
+      calls.push({ command, args });
+      return { stdout: '', stderr: '' };
+    }));
+    const skill: Skill = {
+      name: 'managed-skill',
+      description: '',
+      provider: 'global',
+      path: path.join(dir, 'managed-skill'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      source: { type: 'skillssh' },
+    };
+
+    await manager.uninstallSkill(skill);
+
+    expect(calls).toEqual([{
+      command: 'npx',
+      args: ['skills', 'remove', 'managed-skill', '-g', '-y'],
+    }]);
+  });
+
+  it('does not toggle Global Skills by renaming shared content', async () => {
+    const globalDir = path.join(dir, 'global');
+    const skillDir = path.join(globalDir, 'shared-skill');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: shared-skill\ndescription: shared\n---\n');
+
+    const customManager = new SkillManager();
+    customManager.registerProvider(new GlobalProvider([globalDir]));
+    await customManager.scanAll();
+
+    const [skill] = customManager.getAllSkills();
+    await expect(customManager.toggleSkill(skill)).rejects.toThrow('does not support toggle');
+    await expect(access(skillDir)).resolves.toBeUndefined();
+  });
+
+  it('rejects installs to non-Global providers before fetching from a source', async () => {
+    let fetchCount = 0;
+    const source: IInstallSource = {
+      id: 'skillssh',
+      displayName: 'skills.sh',
+      search: async () => [],
+      fetch: async () => {
+        fetchCount += 1;
+        return { tempDir: dir, skillName: 'managed-skill', files: [] };
+      },
+      checkUpdate: async () => null,
+    };
+    manager.registerSource(source);
+
+    await expect(manager.installFromSource('skillssh', 'owner/repo', 'codex')).rejects.toThrow('Global Skills');
+    expect(fetchCount).toBe(0);
+  });
+
+  it('rejects non-skills.sh install sources before fetching', async () => {
+    let fetchCount = 0;
+    const source: IInstallSource = {
+      id: 'github',
+      displayName: 'GitHub',
+      search: async () => [],
+      fetch: async () => {
+        fetchCount += 1;
+        return { tempDir: dir, skillName: 'github-skill', files: [] };
+      },
+      checkUpdate: async () => null,
+    };
+    manager.registerSource(source);
+
+    await expect(manager.installFromSource('github', 'owner/repo/path', 'global')).rejects.toThrow('skills.sh');
+    expect(fetchCount).toBe(0);
+  });
+
+  it('reports provider and project scan paths while scanning custom paths and skipping missing paths', async () => {
+    const missingProviderPath = path.join(dir, 'missing-provider');
+    const customProviderPath = path.join(dir, 'custom-provider');
+    const projectRoot = path.join(dir, 'repo');
+    await mkdir(path.join(customProviderPath, 'custom-skill'), { recursive: true });
+    await writeFile(path.join(customProviderPath, 'custom-skill', 'SKILL.md'), '---\nname: custom-skill\ndescription: custom\n---\n');
+    await mkdir(path.join(projectRoot, '.custom', 'skills', 'project-skill'), { recursive: true });
+    await writeFile(path.join(projectRoot, '.custom', 'skills', 'project-skill', 'SKILL.md'), '---\nname: project-skill\ndescription: project\n---\n');
+
+    const customManager = new SkillManager();
+    customManager.registerProvider(new CodexProvider([missingProviderPath, customProviderPath]));
+
+    await customManager.scanAll(projectRoot, ['missing-project-skills', '.custom/skills']);
+
+    expect(customManager.getAllSkills().map((skill) => skill.name)).toContain('custom-skill');
+    expect(customManager.getProjectSkills().map((skill) => skill.name)).toEqual(['project-skill']);
+    expect(customManager.getScanPathDiagnostics()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ scope: 'provider', provider: 'codex', path: missingProviderPath, exists: false }),
+      expect.objectContaining({ scope: 'provider', provider: 'codex', path: customProviderPath, exists: true }),
+      expect.objectContaining({ scope: 'project', path: path.join(projectRoot, 'missing-project-skills'), exists: false }),
+      expect.objectContaining({ scope: 'project', path: path.join(projectRoot, '.custom', 'skills'), exists: true }),
+    ]));
   });
 });

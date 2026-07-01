@@ -9,12 +9,14 @@ interface Shortcut {
 const SHORTCUTS: Record<string, Shortcut[]> = {
   list: [
     { key: '↑↓', label: 'navigate' },
-    { key: 'space', label: 'toggle' },
+    { key: 'space', label: 'toggle when supported' },
     { key: 'enter', label: 'detail' },
     { key: '/', label: 'search' },
     { key: 'tab', label: 'tabs' },
+    { key: 'p', label: 'project' },
+    { key: 's', label: 'settings' },
+    { key: 'u', label: 'updates' },
     { key: 'i', label: 'install' },
-    { key: 'c', label: 'create' },
     { key: 'q', label: 'quit' },
   ],
   install: [
@@ -22,33 +24,51 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
     { key: '↑↓', label: 'navigate' },
     { key: 'enter', label: 'select' },
   ],
-  create: [
+  project: [
     { key: 'esc', label: 'back' },
-    { key: 'enter', label: 'confirm' },
+    { key: '↑↓', label: 'navigate' },
+    { key: 'q', label: 'quit' },
+  ],
+  settings: [
+    { key: 'esc', label: 'back' },
+    { key: '↑↓', label: 'scroll' },
+    { key: 'q', label: 'quit' },
+  ],
+  updates: [
+    { key: 'esc', label: 'back' },
+    { key: 'enter', label: 'check/apply' },
+    { key: 'r', label: 'recheck' },
+    { key: '↑↓', label: 'navigate' },
+    { key: 'q', label: 'quit' },
   ],
 };
 
 const DETAIL_BASE: Shortcut[] = [
   { key: 'esc', label: 'back' },
-  { key: 'space', label: 'toggle' },
 ];
 
 const DETAIL_TAIL: Shortcut[] = [
-  { key: 'e', label: 'edit' },
   { key: 'o', label: 'open folder' },
-  { key: 'd', label: 'delete' },
 ];
 
 export function StatusBar() {
-  const { view, selectedSkill } = useAppContext();
+  const { view, selectedSkill, manager } = useAppContext();
 
   let shortcuts: Shortcut[];
   if (view === 'detail') {
     const sourceType = selectedSkill?.source?.type;
-    const isUpdatable = sourceType === 'skillssh' || sourceType === 'github';
+    const isUpdatable = sourceType === 'skillssh';
+    const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
+    const canToggle = selectedSkill
+      ? Boolean(manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill))
+      : false;
+    const detailBase = canToggle
+      ? [...DETAIL_BASE, { key: 'space', label: selectedSkill?.origin?.type === 'plugin' ? 'toggle plugin' : 'toggle' }]
+      : DETAIL_BASE;
+    const tail = isRemovable ? [...DETAIL_TAIL, { key: 'd', label: 'delete' }] : DETAIL_TAIL;
     shortcuts = isUpdatable
-      ? [...DETAIL_BASE, { key: 'u', label: 'check update' }, ...DETAIL_TAIL]
-      : [...DETAIL_BASE, ...DETAIL_TAIL];
+      ? [...detailBase, { key: 'u', label: 'check update' }, ...tail]
+      : [...detailBase, ...tail];
   } else {
     shortcuts = SHORTCUTS[view] ?? [];
   }

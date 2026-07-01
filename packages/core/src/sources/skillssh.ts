@@ -6,6 +6,12 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+type CommandResult = { stdout: string; stderr: string };
+type CommandRunner = (command: string, args: string[], options: {
+  timeout: number;
+  env: NodeJS.ProcessEnv;
+}) => Promise<CommandResult>;
+
 function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, '');
 }
@@ -45,9 +51,11 @@ export class SkillsShSource implements IInstallSource {
   readonly id = 'skillssh';
   readonly displayName = 'skills.sh';
 
+  constructor(private readonly runCommand: CommandRunner = execFileAsync) {}
+
   async search(query: string): Promise<RemoteSkill[]> {
     try {
-      const { stdout, stderr } = await execFileAsync('npx', ['skills', 'find', query], {
+      const { stdout, stderr } = await this.runCommand('npx', ['skills', 'find', query], {
         timeout: 30_000,
         env: { ...process.env, NO_COLOR: '1' },
       });
@@ -67,7 +75,7 @@ export class SkillsShSource implements IInstallSource {
     if (skill) args.push('--skill', skill);
 
     try {
-      await execFileAsync('npx', args, {
+      await this.runCommand('npx', args, {
         timeout: 60_000,
         env: { ...process.env, NO_COLOR: '1' },
       });
@@ -86,7 +94,7 @@ export class SkillsShSource implements IInstallSource {
   async checkUpdate(skill: Skill): Promise<UpdateInfo | null> {
     if (skill.source?.type !== 'skillssh') return null;
     try {
-      const { stdout, stderr } = await execFileAsync('npx', ['skills', 'check'], {
+      const { stdout, stderr } = await this.runCommand('npx', ['skills', 'check'], {
         timeout: 30_000,
         env: { ...process.env, NO_COLOR: '1' },
       });
@@ -112,7 +120,7 @@ export class SkillsShSource implements IInstallSource {
 
   async updateViaCli(skillName: string): Promise<void> {
     try {
-      await execFileAsync('npx', ['skills', 'update', skillName, '-g', '-y'], {
+      await this.runCommand('npx', ['skills', 'update', skillName, '-g', '-y'], {
         timeout: 60_000,
         env: { ...process.env, NO_COLOR: '1' },
       });
@@ -124,7 +132,7 @@ export class SkillsShSource implements IInstallSource {
 
   async removeViaCli(skillName: string): Promise<void> {
     try {
-      await execFileAsync('npx', ['skills', 'remove', skillName, '-g', '-y'], {
+      await this.runCommand('npx', ['skills', 'remove', skillName, '-g', '-y'], {
         timeout: 60_000,
         env: { ...process.env, NO_COLOR: '1' },
       });
