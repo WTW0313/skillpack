@@ -36,6 +36,10 @@ _Avoid_: Provider toggle target, per-agent state
 A skill stored inside a project repository and maintained by that repository's authors through git.
 _Avoid_: Global Skill, managed skill
 
+**Plugin-Owned Skill**:
+A skill distributed as part of a provider plugin. Its availability may depend on the owning plugin's access state as well as any provider-specific per-skill state.
+_Avoid_: Provider-local skill, independent toggle target
+
 **skills.sh**:
 The external skill ecosystem and CLI used for installing, updating, and removing Global Skills.
 _Avoid_: GitHub install source, package manager

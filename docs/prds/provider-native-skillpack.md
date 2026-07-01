@@ -65,7 +65,7 @@ Skillpack will scan each Skill Provider according to that provider's own rules, 
 - Codex and Claude support scan plus enable/disable only.
 - Global Skills support scan, install, update, and remove when managed through skills.sh. They do not support enable/disable because their directories are Shared Skill Content that provider-specific instances may reference.
 - Provider-local destructive removal is out of scope.
-- Enable/disable uses provider-specific Disable Strategies. Codex uses `~/.codex/config.toml` `[[skills.config]]` entries keyed by absolute `SKILL.md` path. Claude regular skills use `skillOverrides` in Claude `settings.json`; Claude plugin skills use the owning plugin's `enabledPlugins` setting when Skillpack can infer the plugin ID. `.disabled-` renaming is fallback behavior only for provider-owned locations with no known provider mechanism; it is not used for Global Skills.
+- Enable/disable uses provider-specific Disable Strategies. Codex provider-local skills use `~/.codex/config.toml` `[[skills.config]]` entries keyed by absolute `SKILL.md` path. Codex plugin skills use the owning plugin's `[plugins."plugin-name@marketplace-name"]` entry, with availability determined by `plugin enabled AND skill config not false`. Claude regular skills use `skillOverrides` in Claude `settings.json`; Claude plugin skills use the owning plugin's `enabledPlugins` setting when Skillpack can infer the plugin ID. `.disabled-` renaming is fallback behavior only for provider-owned locations with no known provider mechanism; it is not used for Global Skills.
 - Update checks are manual and should not block startup.
 - Provider paths are auto-detected with configurable overrides.
 - Detail views follow explain-before-action.

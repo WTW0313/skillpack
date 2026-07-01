@@ -28,10 +28,11 @@ The main experience is Inventory. It should answer:
 In scope:
 
 - Scan Codex, Claude, Global, and Project Skill locations using provider-specific rules.
+- Scan Codex provider-local skills from `~/.codex/skills` and active-looking Codex plugin skills from `~/.codex/plugins/cache` by default. Stale or duplicate cached plugin copies should not appear in the main inventory by default.
 - Build Skill Groups from provider instances using provenance-aware Skill Identity.
 - Show provider badges, Health Signals, and provenance summaries in the main Inventory.
 - Show Project Skills in a separate read-only view.
-- Enable or disable Codex, Claude, and Global provider instances through provider-specific Disable Strategies.
+- Enable or disable Codex and Claude provider instances through provider-specific Disable Strategies.
 - Use `.disabled-` renaming only when no known provider config or native disable mechanism exists.
 - Install Global Skills through skills.sh only.
 - Remove and update skills.sh-managed Global Skills through skills.sh only.
@@ -105,10 +106,23 @@ Each provider adapter owns enable/disable behavior. A strategy should prefer kno
 
 Known v1 strategies:
 
-- Codex: read/write `[[skills.config]]` entries in `~/.codex/config.toml`, keyed by absolute `SKILL.md` path.
+- Codex provider-local skills: read/write `[[skills.config]]` entries in `~/.codex/config.toml`, keyed by absolute `SKILL.md` path.
+- Codex plugin skills: read/write `[plugins."plugin-name@marketplace-name"]` in `~/.codex/config.toml`, when the plugin ID is inferable from the cache path. Skill Availability is `plugin enabled AND skill config not false`; toggling a plugin-owned skill toggles the owning plugin and affects all skills from that plugin.
 - Claude regular skills: read/write `skillOverrides` in Claude `settings.json`, keyed by skill name.
 - Claude plugin skills: read/write `enabledPlugins` in Claude `settings.json`, keyed by `plugin-name@marketplace-name`, when the plugin ID is inferable from the cache path.
 - Global / skills.sh: no enable/disable strategy. Global Skills are Shared Skill Content and expose install, update, and remove lifecycle actions only.
+
+Plugin-level toggles require confirmation in the TUI. The confirmation must name the owning plugin and show the sibling skills affected by the same plugin availability gate.
+
+Codex plugin cache scanning should select active-looking plugin roots for the main inventory:
+
+- Build candidates from `~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/`.
+- Include candidates whose `plugin@marketplace` appears in `~/.codex/config.toml`, even when disabled.
+- Include remote-installed or bundled candidates without a config entry only when another root has not already been selected for the same plugin name.
+- If multiple versions exist for the same `plugin@marketplace`, select the highest semantic version; for non-semver versions, select the newest modified root.
+- Hide non-selected cached copies from the main inventory for now.
+
+A missing Codex plugin config entry means the active-looking plugin root is enabled by default. Disabling such a plugin writes a new `[plugins."plugin-name@marketplace-name"]` table with `enabled = false`.
 
 ## Provider Capabilities
 
