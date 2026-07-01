@@ -52,6 +52,14 @@ _Avoid_: Installed skill, Skillpack-created skill
 The cross-provider view of discovered skills, their provenance, availability, and health.
 _Avoid_: Skill editor, authoring workspace
 
+**Terminal Envelope**:
+The terminal size range the TUI deliberately designs and verifies for: a full baseline layout at 80x24, a compact usable layout down to 60x18, and a minimal too-small layout below that.
+_Avoid_: Responsive target, screen size
+
+**Terminal Compatibility**:
+The TUI's ability to remain understandable across terminals with different color, glyph, width, and resize behavior.
+_Avoid_: Pretty terminal rendering, theme support
+
 **Scan Root**:
 A directory Skillpack inspects to discover provider, shared global, or project skills.
 _Avoid_: Skill, provider, install source
