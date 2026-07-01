@@ -4,6 +4,20 @@ export interface SkillMetadata {
   tags?: string[];
 }
 
+export interface PluginSkillOrigin {
+  type: 'plugin';
+  pluginId: string;
+  pluginName: string;
+  marketplace: string;
+  version?: string;
+  displayName?: string;
+  pluginEnabled: boolean;
+  skillConfigEnabled?: boolean;
+  identityStatus?: 'confirmed' | 'mismatched';
+}
+
+export type SkillOrigin = PluginSkillOrigin;
+
 export interface SkillSource {
   type: 'skillssh' | 'local';
   repo?: string;
@@ -18,7 +32,7 @@ export interface SkillSource {
   };
 }
 
-export type SkillScanIssueCode = 'invalid-skill-md' | 'broken-symlink';
+export type SkillScanIssueCode = 'invalid-skill-md' | 'broken-symlink' | 'plugin-identity-mismatch';
 
 export interface SkillScanIssue {
   code: SkillScanIssueCode;
@@ -35,6 +49,7 @@ export interface Skill {
   enabled: boolean;
   scope: 'global' | 'project';
   metadata: SkillMetadata;
+  origin?: SkillOrigin;
   source?: SkillSource;
   scanIssues?: SkillScanIssue[];
 }

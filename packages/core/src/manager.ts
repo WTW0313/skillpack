@@ -137,6 +137,7 @@ export class SkillManager {
       resolvedPath: skill.resolvedPath,
       version: skill.version,
       enabled: skill.enabled,
+      origin: skill.origin,
       source: skill.source,
       actions: [],
       healthSignals: (skill.scanIssues ?? []).map((issue) => ({
@@ -155,7 +156,8 @@ export class SkillManager {
     if (!provider.capabilities.canToggle) {
       throw new Error(`${provider.displayName} does not support toggle`);
     }
-    await provider.setEnabled(skill, !skill.enabled);
+    const targetEnabled = skill.origin?.type === 'plugin' ? !skill.origin.pluginEnabled : !skill.enabled;
+    await provider.setEnabled(skill, targetEnabled);
   }
 
   async toggleInventoryInstance(instance: SkillInventoryInstance): Promise<void> {
@@ -164,7 +166,8 @@ export class SkillManager {
     if (!provider.capabilities.canToggle) {
       throw new Error(`${provider.displayName} does not support toggle`);
     }
-    await provider.setEnabled(instance, !instance.enabled);
+    const targetEnabled = instance.origin?.type === 'plugin' ? !instance.origin.pluginEnabled : !instance.enabled;
+    await provider.setEnabled(instance, targetEnabled);
   }
 
   async uninstallSkill(skill: Skill): Promise<void> {

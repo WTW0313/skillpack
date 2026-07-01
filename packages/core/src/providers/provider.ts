@@ -12,7 +12,7 @@ export interface ProviderCapabilities {
   canCreate: boolean;
 }
 
-export type SkillToggleTarget = Pick<Skill, 'name' | 'path' | 'enabled'>;
+export type SkillToggleTarget = Pick<Skill, 'name' | 'path' | 'enabled' | 'origin'>;
 
 export interface ISkillProvider {
   readonly id: string;
@@ -38,9 +38,9 @@ export abstract class BaseProvider implements ISkillProvider {
   abstract readonly basePaths: string[];
   abstract readonly capabilities: ProviderCapabilities;
 
-  async scan(): Promise<Skill[]> {
+  protected async scanBasePaths(basePaths: string[]): Promise<Skill[]> {
     const skills: Skill[] = [];
-    for (const basePath of this.basePaths) {
+    for (const basePath of basePaths) {
       try { await access(basePath); } catch { continue; }
       const entries = await readdir(basePath, { withFileTypes: true });
       for (const entry of entries) {
@@ -117,6 +117,10 @@ export abstract class BaseProvider implements ISkillProvider {
       }
     }
     return skills;
+  }
+
+  async scan(): Promise<Skill[]> {
+    return this.scanBasePaths(this.basePaths);
   }
 
   async install(_name: string, _request: InstallRequest): Promise<void> { throw new Error(`${this.displayName} does not support install`); }

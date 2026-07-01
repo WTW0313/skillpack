@@ -35,6 +35,14 @@ interface CodexSkillConfigEntry {
   enabledLine?: number;
 }
 
+interface CodexPluginConfigEntry {
+  pluginId: string;
+  enabled?: boolean;
+  startLine: number;
+  endLine: number;
+  enabledLine?: number;
+}
+
 function parseTomlString(raw: string): string | undefined {
   const value = raw.trim();
   if (value.startsWith('"')) {
@@ -94,6 +102,47 @@ function parseCodexSkillConfigEntries(text: string): CodexSkillConfigEntry[] {
   return entries;
 }
 
+function parseCodexPluginHeader(trimmed: string): string | undefined {
+  const match = trimmed.match(/^\[plugins\.((?:"(?:\\.|[^"\\])*")|(?:'[^']*'))\]$/);
+  if (!match) return undefined;
+  return parseTomlString(match[1]);
+}
+
+function parseCodexPluginConfigEntries(text: string): CodexPluginConfigEntry[] {
+  const lines = text.split('\n');
+  const entries: CodexPluginConfigEntry[] = [];
+  let current: CodexPluginConfigEntry | undefined;
+
+  for (const [index, line] of lines.entries()) {
+    const trimmed = line.trim();
+    const pluginId = parseCodexPluginHeader(trimmed);
+    if (pluginId) {
+      if (current) {
+        current.endLine = index;
+        entries.push(current);
+      }
+      current = { pluginId, startLine: index, endLine: lines.length };
+      continue;
+    }
+    if (current && /^\[{1,2}[^\]]+\]{1,2}$/.test(trimmed)) {
+      current.endLine = index;
+      entries.push(current);
+      current = undefined;
+      continue;
+    }
+    if (!current) continue;
+
+    const enabledMatch = line.match(/^\s*enabled\s*=\s*(true|false)\b/);
+    if (enabledMatch) {
+      current.enabled = enabledMatch[1] === 'true';
+      current.enabledLine = index;
+    }
+  }
+
+  if (current) entries.push(current);
+  return entries;
+}
+
 async function readTextIfExists(filePath: string): Promise<string> {
   try {
     return await readFile(filePath, 'utf-8');
@@ -108,6 +157,16 @@ export async function readCodexSkillConfigEnabled(configPath: string, skillMdPat
   const target = path.resolve(skillMdPath);
   const entry = parseCodexSkillConfigEntries(text).find((item) => item.path && path.resolve(item.path) === target);
   return entry?.enabled;
+}
+
+export async function readCodexPluginConfig(configPath: string): Promise<Record<string, boolean | undefined>> {
+  const text = await readTextIfExists(configPath);
+  return Object.fromEntries(parseCodexPluginConfigEntries(text).map((entry) => [entry.pluginId, entry.enabled]));
+}
+
+export async function readCodexPluginEnabled(configPath: string, pluginId: string): Promise<boolean | undefined> {
+  const config = await readCodexPluginConfig(configPath);
+  return config[pluginId];
 }
 
 export async function writeCodexSkillConfigEnabled(configPath: string, skillMdPath: string, enabled: boolean): Promise<void> {
@@ -127,6 +186,28 @@ export async function writeCodexSkillConfigEnabled(configPath: string, skillMdPa
   } else {
     if (lines.length > 0 && lines[lines.length - 1] !== '') lines.push('');
     lines.push('[[skills.config]]', `path = ${JSON.stringify(target)}`, enabledLine);
+  }
+
+  await mkdir(path.dirname(configPath), { recursive: true });
+  await writeFile(configPath, `${lines.join('\n').replace(/\n+$/, '')}\n`, 'utf-8');
+}
+
+export async function writeCodexPluginEnabled(configPath: string, pluginId: string, enabled: boolean): Promise<void> {
+  const text = await readTextIfExists(configPath);
+  const lines = text ? text.split('\n') : [];
+  const entry = parseCodexPluginConfigEntries(text).find((item) => item.pluginId === pluginId);
+  const enabledLine = `enabled = ${enabled ? 'true' : 'false'}`;
+
+  if (entry) {
+    if (entry.enabledLine !== undefined) {
+      const indent = lines[entry.enabledLine]?.match(/^\s*/)?.[0] ?? '';
+      lines[entry.enabledLine] = `${indent}${enabledLine}`;
+    } else {
+      lines.splice(entry.startLine + 1, 0, enabledLine);
+    }
+  } else {
+    if (lines.length > 0 && lines[lines.length - 1] !== '') lines.push('');
+    lines.push(`[plugins.${JSON.stringify(pluginId)}]`, enabledLine);
   }
 
   await mkdir(path.dirname(configPath), { recursive: true });

@@ -7,6 +7,7 @@ export type HealthSignalCode =
   | 'inferred-identity'
   | 'invalid-skill-md'
   | 'broken-symlink'
+  | 'plugin-identity-mismatch'
   | 'unmanaged-global-skill'
   | 'update-available';
 
@@ -30,6 +31,7 @@ export interface SkillInventoryInstance {
   resolvedPath?: string;
   version?: string;
   enabled: boolean;
+  origin?: Skill['origin'];
   source?: SkillSource;
   disableStrategy?: DisableStrategy;
   actions: SkillAction[];
@@ -78,7 +80,8 @@ function inferredIdentityFor(skill: Skill): { key: string; confidence: SkillIden
 }
 
 function actionsFor(skill: Skill): SkillAction[] {
-  const toggleAction: SkillAction = skill.enabled ? 'disable' : 'enable';
+  const toggleState = skill.origin?.type === 'plugin' ? skill.origin.pluginEnabled : skill.enabled;
+  const toggleAction: SkillAction = toggleState ? 'disable' : 'enable';
   if (skill.scope === 'project') return [];
   if (skill.provider === 'global' && skill.source?.type === 'skillssh') {
     return ['update', 'remove'];
@@ -111,6 +114,7 @@ function toInstance(skill: Skill, options: BuildSkillInventoryOptions): SkillInv
     resolvedPath: skill.resolvedPath,
     version: skill.version,
     enabled: skill.enabled,
+    origin: skill.origin,
     source: skill.source,
     disableStrategy: options.getDisableStrategy?.(skill),
     actions: actionsFor(skill),

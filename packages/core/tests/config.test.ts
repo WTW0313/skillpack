@@ -45,13 +45,17 @@ describe('ConfigManager', () => {
   it('auto-detects default provider paths against the configured home directory', async () => {
     const homeDir = path.join(root, 'home');
     await mkdir(path.join(homeDir, '.codex', 'skills'), { recursive: true });
+    await mkdir(path.join(homeDir, '.codex', 'plugins', 'cache'), { recursive: true });
     await mkdir(path.join(homeDir, '.agents', 'skills'), { recursive: true });
 
     const config = await new ConfigManager({ configDir, homeDir }).load();
 
     expect(config.providers.codex).toEqual({
       enabled: true,
-      paths: [path.join(homeDir, '.codex', 'skills')],
+      paths: [
+        path.join(homeDir, '.codex', 'skills'),
+        path.join(homeDir, '.codex', 'plugins', 'cache'),
+      ],
     });
     expect(config.providers.global).toEqual({
       enabled: true,

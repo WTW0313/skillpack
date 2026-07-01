@@ -35,7 +35,7 @@ export function createDefaultConfig(homeDir = os.homedir()): SkillpackConfig {
     autoCheckUpdates: true,
     projectSkillsDirs: ['.codex/skills', '.claude/skills', '.agents/skills'],
     providers: {
-      codex: { enabled: true, paths: [path.join(homeDir, '.codex', 'skills')] },
+      codex: { enabled: true, paths: [path.join(homeDir, '.codex', 'skills'), path.join(homeDir, '.codex', 'plugins', 'cache')] },
       claude: { enabled: true, paths: [path.join(homeDir, '.claude', 'plugins', 'cache'), path.join(homeDir, '.claude', 'skills')] },
       global: { enabled: true, paths: [path.join(homeDir, '.agents', 'skills')] },
     },
