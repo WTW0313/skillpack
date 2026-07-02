@@ -1,0 +1,49 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Terminal UI Tests > renders a stable inventory frame 1`] = `
+" * Skillpack  3 instances
+ All 3 │ Codex 1 │ Claude 1 │ Global 1
+
+   NAME                           PROVIDER STATUS   RELATED        ISSUE
+ > alpha                          codex    enabled  -              -
+   bravo                          claude   disabled -              -
+   charlie                        global   enabled  -              -
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ──↑↓ navigat  enter detai  / searc  ? hel  tab tab  p projec  s setting  i        u update  q quit
+                                                                        install"
+`;
+
+exports[`Terminal UI Tests > renders a stable too-small terminal frame 1`] = `
+" skillpack
+ Terminal too small
+ Resize to at least 60x18.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ q quit"
+`;

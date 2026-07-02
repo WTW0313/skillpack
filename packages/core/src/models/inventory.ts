@@ -2,17 +2,24 @@ import type { Skill, SkillSource } from './skill.js';
 
 export type SkillIdentityConfidence = 'confirmed' | 'inferred';
 
-export type HealthSignalCode =
-  | 'grouped-across-providers'
-  | 'inferred-identity'
+export type InventoryIssueCode =
   | 'invalid-skill-md'
   | 'broken-symlink'
-  | 'plugin-identity-mismatch'
+  | 'plugin-identity-mismatch';
+
+export type InventoryNoticeCode =
+  | 'related-providers'
+  | 'name-only-relationship'
   | 'unmanaged-global-skill'
   | 'update-available';
 
-export interface HealthSignal {
-  code: HealthSignalCode;
+export interface InventoryIssue {
+  code: InventoryIssueCode;
+  message: string;
+}
+
+export interface InventoryNotice {
+  code: InventoryNoticeCode;
   message: string;
 }
 
@@ -35,7 +42,8 @@ export interface SkillInventoryInstance {
   source?: SkillSource;
   disableStrategy?: DisableStrategy;
   actions: SkillAction[];
-  healthSignals: HealthSignal[];
+  issues: InventoryIssue[];
+  notices: InventoryNotice[];
 }
 
 export interface SkillGroup {
@@ -50,23 +58,25 @@ export interface SkillGroup {
     enabled: boolean;
   }>;
   instances: SkillInventoryInstance[];
-  healthSignals: HealthSignal[];
+  issues: InventoryIssue[];
+  notices: InventoryNotice[];
 }
 
 export function normalizeSkillName(name: string): string {
   return name.trim().toLowerCase().replace(/[\s_]+/g, '-');
 }
 
-function strongIdentityFor(skill: Skill): { key: string; reason: string } | null {
+function strongIdentityFor(skill: Skill): { key: string; reason: string; confirmsSingleInstance: boolean } | null {
   const realPath = skill.resolvedPath ?? skill.path;
-  if (skill.resolvedPath) {
-    return { key: `realpath:${realPath}`, reason: 'shared real path' };
-  }
   if (skill.source?.type === 'skillssh' && (skill.source.skillFolderHash || skill.source.repo)) {
     return {
       key: `skillssh:${skill.source.skillFolderHash ?? skill.source.repo}`,
       reason: 'skills.sh provenance',
+      confirmsSingleInstance: true,
     };
+  }
+  if (skill.resolvedPath) {
+    return { key: `realpath:${realPath}`, reason: 'shared real path', confirmsSingleInstance: false };
   }
   return null;
 }
@@ -79,7 +89,7 @@ function inferredIdentityFor(skill: Skill): { key: string; confidence: SkillIden
   };
 }
 
-function actionsFor(skill: Skill): SkillAction[] {
+function actionsFor(skill: Skill, disableStrategy: DisableStrategy | undefined): SkillAction[] {
   const toggleState = skill.origin?.type === 'plugin' ? skill.origin.pluginEnabled : skill.enabled;
   const toggleAction: SkillAction = toggleState ? 'disable' : 'enable';
   if (skill.scope === 'project') return [];
@@ -87,25 +97,34 @@ function actionsFor(skill: Skill): SkillAction[] {
     return ['update', 'remove'];
   }
   if (skill.provider === 'global') return [];
-  return [toggleAction];
+  return disableStrategy ? [toggleAction] : [];
 }
 
-function healthSignalsFor(skill: Skill): HealthSignal[] {
-  const signals: HealthSignal[] = (skill.scanIssues ?? []).map((issue) => ({
+function issuesFor(skill: Skill): InventoryIssue[] {
+  return (skill.scanIssues ?? []).map((issue) => ({
     code: issue.code,
     message: issue.message,
   }));
+}
+
+function noticesFor(skill: Skill, options: BuildSkillInventoryOptions): InventoryNotice[] {
+  const notices: InventoryNotice[] = [];
   if (skill.provider === 'global' && skill.source?.type !== 'skillssh') {
-    signals.push({ code: 'unmanaged-global-skill', message: 'Global Skill is not managed by skills.sh metadata' });
+    notices.push({ code: 'unmanaged-global-skill', message: 'Global Skill is not managed by skills.sh metadata' });
   }
-  return signals;
+  if (options.hasUpdate?.(skill)) {
+    notices.push({ code: 'update-available', message: 'skills.sh update is available' });
+  }
+  return notices;
 }
 
 export interface BuildSkillInventoryOptions {
   getDisableStrategy?: (skill: Skill) => DisableStrategy | undefined;
+  hasUpdate?: (skill: Skill) => boolean;
 }
 
 function toInstance(skill: Skill, options: BuildSkillInventoryOptions): SkillInventoryInstance {
+  const disableStrategy = options.getDisableStrategy?.(skill);
   return {
     name: skill.name,
     description: skill.description,
@@ -116,15 +135,16 @@ function toInstance(skill: Skill, options: BuildSkillInventoryOptions): SkillInv
     enabled: skill.enabled,
     origin: skill.origin,
     source: skill.source,
-    disableStrategy: options.getDisableStrategy?.(skill),
-    actions: actionsFor(skill),
-    healthSignals: healthSignalsFor(skill),
+    disableStrategy,
+    actions: actionsFor(skill, disableStrategy),
+    issues: issuesFor(skill),
+    notices: noticesFor(skill, options),
   };
 }
 
 export function buildSkillInventory(skills: Skill[], options: BuildSkillInventoryOptions = {}): SkillGroup[] {
   const inventorySkills = skills.filter((s) => s.scope !== 'project');
-  const strongGroups = new Map<string, { reason: string; skills: Skill[] }>();
+  const strongGroups = new Map<string, { reason: string; confirmsSingleInstance: boolean; skills: Skill[] }>();
   for (const skill of inventorySkills) {
     const identity = strongIdentityFor(skill);
     if (!identity) continue;
@@ -132,14 +152,18 @@ export function buildSkillInventory(skills: Skill[], options: BuildSkillInventor
     if (existing) {
       existing.skills.push(skill);
     } else {
-      strongGroups.set(identity.key, { reason: identity.reason, skills: [skill] });
+      strongGroups.set(identity.key, {
+        reason: identity.reason,
+        confirmsSingleInstance: identity.confirmsSingleInstance,
+        skills: [skill],
+      });
     }
   }
 
   const assigned = new Set<Skill>();
   const groups = new Map<string, { identity: { confidence: SkillIdentityConfidence; reason: string }; skills: Skill[] }>();
   for (const [key, group] of strongGroups) {
-    if (group.skills.length < 2) continue;
+    if (group.skills.length < 2 && !group.confirmsSingleInstance) continue;
     for (const skill of group.skills) assigned.add(skill);
     groups.set(key, { identity: { confidence: 'confirmed', reason: group.reason }, skills: group.skills });
   }
@@ -157,17 +181,13 @@ export function buildSkillInventory(skills: Skill[], options: BuildSkillInventor
 
   return [...groups.entries()].map(([id, group]) => {
     const instances = group.skills.map((skill) => toInstance(skill, options));
-    const healthSignals = instances.flatMap((instance) => instance.healthSignals);
+    const notices: InventoryNotice[] = [];
     if (instances.length > 1) {
-      healthSignals.push({
-        code: 'grouped-across-providers',
-        message: 'Skill appears in multiple providers',
-      });
-    }
-    if (group.identity.confidence === 'inferred') {
-      healthSignals.push({
-        code: 'inferred-identity',
-        message: 'Skill identity is inferred from normalized name',
+      notices.push({
+        code: group.identity.confidence === 'confirmed' ? 'related-providers' : 'name-only-relationship',
+        message: group.identity.confidence === 'confirmed'
+          ? 'Skill has confirmed related provider instances'
+          : 'Skill has same-name provider instances without confirming provenance',
       });
     }
 
@@ -183,7 +203,8 @@ export function buildSkillInventory(skills: Skill[], options: BuildSkillInventor
         enabled: instance.enabled,
       })),
       instances,
-      healthSignals,
+      issues: instances.flatMap((instance) => instance.issues),
+      notices,
     };
   });
 }

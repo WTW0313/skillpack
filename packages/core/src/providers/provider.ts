@@ -1,15 +1,10 @@
-import type { DisableStrategy, ProviderScanPath, Skill, SkillTemplate } from '../models/index.js';
-import type { InstallRequest } from '../models/source.js';
+import type { DisableStrategy, ProviderScanPath, Skill } from '../models/index.js';
 import { readdir, access, readFile, rename, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { parseSkillMd } from '../parser.js';
 
 export interface ProviderCapabilities {
-  canInstall: boolean;
-  canUninstall: boolean;
-  canUpdate: boolean;
   canToggle: boolean;
-  canCreate: boolean;
 }
 
 export type SkillToggleTarget = Pick<Skill, 'name' | 'path' | 'enabled' | 'origin'>;
@@ -21,15 +16,11 @@ export interface ISkillProvider {
   readonly capabilities: ProviderCapabilities;
 
   scan(): Promise<Skill[]>;
-  install(name: string, request: InstallRequest): Promise<void>;
-  uninstall(name: string): Promise<void>;
-  update(name: string): Promise<void>;
   enable(name: string): Promise<void>;
   disable(name: string): Promise<void>;
   setEnabled(skill: SkillToggleTarget, enabled: boolean): Promise<void>;
   getDisableStrategy(skill: SkillToggleTarget): DisableStrategy | undefined;
   getScanPaths(): ProviderScanPath[];
-  create(template: SkillTemplate): Promise<Skill>;
 }
 
 export abstract class BaseProvider implements ISkillProvider {
@@ -123,9 +114,6 @@ export abstract class BaseProvider implements ISkillProvider {
     return this.scanBasePaths(this.basePaths);
   }
 
-  async install(_name: string, _request: InstallRequest): Promise<void> { throw new Error(`${this.displayName} does not support install`); }
-  async uninstall(_name: string): Promise<void> { throw new Error(`${this.displayName} does not support uninstall`); }
-  async update(_name: string): Promise<void> { throw new Error(`${this.displayName} does not support update`); }
   getDisableStrategy(_skill: SkillToggleTarget): DisableStrategy | undefined {
     if (!this.capabilities.canToggle) return undefined;
     return {
@@ -191,5 +179,4 @@ export abstract class BaseProvider implements ISkillProvider {
     }
     throw new Error(`Skill "${name}" not found in ${this.displayName}`);
   }
-  async create(_template: SkillTemplate): Promise<Skill> { throw new Error(`${this.displayName} does not support create`); }
 }

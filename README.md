@@ -39,9 +39,9 @@ node packages/tui/dist/skillpack.js
 
 ## Quick Start
 
-Launch `skillpack` to see all discovered skills grouped by provider. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to switch between provider tabs (All, Codex, Claude, Global), and `/` to search.
+Launch `skillpack` to see discovered skills grouped into Skill Groups with provider status and Health Signals. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to filter by provider (All, Codex, Claude, Global), and `/` to search.
 
-Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a skills.sh Global Skill, or `u` to open manual updates. Plugin-owned skills require confirmation because the action toggles the owning plugin and affects sibling skills from the same plugin.
+Press `Enter` to inspect a Skill Group, then use left/right to choose a provider instance before taking instance-level actions. Press `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a skills.sh Global Skill, or `u` to open manual updates. Plugin-owned skills require confirmation because the action toggles the owning plugin and affects sibling skills from the same plugin.
 
 ## Keyboard Shortcuts
 
@@ -50,8 +50,7 @@ Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` t
 | Key | Action | Description |
 |-----|--------|-------------|
 | `↑` / `↓` | Navigate | Move selection up / down |
-| `Space` | Toggle | Enable or disable a selected Codex or Claude skill; plugin-owned skills ask for confirmation |
-| `Enter` | Detail | Open skill detail view |
+| `Enter` | Detail | Open Skill Group detail view |
 | `Tab` / `Shift+Tab` | Switch tab | Cycle through All / Codex / Claude / Global |
 | `/` | Search | Fuzzy match on name + description |
 | `Esc` | Clear search | Clear the active search filter |
@@ -66,6 +65,7 @@ Press `Space` to toggle a Codex or Claude provider instance on or off, `Enter` t
 | Key | Action | Description |
 |-----|--------|-------------|
 | `Esc` | Back | Return to list view |
+| `←` / `→` | Provider instance | Switch the selected provider instance inside the Skill Group |
 | `Space` | Toggle | Enable or disable a Codex or Claude skill; plugin-owned skills ask for confirmation |
 | `o` / `O` | Open folder | Open skill directory in system file manager |
 | `d` | Delete | Remove a skills.sh-managed Global Skill with confirmation |
@@ -78,7 +78,7 @@ Skillpack stores its configuration at `~/.config/skillpack/config.json`. On firs
 ```json
 {
   "editor": "vi",
-  "autoCheckUpdates": true,
+  "autoCheckUpdates": false,
   "projectSkillsDirs": [
     ".codex/skills",
     ".claude/skills",
@@ -107,15 +107,12 @@ class MyProvider extends BaseProvider {
   readonly displayName = 'My Platform';
   readonly basePaths = ['/path/to/skills'];
   readonly capabilities: ProviderCapabilities = {
-    canInstall: true,
-    canUninstall: true,
-    canUpdate: false,
     canToggle: true,
-    canCreate: true,
   };
 
-  override async uninstall(name: string) { /* ... */ }
-  override async create(template) { /* return Skill */ }
+  override async scan() { /* return provider-native Skill instances */ }
+  override async setEnabled(skill, enabled) { /* update provider-native availability */ }
+  override getDisableStrategy(skill) { /* describe the availability mechanism */ }
 }
 ```
 

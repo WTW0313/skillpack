@@ -52,21 +52,67 @@ _Avoid_: Installed skill, Skillpack-created skill
 The cross-provider view of discovered skills, their provenance, availability, and health.
 _Avoid_: Skill editor, authoring workspace
 
+**Provider Instance**:
+A discovered skill as represented by one Skill Provider, including that provider's availability and provenance for the skill.
+_Avoid_: Skill Group row, duplicate
+
+**Terminal Envelope**:
+The terminal size range the TUI deliberately designs and verifies for: a full baseline layout at 80x24, a compact usable layout down to 60x18, and a minimal too-small layout below that.
+_Avoid_: Responsive target, screen size
+
+**Terminal Compatibility**:
+The TUI's ability to remain understandable across terminals with different color, glyph, width, and resize behavior.
+_Avoid_: Pretty terminal rendering, theme support
+
+**Terminal UI Test**:
+A test that verifies the rendered Skillpack TUI state and keyboard-driven interaction from the user's terminal perspective.
+_Avoid_: CLI I/O Test, unit test
+
+**CLI I/O Test**:
+A test that verifies the Skillpack command process contract through standard input, standard output, signals, and terminal control sequences.
+_Avoid_: Terminal UI Test, component test
+
 **Scan Root**:
 A directory Skillpack inspects to discover provider, shared global, or project skills.
 _Avoid_: Skill, provider, install source
 
-**Health Signal**:
-A deterministic inventory finding that helps the user understand a skill's provider coverage, provenance, or loadability.
-_Avoid_: Security score, quality rating
+**Inventory Notice**:
+A non-problem inventory fact that helps the user understand provider coverage, provenance, or grouping confidence.
+_Avoid_: Warning, issue
+
+**Inventory Issue**:
+A deterministic inventory finding that means a Provider Instance likely needs attention or a user decision.
+_Avoid_: Notice, security score, quality rating
+
+Inventory Notices include update opportunities, unmanaged local provenance, and weak name-only relationships. Inventory Issues are reserved for findings that directly affect reliability or safe operation, such as invalid `SKILL.md` files, broken symlinks, and provider state that conflicts with the discovered filesystem state.
+
+**Update Opportunity**:
+A known newer version for a managed Global Skill. It is useful action context, not evidence that the current skill is broken.
+_Avoid_: Inventory Issue, stale skill warning
 
 **Skill Group**:
-The inventory row that collects provider-specific instances believed to represent the same skill.
+A relationship object that collects Provider Instances believed to represent the same skill.
 _Avoid_: Duplicate, provider row
+
+**Inventory Row**:
+The primary row in Skill Inventory. It should represent the object the user can inspect or act on directly.
+_Avoid_: Abstract grouping, hidden provider selection
+
+**Relationship-Aware Ordering**:
+An inventory ordering model where Provider Instance rows remain individually actionable but related instances are kept near each other when possible.
+_Avoid_: Provider partitioning, abstract group row
+
+**Related Providers**:
+The main-list hint that a Provider Instance has confirmed same-skill relationships in other providers. It should only be based on strong provenance evidence and should not include name-only matches.
+_Avoid_: Duplicate badge, weak match count
 
 **Skill Identity**:
 The evidence Skillpack uses to decide which provider-specific instances belong to the same Skill Group.
 _Avoid_: Display name, directory name
+
+**Name-Only Relationship**:
+A weak relationship between Provider Instances based only on normalized skill names, without path or source provenance confirming they are the same skill.
+_Avoid_: Confirmed relationship, duplicate
 
 **Disable Strategy**:
 The provider-specific mechanism Skillpack uses to make a skill unavailable to an agent.

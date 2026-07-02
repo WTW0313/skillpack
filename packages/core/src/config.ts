@@ -32,7 +32,7 @@ export interface ConfigManagerOptions {
 export function createDefaultConfig(homeDir = os.homedir()): SkillpackConfig {
   return {
     editor: process.env.EDITOR || 'vi',
-    autoCheckUpdates: true,
+    autoCheckUpdates: false,
     projectSkillsDirs: ['.codex/skills', '.claude/skills', '.agents/skills'],
     providers: {
       codex: { enabled: true, paths: [path.join(homeDir, '.codex', 'skills'), path.join(homeDir, '.codex', 'plugins', 'cache')] },

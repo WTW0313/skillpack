@@ -46,6 +46,29 @@ describe('SkillsShSource', () => {
     expect(calls).toEqual([{ command: 'npx', args: ['skills', 'check'] }]);
   });
 
+  it('checks multiple skills for updates with one skills CLI call', async () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+    const source = new SkillsShSource(async (command, args) => {
+      calls.push({ command, args });
+      return { stdout: 'alpha update available\nbeta up to date\ngamma outdated\n', stderr: '' };
+    });
+    const skills: Skill[] = ['alpha', 'beta', 'gamma'].map((name) => ({
+      name,
+      description: '',
+      provider: 'global',
+      path: `/fake/${name}`,
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      source: { type: 'skillssh', skillFolderHash: `${name}-hash` },
+    }));
+
+    const updates = await source.checkUpdates(skills);
+
+    expect(updates.map(({ skill }) => skill.name)).toEqual(['alpha', 'gamma']);
+    expect(calls).toEqual([{ command: 'npx', args: ['skills', 'check'] }]);
+  });
+
   it('updates a skills.sh-managed Global Skill through the skills CLI', async () => {
     const calls: Array<{ command: string; args: string[] }> = [];
     const source = new SkillsShSource(async (command, args) => {

@@ -59,20 +59,6 @@ describe('CodexProvider', () => {
     expect(skills).toHaveLength(0);
   });
 
-  it('creates a new skill', async () => {
-    const skill = await provider.create({ name: 'new-skill', description: 'Brand new' });
-    expect(skill.name).toBe('new-skill');
-    expect(skill.source?.type).toBe('local');
-  });
-
-  it('uninstalls a skill', async () => {
-    const skillDir = path.join(dir, 'to-delete');
-    await writeSkill(skillDir, 'to-delete', 'Delete me');
-    await provider.uninstall('to-delete');
-    const skills = await provider.scan();
-    expect(skills).toHaveLength(0);
-  });
-
   it('reads enabled state from Codex config entries', async () => {
     const skillDir = path.join(dir, 'my-skill');
     await writeSkill(skillDir, 'my-skill', 'Toggle me');
@@ -251,5 +237,35 @@ describe('CodexProvider', () => {
       message: 'Codex plugin manifest name "not-github" does not match cache plugin "github"',
     }]);
     expect(pluginProvider.getDisableStrategy(skill)).toBeUndefined();
+  });
+
+  it('surfaces invalid plugin SKILL.md files as scan issues', async () => {
+    const pluginCache = path.join(dir, 'plugins', 'cache');
+    const pluginProvider = new CodexProvider([pluginCache], configPath);
+    const pluginRoot = path.join(pluginCache, 'openai-curated', 'github', '1.2.3');
+    const skillDir = path.join(pluginRoot, 'skills', 'broken');
+    await mkdir(path.join(pluginRoot, '.codex-plugin'), { recursive: true });
+    await writeFile(path.join(pluginRoot, '.codex-plugin', 'plugin.json'), JSON.stringify({
+      name: 'github',
+      version: '1.2.3',
+      skills: './skills/',
+    }), 'utf-8');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: [\n---\n');
+
+    const [skill] = await pluginProvider.scan();
+
+    expect(skill).toMatchObject({
+      name: 'broken',
+      provider: 'codex',
+      origin: {
+        type: 'plugin',
+        pluginId: 'github@openai-curated',
+      },
+      scanIssues: [{
+        code: 'invalid-skill-md',
+        message: expect.any(String),
+      }],
+    });
   });
 });

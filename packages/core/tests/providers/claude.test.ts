@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, mkdir, writeFile, readFile, access } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readFile, access, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ClaudeProvider } from '../../src/providers/claude.js';
@@ -102,6 +102,14 @@ describe('ClaudeProvider', () => {
 
     expect(skills).toHaveLength(1);
     expect(skills[0].enabled).toBe(false);
+    expect(skills[0].origin).toMatchObject({
+      type: 'plugin',
+      pluginId: 'deploy-plugin@team-tools',
+      pluginName: 'deploy-plugin',
+      marketplace: 'team-tools',
+      version: '1.0.0',
+      pluginEnabled: false,
+    });
   });
 
   it('toggles plugin skills through enabledPlugins for the owning plugin', async () => {
@@ -117,5 +125,44 @@ describe('ClaudeProvider', () => {
     await provider.setEnabled({ ...skill, enabled: false }, true);
 
     expect(JSON.parse(await readFile(settingsPath, 'utf-8')).enabledPlugins['deploy-plugin@team-tools']).toBe(true);
+  });
+
+  it('surfaces broken flat skill symlinks as scan issues', async () => {
+    await mkdir(flatDir, { recursive: true });
+    await symlink(path.join(root, 'missing-skill'), path.join(flatDir, 'missing-skill'));
+
+    const skills = await provider.scan();
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0]).toMatchObject({
+      name: 'missing-skill',
+      provider: 'claude',
+      scanIssues: [{
+        code: 'broken-symlink',
+        message: expect.any(String),
+      }],
+    });
+  });
+
+  it('surfaces invalid plugin SKILL.md files as scan issues', async () => {
+    const skillDir = path.join(cacheDir, 'team-tools', 'deploy-plugin', '1.0.0', 'skills', 'broken');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: [\n---\n');
+
+    const skills = await provider.scan();
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0]).toMatchObject({
+      name: 'broken',
+      provider: 'claude',
+      origin: {
+        type: 'plugin',
+        pluginId: 'deploy-plugin@team-tools',
+      },
+      scanIssues: [{
+        code: 'invalid-skill-md',
+        message: expect.any(String),
+      }],
+    });
   });
 });

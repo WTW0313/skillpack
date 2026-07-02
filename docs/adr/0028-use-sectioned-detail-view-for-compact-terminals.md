@@ -1,0 +1,3 @@
+# Use sectioned Detail view for compact terminals
+
+Skillpack Detail views will keep summary and provider-native state visible first, then expose Paths, Source, Description, Findings, and Actions as sections when terminal space is constrained. Findings contain Inventory Issues and Inventory Notices without treating non-problem notices as warnings. At the full 80x24 Terminal Envelope baseline the view may read as one page when content fits, but compact layouts should prevent long paths or descriptions from crowding out Skill Availability and action state. The Description content itself should wrap into readable visual lines and scroll within its bounded region instead of truncating long prose to one ellipsized row.

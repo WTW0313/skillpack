@@ -1,15 +1,16 @@
 import { useMemo } from 'react';
 import Fuse from 'fuse.js';
-import type { Skill } from '@skillpack/core';
 
-export function useSearch(skills: Skill[], query: string): Skill[] {
+const DEFAULT_SEARCH_KEYS = ['name', 'description'];
+
+export function useSearch<T>(items: T[], query: string, keys = DEFAULT_SEARCH_KEYS): T[] {
   const fuse = useMemo(
-    () => new Fuse(skills, { keys: ['name', 'description'], threshold: 0.4 }),
-    [skills],
+    () => new Fuse(items, { keys, threshold: 0.4 }),
+    [items, keys],
   );
 
   return useMemo(() => {
-    if (!query) return skills;
+    if (!query) return items;
     return fuse.search(query).map((result) => result.item);
-  }, [fuse, skills, query]);
+  }, [fuse, items, query]);
 }

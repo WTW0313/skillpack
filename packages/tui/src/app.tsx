@@ -1,4 +1,6 @@
-import { Box, Text } from 'ink';
+import { useState } from 'react';
+import { Box, Text, useApp } from 'ink';
+import { useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { AppProvider, useAppContext } from './context/app-context.js';
 import { useSkillManager } from './hooks/use-skill-manager.js';
@@ -8,7 +10,10 @@ import { InstallView } from './views/install-view.js';
 import { ProjectSkillsView } from './views/project-skills-view.js';
 import { SettingsView } from './views/settings-view.js';
 import { UpdatesView } from './views/updates-view.js';
-import { useTerminalSize } from './hooks/use-terminal-size.js';
+import { TerminalSizeProvider, useTerminalSize } from './hooks/use-terminal-size.js';
+import { getTerminalMode, type TerminalSize } from './lib/responsive-layout.js';
+import { HelpOverlay } from './components/help-overlay.js';
+import type { SkillManager, SkillpackConfig } from '@skillpack/core';
 
 function Router() {
   const { view } = useAppContext();
@@ -23,9 +28,50 @@ function Router() {
   }
 }
 
-export function App() {
-  const { manager, config, error } = useSkillManager();
-  const { rows } = useTerminalSize();
+function AppFrame() {
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useInput((input, key) => {
+    if (input === '?') {
+      setHelpOpen((open) => !open);
+      return;
+    }
+    if (key.escape && helpOpen) {
+      setHelpOpen(false);
+    }
+  });
+
+  return helpOpen ? <HelpOverlay onClose={() => setHelpOpen(false)} /> : <Router />;
+}
+
+function TooSmallTerminalView({ rows }: { rows: number }) {
+  const { exit } = useApp();
+
+  useInput((input) => {
+    if (input === 'q') exit();
+  });
+
+  return (
+    <Box flexDirection="column" height={rows} paddingX={1}>
+      <Text bold>skillpack</Text>
+      <Text dimColor>Terminal too small</Text>
+      <Text dimColor>Resize to at least 60x18.</Text>
+      <Box flexGrow={1} />
+      <Text dimColor>q quit</Text>
+    </Box>
+  );
+}
+
+export interface AppSurfaceProps {
+  manager: SkillManager | null;
+  config: SkillpackConfig | null;
+  error: string | null;
+  terminalSize?: TerminalSize;
+}
+
+function AppSurfaceContent({ manager, config, error }: Omit<AppSurfaceProps, 'terminalSize'>) {
+  const { columns, rows } = useTerminalSize();
+  const terminalMode = getTerminalMode({ columns, rows });
 
   if (error) {
     return (
@@ -43,11 +89,29 @@ export function App() {
     );
   }
 
+  if (terminalMode === 'too-small') {
+    return <TooSmallTerminalView rows={rows} />;
+  }
+
   return (
     <AppProvider manager={manager} config={config}>
       <Box flexDirection="column" height={rows}>
-        <Router />
+        <AppFrame />
       </Box>
     </AppProvider>
   );
+}
+
+export function AppSurface({ manager, config, error, terminalSize }: AppSurfaceProps) {
+  const content = <AppSurfaceContent manager={manager} config={config} error={error} />;
+
+  return terminalSize
+    ? <TerminalSizeProvider size={terminalSize}>{content}</TerminalSizeProvider>
+    : content;
+}
+
+export function App() {
+  const { manager, config, error } = useSkillManager();
+
+  return <AppSurface manager={manager} config={config} error={error} />;
 }

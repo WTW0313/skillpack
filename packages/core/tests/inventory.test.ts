@@ -44,9 +44,30 @@ describe('Skill Inventory', () => {
     expect(inventory[0].name).toBe('figma');
     expect(inventory[0].identity.confidence).toBe('confirmed');
     expect(inventory[0].instances.map((instance) => instance.provider).sort()).toEqual(['codex', 'global']);
+    expect(inventory[0].notices.map((notice) => notice.code)).toContain('related-providers');
   });
 
-  it('groups provider instances by normalized name as inferred when provenance is unavailable', async () => {
+  it('does not create findings for a single local skill with name-only identity', () => {
+    const inventory = buildSkillInventory([{
+      name: 'local-codex',
+      description: '',
+      provider: 'codex',
+      path: path.join(root, 'codex', 'local-codex'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      source: { type: 'local' },
+    }]);
+
+    expect(inventory).toHaveLength(1);
+    expect(inventory[0].identity.confidence).toBe('inferred');
+    expect(inventory[0].issues).toEqual([]);
+    expect(inventory[0].notices).toEqual([]);
+    expect(inventory[0].instances[0].issues).toEqual([]);
+    expect(inventory[0].instances[0].notices).toEqual([]);
+  });
+
+  it('keeps same-name provider instances as inferred detail relationships when provenance is unavailable', async () => {
     const codexDir = path.join(root, 'codex');
     const globalDir = path.join(root, 'global');
     await writeSkill(path.join(codexDir, 'figma-tool'), 'figma-tool');
@@ -61,7 +82,8 @@ describe('Skill Inventory', () => {
     const inventory = manager.getInventory();
     expect(inventory).toHaveLength(1);
     expect(inventory[0].identity.confidence).toBe('inferred');
-    expect(inventory[0].healthSignals.map((signal) => signal.code)).toContain('inferred-identity');
+    expect(inventory[0].notices.map((notice) => notice.code)).toContain('name-only-relationship');
+    expect(inventory[0].issues).toEqual([]);
   });
 
   it('keeps project skills out of controllable inventory without shadowing provider skills', async () => {
@@ -83,7 +105,7 @@ describe('Skill Inventory', () => {
     expect(manager.getProjectSkills()[0].actions).toEqual([]);
   });
 
-  it('surfaces invalid SKILL.md files as health signals', async () => {
+  it('surfaces invalid SKILL.md files as inventory issues', async () => {
     const codexDir = path.join(root, 'codex');
     const brokenSkill = path.join(codexDir, 'broken');
     await mkdir(brokenSkill, { recursive: true });
@@ -97,10 +119,10 @@ describe('Skill Inventory', () => {
     const inventory = manager.getInventory();
     expect(inventory).toHaveLength(1);
     expect(inventory[0].name).toBe('broken');
-    expect(inventory[0].healthSignals.map((signal) => signal.code)).toContain('invalid-skill-md');
+    expect(inventory[0].instances[0].issues.map((issue) => issue.code)).toContain('invalid-skill-md');
   });
 
-  it('surfaces broken skill symlinks as health signals', async () => {
+  it('surfaces broken skill symlinks as inventory issues', async () => {
     const codexDir = path.join(root, 'codex');
     await mkdir(codexDir);
     await symlink(path.join(root, 'missing-skill'), path.join(codexDir, 'missing-skill'));
@@ -113,10 +135,10 @@ describe('Skill Inventory', () => {
     const inventory = manager.getInventory();
     expect(inventory).toHaveLength(1);
     expect(inventory[0].name).toBe('missing-skill');
-    expect(inventory[0].healthSignals.map((signal) => signal.code)).toContain('broken-symlink');
+    expect(inventory[0].instances[0].issues.map((issue) => issue.code)).toContain('broken-symlink');
   });
 
-  it('exposes provider-safe actions and flags unmanaged Global Skills', async () => {
+  it('exposes provider-safe actions and records unmanaged Global Skills as notices', async () => {
     const codexDir = path.join(root, 'codex');
     const globalDir = path.join(root, 'global');
     await writeSkill(path.join(codexDir, 'local-codex'), 'local-codex');
@@ -134,7 +156,8 @@ describe('Skill Inventory', () => {
 
     expect(codex.instances[0].actions).toEqual(['disable']);
     expect(global.instances[0].actions).toEqual([]);
-    expect(global.healthSignals.map((signal) => signal.code)).toContain('unmanaged-global-skill');
+    expect(global.instances[0].notices.map((notice) => notice.code)).toContain('unmanaged-global-skill');
+    expect(global.instances[0].issues).toEqual([]);
   });
 
   it('does not expose enable or disable actions for skills.sh-managed Global Skills', () => {
@@ -146,11 +169,55 @@ describe('Skill Inventory', () => {
       enabled: true,
       scope: 'global',
       metadata: {},
-      source: { type: 'skillssh' },
+      source: { type: 'skillssh', repo: 'owner/repo' },
     }]);
 
     expect(inventory).toHaveLength(1);
+    expect(inventory[0].identity.confidence).toBe('confirmed');
     expect(inventory[0].instances[0].actions).toEqual(['update', 'remove']);
+  });
+
+  it('does not expose toggle actions when the provider has no Disable Strategy', () => {
+    const inventory = buildSkillInventory([{
+      name: 'plugin-skill',
+      description: '',
+      provider: 'codex',
+      path: path.join(root, 'codex', 'plugin-skill'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      origin: {
+        type: 'plugin',
+        pluginId: 'github@openai-curated',
+        pluginName: 'github',
+        marketplace: 'openai-curated',
+        pluginEnabled: true,
+        identityStatus: 'mismatched',
+      },
+      source: { type: 'local' },
+    }], {
+      getDisableStrategy: () => undefined,
+    });
+
+    expect(inventory[0].instances[0].actions).toEqual([]);
+  });
+
+  it('surfaces remembered skills.sh update checks as notices', () => {
+    const inventory = buildSkillInventory([{
+      name: 'managed-global',
+      description: '',
+      provider: 'global',
+      path: path.join(root, 'global', 'managed-global'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      source: { type: 'skillssh', repo: 'owner/repo' },
+    }], {
+      hasUpdate: () => true,
+    });
+
+    expect(inventory[0].instances[0].notices.map((notice) => notice.code)).toContain('update-available');
+    expect(inventory[0].issues).toEqual([]);
   });
 
   it('exposes the provider Disable Strategy for mutable inventory instances', async () => {
@@ -207,6 +274,6 @@ describe('Skill Inventory', () => {
     expect(projectSkills).toHaveLength(1);
     expect(projectSkills[0].name).toBe('broken-project');
     expect(projectSkills[0].actions).toEqual([]);
-    expect(projectSkills[0].healthSignals.map((signal) => signal.code)).toContain('invalid-skill-md');
+    expect(projectSkills[0].issues.map((issue) => issue.code)).toContain('invalid-skill-md');
   });
 });
