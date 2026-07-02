@@ -64,6 +64,14 @@ _Avoid_: Responsive target, screen size
 The TUI's ability to remain understandable across terminals with different color, glyph, width, and resize behavior.
 _Avoid_: Pretty terminal rendering, theme support
 
+**Terminal UI Test**:
+A test that verifies the rendered Skillpack TUI state and keyboard-driven interaction from the user's terminal perspective.
+_Avoid_: CLI I/O Test, unit test
+
+**CLI I/O Test**:
+A test that verifies the Skillpack command process contract through standard input, standard output, signals, and terminal control sequences.
+_Avoid_: Terminal UI Test, component test
+
 **Scan Root**:
 A directory Skillpack inspects to discover provider, shared global, or project skills.
 _Avoid_: Skill, provider, install source

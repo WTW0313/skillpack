@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react';
+import { createContext, createElement, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useStdout } from 'ink';
+import type { TerminalSize } from '../lib/responsive-layout.js';
+
+const TerminalSizeOverrideContext = createContext<TerminalSize | null>(null);
+
+export function TerminalSizeProvider({ size, children }: { size: TerminalSize; children: ReactNode }) {
+  return createElement(TerminalSizeOverrideContext.Provider, { value: size }, children);
+}
 
 export function useTerminalSize() {
+  const override = useContext(TerminalSizeOverrideContext);
   const { stdout } = useStdout();
   const [size, setSize] = useState({
     columns: stdout?.columns ?? 80,
@@ -17,5 +25,5 @@ export function useTerminalSize() {
     return () => { stdout.off('resize', onResize); };
   }, [stdout]);
 
-  return size;
+  return override ?? size;
 }

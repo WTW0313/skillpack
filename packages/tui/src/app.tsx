@@ -10,9 +10,10 @@ import { InstallView } from './views/install-view.js';
 import { ProjectSkillsView } from './views/project-skills-view.js';
 import { SettingsView } from './views/settings-view.js';
 import { UpdatesView } from './views/updates-view.js';
-import { useTerminalSize } from './hooks/use-terminal-size.js';
-import { getTerminalMode } from './lib/responsive-layout.js';
+import { TerminalSizeProvider, useTerminalSize } from './hooks/use-terminal-size.js';
+import { getTerminalMode, type TerminalSize } from './lib/responsive-layout.js';
 import { HelpOverlay } from './components/help-overlay.js';
+import type { SkillManager, SkillpackConfig } from '@skillpack/core';
 
 function Router() {
   const { view } = useAppContext();
@@ -43,8 +44,14 @@ function AppFrame() {
   return helpOpen ? <HelpOverlay onClose={() => setHelpOpen(false)} /> : <Router />;
 }
 
-export function App() {
-  const { manager, config, error } = useSkillManager();
+export interface AppSurfaceProps {
+  manager: SkillManager | null;
+  config: SkillpackConfig | null;
+  error: string | null;
+  terminalSize?: TerminalSize;
+}
+
+function AppSurfaceContent({ manager, config, error }: Omit<AppSurfaceProps, 'terminalSize'>) {
   const { columns, rows } = useTerminalSize();
   const terminalMode = getTerminalMode({ columns, rows });
 
@@ -83,4 +90,18 @@ export function App() {
       </Box>
     </AppProvider>
   );
+}
+
+export function AppSurface({ manager, config, error, terminalSize }: AppSurfaceProps) {
+  const content = <AppSurfaceContent manager={manager} config={config} error={error} />;
+
+  return terminalSize
+    ? <TerminalSizeProvider size={terminalSize}>{content}</TerminalSizeProvider>
+    : content;
+}
+
+export function App() {
+  const { manager, config, error } = useSkillManager();
+
+  return <AppSurface manager={manager} config={config} error={error} />;
 }
