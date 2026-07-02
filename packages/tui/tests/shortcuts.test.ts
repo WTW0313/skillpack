@@ -16,10 +16,10 @@ function skill(provider: string): Skill {
 }
 
 describe('getShortcutsForView', () => {
-  it('labels the list shortcut as Global updates', () => {
+  it('does not show a list update shortcut', () => {
     const shortcuts = getShortcutsForView({ view: 'list', selectedSkill: null, canToggle: false });
 
-    expect(shortcuts.find((shortcut) => shortcut.key === 'u')?.label).toBe('global updates');
+    expect(shortcuts.map((shortcut) => shortcut.key)).not.toContain('u');
   });
 
   it('shows Detail update shortcut only for skills.sh-managed Global Skills', () => {

@@ -14,7 +14,6 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
     { key: 'tab', label: 'tabs' },
     { key: 'p', label: 'project' },
     { key: 's', label: 'settings' },
-    { key: 'u', label: 'global updates', compactLabel: 'updates' },
     { key: 'i', label: 'install' },
     { key: 'q', label: 'quit' },
   ],

@@ -94,9 +94,8 @@ export function ListView() {
     if (input === '/') { setSearching(true); return; }
     if (input === 'p') { setView('project'); return; }
     if (input === 's') { setView('settings'); return; }
-    if (input === 'u') { setView('updates'); return; }
     if (input === 'i') { setView('install'); return; }
-    
+
     if (input === ' ' && skills[cursor]) {
       const selected = skills[cursor];
       const canToggle = Boolean(manager.getProvider(selected.provider)?.getDisableStrategy(selected));
@@ -156,7 +155,7 @@ export function ListView() {
     <Box flexDirection="column" flexGrow={1}>
       {/* Header */}
       <Box paddingX={1}>
-        <Text bold color="magenta">{glyphs.brand} skillpack</Text>
+        <Text bold color="magenta">{glyphs.brand} Skillpack</Text>
         <Text dimColor>  {skills.length} skill{skills.length !== 1 ? 's' : ''}</Text>
         {showScroll && (
           <Text dimColor>  {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, skills.length)} of {skills.length}</Text>
