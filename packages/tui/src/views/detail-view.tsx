@@ -524,10 +524,14 @@ export function DetailView() {
               <Text color={selectedSkill.origin.pluginEnabled ? 'green' : undefined} dimColor={!selectedSkill.origin.pluginEnabled}>
                 {selectedSkill.origin.pluginEnabled ? '● enabled' : '○ disabled'}
               </Text>
-              <Text dimColor>skill override </Text>
-              <Text color={selectedSkill.origin.skillConfigEnabled === false ? 'yellow' : undefined}>
-                {selectedSkill.origin.skillConfigEnabled === false ? 'disabled' : 'default'}
-              </Text>
+              {selectedSkill.provider === 'codex' && (
+                <>
+                  <Text dimColor>skill override </Text>
+                  <Text color={selectedSkill.origin.skillConfigEnabled === false ? 'yellow' : undefined}>
+                    {selectedSkill.origin.skillConfigEnabled === false ? 'disabled' : 'default'}
+                  </Text>
+                </>
+              )}
             </Box>
           </>
         )}

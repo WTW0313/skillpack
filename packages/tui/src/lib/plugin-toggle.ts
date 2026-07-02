@@ -25,5 +25,5 @@ export function formatPluginToggleMessage<T extends PluginToggleSkill>(skill: Pl
   const affected = getAffectedPluginSkills(skills, skill);
   const names = affected.map((item) => item.name).join(', ');
   const count = affected.length;
-  return `${action} plugin ${skill.origin.pluginId}? This affects ${count} Codex skill${count === 1 ? '' : 's'}: ${names}.`;
+  return `${action} plugin ${skill.origin.pluginId}? This affects ${count} skill${count === 1 ? '' : 's'}: ${names}.`;
 }

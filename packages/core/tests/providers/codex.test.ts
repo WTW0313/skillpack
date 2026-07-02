@@ -238,4 +238,34 @@ describe('CodexProvider', () => {
     }]);
     expect(pluginProvider.getDisableStrategy(skill)).toBeUndefined();
   });
+
+  it('surfaces invalid plugin SKILL.md files as scan issues', async () => {
+    const pluginCache = path.join(dir, 'plugins', 'cache');
+    const pluginProvider = new CodexProvider([pluginCache], configPath);
+    const pluginRoot = path.join(pluginCache, 'openai-curated', 'github', '1.2.3');
+    const skillDir = path.join(pluginRoot, 'skills', 'broken');
+    await mkdir(path.join(pluginRoot, '.codex-plugin'), { recursive: true });
+    await writeFile(path.join(pluginRoot, '.codex-plugin', 'plugin.json'), JSON.stringify({
+      name: 'github',
+      version: '1.2.3',
+      skills: './skills/',
+    }), 'utf-8');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: [\n---\n');
+
+    const [skill] = await pluginProvider.scan();
+
+    expect(skill).toMatchObject({
+      name: 'broken',
+      provider: 'codex',
+      origin: {
+        type: 'plugin',
+        pluginId: 'github@openai-curated',
+      },
+      scanIssues: [{
+        code: 'invalid-skill-md',
+        message: expect.any(String),
+      }],
+    });
+  });
 });

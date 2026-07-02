@@ -187,7 +187,8 @@ describe('getInventoryLayout', () => {
     expect(compact.visibleRows).toBeGreaterThan(0);
     expect(compact.statusBarVariant).toBe('compact');
     expect(compact.columns.name).toBeGreaterThanOrEqual(12);
-    expect(compact.columns.provider).toBeGreaterThanOrEqual(6);
+    expect(compact.columns.provider).toBeGreaterThanOrEqual('PROVIDER'.length);
+    expect(fitCell('PROVIDER', compact.columns.provider)).toBe('PROVIDER');
     expect(compact.columns.state).toBe(8);
     expect(compact.columns.related).toBe(10);
     expect(compact.columns.issue).toBe(8);

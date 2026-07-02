@@ -6,12 +6,29 @@ import path from 'node:path';
 import os from 'node:os';
 import { parseSkillMd } from '../parser.js';
 
-async function isDirEntry(entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string }, parentPath: string): Promise<boolean> {
-  if (entry.isDirectory()) return true;
+type SkillDirEntryStatus = 'directory' | 'broken-symlink' | 'other';
+
+async function getSkillDirEntryStatus(entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string }, parentPath: string): Promise<SkillDirEntryStatus> {
+  if (entry.isDirectory()) return 'directory';
   if (entry.isSymbolicLink()) {
-    try { return (await stat(path.join(parentPath, entry.name))).isDirectory(); } catch { return false; }
+    try { return (await stat(path.join(parentPath, entry.name))).isDirectory() ? 'directory' : 'other'; } catch { return 'broken-symlink'; }
   }
-  return false;
+  return 'other';
+}
+
+async function isDirEntry(entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string }, parentPath: string): Promise<boolean> {
+  return await getSkillDirEntryStatus(entry, parentPath) === 'directory';
+}
+
+function pluginOrigin(publisher: string, pluginName: string, version: string, pluginEnabled: boolean): NonNullable<Skill['origin']> {
+  return {
+    type: 'plugin',
+    pluginId: `${pluginName}@${publisher}`,
+    pluginName,
+    marketplace: publisher,
+    version: version !== 'unknown' ? version : undefined,
+    pluginEnabled,
+  };
 }
 
 export class ClaudeProvider extends BaseProvider {
@@ -100,18 +117,37 @@ export class ClaudeProvider extends BaseProvider {
       try { await access(basePath); } catch { continue; }
       const entries = await readdir(basePath, { withFileTypes: true });
       for (const entry of entries) {
-        let isDir = entry.isDirectory();
-        if (!isDir && entry.isSymbolicLink()) {
-          try { isDir = (await stat(path.join(basePath, entry.name))).isDirectory(); } catch { continue; }
-        }
-        if (!isDir) continue;
         const isDisabled = entry.name.startsWith('.disabled-');
         const skillDirName = isDisabled ? entry.name.slice('.disabled-'.length) : entry.name;
         if (entry.name.startsWith('.') && !isDisabled) continue;
         const skillDir = path.join(basePath, entry.name);
+        const entryStatus = await getSkillDirEntryStatus(entry, basePath);
+        if (entryStatus === 'broken-symlink') {
+          skills.push({
+            name: skillDirName,
+            description: '',
+            provider: this.id,
+            path: skillDir,
+            enabled: !isDisabled,
+            scope: 'global',
+            metadata: {},
+            source: { type: 'local' },
+            scanIssues: [{
+              code: 'broken-symlink',
+              message: 'Broken skill symlink',
+            }],
+          });
+          continue;
+        }
+        if (entryStatus !== 'directory') continue;
         const skillMdPath = path.join(skillDir, 'SKILL.md');
+        let content: string;
         try {
-          const content = await readFile(skillMdPath, 'utf-8');
+          content = await readFile(skillMdPath, 'utf-8');
+        } catch {
+          continue;
+        }
+        try {
           const parsed = parseSkillMd(content);
           const resolved = await realpath(skillDir);
           const dirStat = await stat(resolved);
@@ -129,7 +165,25 @@ export class ClaudeProvider extends BaseProvider {
             metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
             source: { type: 'local', createdAt: dirStat.birthtime.toISOString() },
           });
-        } catch { /* skip */ }
+        } catch (err) {
+          const resolved = await realpath(skillDir).catch(() => skillDir);
+          const dirStat = await stat(resolved).catch(() => undefined);
+          skills.push({
+            name: skillDirName,
+            description: '',
+            provider: this.id,
+            path: skillDir,
+            resolvedPath: resolved !== skillDir ? resolved : undefined,
+            enabled: !isDisabled,
+            scope: 'global',
+            metadata: {},
+            source: { type: 'local', createdAt: dirStat?.birthtime.toISOString() },
+            scanIssues: [{
+              code: 'invalid-skill-md',
+              message: err instanceof Error ? err.message : 'Invalid SKILL.md',
+            }],
+          });
+        }
       }
     }
     return skills;
@@ -156,14 +210,40 @@ export class ClaudeProvider extends BaseProvider {
             try { await access(skillsDir); } catch { continue; }
             const skillEntries = await readdir(skillsDir, { withFileTypes: true });
             for (const entry of skillEntries) {
-              if (!(await isDirEntry(entry, skillsDir))) continue;
               const isDisabled = entry.name.startsWith('.disabled-');
               const skillDirName = isDisabled ? entry.name.slice('.disabled-'.length) : entry.name;
               if (entry.name.startsWith('.') && !isDisabled) continue;
               const skillPath = path.join(skillsDir, entry.name);
+              const entryStatus = await getSkillDirEntryStatus(entry, skillsDir);
+              const origin = pluginOrigin(pub.name, plugin.name, ver.name, pluginEnabled);
+              if (entryStatus === 'broken-symlink') {
+                skills.push({
+                  name: skillDirName,
+                  description: '',
+                  provider: this.id,
+                  path: skillPath,
+                  version: ver.name !== 'unknown' ? ver.name : undefined,
+                  enabled: !isDisabled && pluginEnabled,
+                  scope: 'global',
+                  metadata: {},
+                  origin,
+                  source: { type: 'local' },
+                  scanIssues: [{
+                    code: 'broken-symlink',
+                    message: 'Broken skill symlink',
+                  }],
+                });
+                continue;
+              }
+              if (entryStatus !== 'directory') continue;
               const skillMdPath = path.join(skillPath, 'SKILL.md');
+              let content: string;
               try {
-                const content = await readFile(skillMdPath, 'utf-8');
+                content = await readFile(skillMdPath, 'utf-8');
+              } catch {
+                continue;
+              }
+              try {
                 const parsed = parseSkillMd(content);
                 const resolved = await realpath(skillPath);
                 const dirStat = await stat(resolved);
@@ -174,9 +254,30 @@ export class ClaudeProvider extends BaseProvider {
                   version: ver.name !== 'unknown' ? ver.name : undefined,
                   enabled: !isDisabled && pluginEnabled, scope: 'global',
                   metadata: { license: parsed.metadata.license, author: parsed.metadata.author ?? pub.name, tags: parsed.metadata.tags },
+                  origin,
                   source: { type: 'local', createdAt: dirStat.birthtime.toISOString() },
                 });
-              } catch { /* skip */ }
+              } catch (err) {
+                const resolved = await realpath(skillPath).catch(() => skillPath);
+                const dirStat = await stat(resolved).catch(() => undefined);
+                skills.push({
+                  name: skillDirName,
+                  description: '',
+                  provider: this.id,
+                  path: skillPath,
+                  resolvedPath: resolved !== skillPath ? resolved : undefined,
+                  version: ver.name !== 'unknown' ? ver.name : undefined,
+                  enabled: !isDisabled && pluginEnabled,
+                  scope: 'global',
+                  metadata: {},
+                  origin,
+                  source: { type: 'local', createdAt: dirStat?.birthtime.toISOString() },
+                  scanIssues: [{
+                    code: 'invalid-skill-md',
+                    message: err instanceof Error ? err.message : 'Invalid SKILL.md',
+                  }],
+                });
+              }
             }
           }
         }

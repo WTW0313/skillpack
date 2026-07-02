@@ -29,12 +29,26 @@ interface CodexPluginManifest {
   };
 }
 
+type SkillDirEntryStatus = 'directory' | 'broken-symlink' | 'other';
+
 async function isDirectory(filePath: string): Promise<boolean> {
   try {
     return (await stat(filePath)).isDirectory();
   } catch {
     return false;
   }
+}
+
+async function getSkillDirEntryStatus(entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string }, parentPath: string): Promise<SkillDirEntryStatus> {
+  if (entry.isDirectory()) return 'directory';
+  if (entry.isSymbolicLink()) {
+    try {
+      return (await stat(path.join(parentPath, entry.name))).isDirectory() ? 'directory' : 'other';
+    } catch {
+      return 'broken-symlink';
+    }
+  }
+  return 'other';
 }
 
 function looksLikePluginCache(basePath: string): boolean {
@@ -239,16 +253,56 @@ export class CodexProvider extends BaseProvider {
     const entries = await readdir(skillsPath, { withFileTypes: true });
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
       if (entry.name.startsWith('.')) continue;
       const skillPath = path.join(skillsPath, entry.name);
       const skillMdPath = path.join(skillPath, 'SKILL.md');
+      const skillConfigEnabled = await readCodexSkillConfigEnabled(this.configPath, skillMdPath);
+      const origin: Skill['origin'] = {
+        type: 'plugin',
+        pluginId: pluginRoot.pluginId,
+        pluginName: pluginRoot.pluginName,
+        marketplace: pluginRoot.marketplace,
+        version: pluginRoot.version,
+        displayName: pluginRoot.displayName,
+        pluginEnabled,
+        skillConfigEnabled,
+        identityStatus,
+      };
+      const identityIssues = identityStatus === 'mismatched' ? [{
+        code: 'plugin-identity-mismatch' as const,
+        message: `Codex plugin manifest name "${pluginRoot.manifestName}" does not match cache plugin "${pluginRoot.pluginName}"`,
+      }] : [];
+      const entryStatus = await getSkillDirEntryStatus(entry, skillsPath);
+      if (entryStatus === 'broken-symlink') {
+        skills.push({
+          name: entry.name,
+          description: '',
+          provider: this.id,
+          path: skillPath,
+          version: pluginRoot.version,
+          enabled: pluginEnabled && skillConfigEnabled !== false,
+          scope: 'global',
+          metadata: {},
+          origin,
+          source: { type: 'local' },
+          scanIssues: [
+            ...identityIssues,
+            { code: 'broken-symlink', message: 'Broken skill symlink' },
+          ],
+        });
+        continue;
+      }
+      if (entryStatus !== 'directory') continue;
+      let content: string;
       try {
-        const content = await readFile(skillMdPath, 'utf-8');
+        content = await readFile(skillMdPath, 'utf-8');
+      } catch {
+        continue;
+      }
+      try {
         const parsed = parseSkillMd(content);
         const resolved = await realpath(skillPath);
         const dirStat = await stat(resolved);
-        const skillConfigEnabled = await readCodexSkillConfigEnabled(this.configPath, skillMdPath);
         skills.push({
           name: parsed.name || entry.name,
           description: parsed.description,
@@ -259,24 +313,31 @@ export class CodexProvider extends BaseProvider {
           enabled: pluginEnabled && skillConfigEnabled !== false,
           scope: 'global',
           metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
-          origin: {
-            type: 'plugin',
-            pluginId: pluginRoot.pluginId,
-            pluginName: pluginRoot.pluginName,
-            marketplace: pluginRoot.marketplace,
-            version: pluginRoot.version,
-            displayName: pluginRoot.displayName,
-            pluginEnabled,
-            skillConfigEnabled,
-            identityStatus,
-          },
+          origin,
           source: { type: 'local', createdAt: dirStat.birthtime.toISOString() },
-          scanIssues: identityStatus === 'mismatched' ? [{
-            code: 'plugin-identity-mismatch',
-            message: `Codex plugin manifest name "${pluginRoot.manifestName}" does not match cache plugin "${pluginRoot.pluginName}"`,
-          }] : undefined,
+          scanIssues: identityIssues.length > 0 ? identityIssues : undefined,
         });
-      } catch { /* skip invalid plugin skills for now */ }
+      } catch (err) {
+        const resolved = await realpath(skillPath).catch(() => skillPath);
+        const dirStat = await stat(resolved).catch(() => undefined);
+        skills.push({
+          name: entry.name,
+          description: '',
+          provider: this.id,
+          path: skillPath,
+          resolvedPath: resolved !== skillPath ? resolved : undefined,
+          version: pluginRoot.version,
+          enabled: pluginEnabled && skillConfigEnabled !== false,
+          scope: 'global',
+          metadata: {},
+          origin,
+          source: { type: 'local', createdAt: dirStat?.birthtime.toISOString() },
+          scanIssues: [
+            ...identityIssues,
+            { code: 'invalid-skill-md', message: err instanceof Error ? err.message : 'Invalid SKILL.md' },
+          ],
+        });
+      }
     }
 
     return skills;
