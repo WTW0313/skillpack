@@ -94,28 +94,24 @@ export class SkillsShSource implements IInstallSource {
   async checkUpdate(skill: Skill): Promise<UpdateInfo | null> {
     if (skill.source?.type !== 'skillssh') return null;
     try {
-      const { stdout, stderr } = await this.runCommand('npx', ['skills', 'check'], {
-        timeout: 30_000,
-        env: { ...process.env, NO_COLOR: '1' },
-      });
-      const clean = stripAnsi(stdout || stderr);
-      const lines = clean.split('\n');
-      for (const line of lines) {
-        if (!line.includes(skill.name)) continue;
-        if (/update|available|outdated/i.test(line)) {
-          const hashPrefix = skill.source.skillFolderHash?.slice(0, 7);
-          return {
-            currentVersion: hashPrefix ?? skill.version,
-            latestVersion: 'latest',
-            hasUpdate: true,
-          };
-        }
-      }
-      if (clean.includes('up to date') || clean.includes('All')) {
-        return null;
-      }
+      return parseUpdateForSkill(await this.runCheckCommand(), skill);
     } catch { /* skip */ }
     return null;
+  }
+
+  async checkUpdates(skills: Skill[]): Promise<Array<{ skill: Skill; update: UpdateInfo }>> {
+    const managedSkills = skills.filter((skill) => skill.source?.type === 'skillssh');
+    if (managedSkills.length === 0) return [];
+
+    try {
+      const clean = await this.runCheckCommand();
+      return managedSkills.flatMap((skill) => {
+        const update = parseUpdateForSkill(clean, skill);
+        return update?.hasUpdate ? [{ skill, update }] : [];
+      });
+    } catch {
+      return [];
+    }
   }
 
   async updateViaCli(skillName: string): Promise<void> {
@@ -142,4 +138,27 @@ export class SkillsShSource implements IInstallSource {
     }
   }
 
+  private async runCheckCommand(): Promise<string> {
+    const { stdout, stderr } = await this.runCommand('npx', ['skills', 'check'], {
+      timeout: 30_000,
+      env: { ...process.env, NO_COLOR: '1' },
+    });
+    return stripAnsi(stdout || stderr);
+  }
+}
+
+function parseUpdateForSkill(clean: string, skill: Skill): UpdateInfo | null {
+  for (const line of clean.split('\n')) {
+    if (!line.includes(skill.name)) continue;
+    if (/update|available|outdated/i.test(line)) {
+      const hashPrefix = skill.source?.skillFolderHash?.slice(0, 7);
+      return {
+        currentVersion: hashPrefix ?? skill.version,
+        latestVersion: 'latest',
+        hasUpdate: true,
+      };
+    }
+  }
+
+  return null;
 }

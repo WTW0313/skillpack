@@ -7,4 +7,5 @@ export interface IInstallSource {
   search(query: string): Promise<RemoteSkill[]>;
   fetch(identifier: string): Promise<DownloadResult>;
   checkUpdate(skill: Skill): Promise<UpdateInfo | null>;
+  checkUpdates?(skills: Skill[]): Promise<Array<{ skill: Skill; update: UpdateInfo }>>;
 }

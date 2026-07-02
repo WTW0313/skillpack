@@ -14,7 +14,7 @@ const SHORTCUTS: Record<string, Shortcut[]> = {
     { key: 'tab', label: 'tabs' },
     { key: 'p', label: 'project' },
     { key: 's', label: 'settings' },
-    { key: 'u', label: 'updates' },
+    { key: 'u', label: 'global updates', compactLabel: 'updates' },
     { key: 'i', label: 'install' },
     { key: 'q', label: 'quit' },
   ],
@@ -66,7 +66,7 @@ export function getShortcutsForView({ view, selectedSkill, canToggle }: Shortcut
   if (view !== 'detail') return SHORTCUTS[view] ?? [];
 
   const sourceType = selectedSkill?.source?.type;
-  const isUpdatable = sourceType === 'skillssh';
+  const isUpdatable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
   const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
   const detailBase = canToggle
     ? [

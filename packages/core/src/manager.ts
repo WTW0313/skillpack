@@ -202,7 +202,15 @@ export class SkillManager {
 
   async checkUpdates(): Promise<Array<{ skill: Skill; update: UpdateInfo }>> {
     const updates: Array<{ skill: Skill; update: UpdateInfo }> = [];
-    for (const skill of this.skills) {
+    const skillshSkills = this.skills.filter(isSkillShManagedGlobalSkill);
+    const skillshSource = this.sources.get('skillssh');
+
+    if (skillshSource?.checkUpdates) {
+      updates.push(...await skillshSource.checkUpdates(skillshSkills));
+      return updates;
+    }
+
+    for (const skill of skillshSkills) {
       const update = await this.checkSkillUpdate(skill);
       if (update) updates.push({ skill, update });
     }
@@ -210,7 +218,7 @@ export class SkillManager {
   }
 
   async checkSkillUpdate(skill: Skill): Promise<UpdateInfo | null> {
-    if (!skill.source || skill.source.type === 'local') return null;
+    if (!isSkillShManagedGlobalSkill(skill)) return null;
     for (const source of this.sources.values()) {
       const update = await source.checkUpdate(skill);
       if (update?.hasUpdate) return update;
@@ -223,7 +231,7 @@ export class SkillManager {
       throw new Error('Cannot update an unmanaged on-disk skill');
     }
 
-    if (skill.source.type !== 'skillssh') {
+    if (!isSkillShManagedGlobalSkill(skill)) {
       throw new Error('Only skills.sh-managed Global Skills can be updated');
     }
 
@@ -272,4 +280,8 @@ async function pathExists(targetPath: string): Promise<boolean> {
 
 function resolveProjectSkillsPath(cwd: string, dir: string): string {
   return path.isAbsolute(dir) ? dir : path.join(cwd, dir);
+}
+
+function isSkillShManagedGlobalSkill(skill: Skill): boolean {
+  return skill.provider === 'global' && skill.source?.type === 'skillssh';
 }

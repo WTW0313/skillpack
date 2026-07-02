@@ -131,6 +131,74 @@ describe('SkillManager', () => {
     expect(fetchCount).toBe(0);
   });
 
+  it('checks updates only for skills.sh-managed Global Skills', async () => {
+    let checkCount = 0;
+    const source: IInstallSource = {
+      id: 'skillssh',
+      displayName: 'skills.sh',
+      search: async () => [],
+      fetch: async () => ({ tempDir: dir, skillName: 'managed-skill', files: [] }),
+      checkUpdate: async () => {
+        checkCount += 1;
+        return { hasUpdate: true, latestVersion: 'latest' };
+      },
+    };
+    manager.registerSource(source);
+
+    const skillDir = path.join(dir, 'linked-skill');
+    await mkdir(skillDir);
+    await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: linked-skill\ndescription: linked\n---\n');
+    await manager.scanAll();
+    manager.getAllSkills()[0].source = { type: 'skillssh' };
+
+    await expect(manager.checkUpdates()).resolves.toEqual([]);
+    expect(checkCount).toBe(0);
+
+    await expect(manager.checkSkillUpdate({
+      name: 'managed-skill',
+      description: '',
+      provider: 'global',
+      path: path.join(dir, 'managed-skill'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      source: { type: 'skillssh' },
+    })).resolves.toEqual({ hasUpdate: true, latestVersion: 'latest' });
+    expect(checkCount).toBe(1);
+  });
+
+  it('updates only skills.sh-managed Global Skills', async () => {
+    const calls: Array<{ command: string; args: string[] }> = [];
+    manager.registerSource(new SkillsShSource(async (command, args) => {
+      calls.push({ command, args });
+      return { stdout: '', stderr: '' };
+    }));
+
+    const linkedSkill: Skill = {
+      name: 'linked-skill',
+      description: '',
+      provider: 'codex',
+      path: path.join(dir, 'linked-skill'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      source: { type: 'skillssh' },
+    };
+    await expect(manager.updateSkill(linkedSkill)).rejects.toThrow('Only skills.sh-managed Global Skills can be updated');
+    expect(calls).toEqual([]);
+
+    await manager.updateSkill({
+      ...linkedSkill,
+      provider: 'global',
+      path: path.join(dir, 'managed-skill'),
+    });
+
+    expect(calls).toEqual([{
+      command: 'npx',
+      args: ['skills', 'update', 'linked-skill', '-g', '-y'],
+    }]);
+  });
+
   it('reports provider and project scan paths while scanning custom paths and skipping missing paths', async () => {
     const missingProviderPath = path.join(dir, 'missing-provider');
     const customProviderPath = path.join(dir, 'custom-provider');
