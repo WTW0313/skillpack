@@ -98,18 +98,18 @@ describe('getBoundedContentLayout', () => {
 
 describe('getDetailLayout', () => {
   it('uses one-page detail at full size and sections at compact size', () => {
-    const full = getDetailLayout({ size: { columns: 80, rows: 24 }, hasDescription: true, hasWarnings: true });
+    const full = getDetailLayout({ size: { columns: 80, rows: 24 }, hasDescription: true, hasFindings: true });
 
     expect(full.mode).toBe('full');
     expect(full.sectioned).toBe(false);
-    expect(full.sections.map((section) => section.id)).toEqual(['summary', 'paths', 'source', 'description', 'warnings', 'actions']);
+    expect(full.sections.map((section) => section.id)).toEqual(['summary', 'paths', 'source', 'description', 'findings', 'actions']);
 
-    const compact = getDetailLayout({ size: { columns: 60, rows: 18 }, hasDescription: true, hasWarnings: true });
+    const compact = getDetailLayout({ size: { columns: 60, rows: 18 }, hasDescription: true, hasFindings: true });
 
     expect(compact.mode).toBe('compact');
     expect(compact.sectioned).toBe(true);
     expect(compact.visibleRows).toBeGreaterThan(0);
-    expect(compact.sections.map((section) => section.id)).toEqual(['summary', 'paths', 'source', 'description', 'warnings', 'actions']);
+    expect(compact.sections.map((section) => section.id)).toEqual(['summary', 'paths', 'source', 'description', 'findings', 'actions']);
   });
 });
 
@@ -153,8 +153,8 @@ describe('Inventory row formatting', () => {
   it('uses full and compact availability labels', () => {
     expect(formatInventoryStatus(true, 'full')).toBe('enabled ');
     expect(formatInventoryStatus(false, 'full')).toBe('disabled');
-    expect(formatInventoryStatus(true, 'compact')).toBe('on ');
-    expect(formatInventoryStatus(false, 'compact')).toBe('off');
+    expect(formatInventoryStatus(true, 'compact')).toBe('on      ');
+    expect(formatInventoryStatus(false, 'compact')).toBe('off     ');
   });
 });
 
@@ -171,8 +171,10 @@ describe('getInventoryLayout', () => {
     expect(full.visibleRows).toBe(17);
     expect(full.statusBarVariant).toBe('full');
     expect(full.columns.name).toBe(30);
-    expect(full.columns.provider).toBe(24);
-    expect(full.columns.status).toBe(18);
+    expect(full.columns.provider).toBe(8);
+    expect(full.columns.state).toBe(8);
+    expect(full.columns.related).toBe(14);
+    expect(full.columns.issue).toBe(10);
 
     const compact = getInventoryLayout({
       size: { columns: 60, rows: 18 },
@@ -186,6 +188,9 @@ describe('getInventoryLayout', () => {
     expect(compact.statusBarVariant).toBe('compact');
     expect(compact.columns.name).toBeGreaterThanOrEqual(12);
     expect(compact.columns.provider).toBeGreaterThanOrEqual(6);
+    expect(compact.columns.state).toBe(8);
+    expect(compact.columns.related).toBe(10);
+    expect(compact.columns.issue).toBe(8);
     expect(compact.rowWidth).toBeLessThanOrEqual(58);
   });
 

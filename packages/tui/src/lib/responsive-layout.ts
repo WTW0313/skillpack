@@ -96,7 +96,9 @@ export interface InventoryLayout {
   columns: {
     name: number;
     provider: number;
-    status: number;
+    state: number;
+    related: number;
+    issue: number;
   };
 }
 
@@ -107,7 +109,7 @@ export interface ShortcutLayoutItem {
   displayLabel?: string;
 }
 
-export type DetailSectionId = 'summary' | 'paths' | 'source' | 'description' | 'warnings' | 'actions';
+export type DetailSectionId = 'summary' | 'paths' | 'source' | 'description' | 'findings' | 'actions';
 
 export interface DetailSection {
   id: DetailSectionId;
@@ -117,7 +119,7 @@ export interface DetailSection {
 export interface DetailLayoutInput {
   size: TerminalSize;
   hasDescription: boolean;
-  hasWarnings: boolean;
+  hasFindings: boolean;
 }
 
 export interface DetailLayout {
@@ -159,12 +161,14 @@ const COMPACT_CHROME_LINES = 5;
 const HORIZONTAL_PADDING = 2;
 const MIN_NAME_WIDTH = 12;
 const MAX_NAME_WIDTH = 30;
-const FULL_PROVIDER_WIDTH = 24;
-const COMPACT_PROVIDER_WIDTH = 18;
-const FULL_STATUS_WIDTH = 18;
-const COMPACT_STATUS_WIDTH = 14;
+const FULL_PROVIDER_WIDTH = 8;
+const COMPACT_PROVIDER_WIDTH = 7;
+const FULL_RELATED_WIDTH = 14;
+const COMPACT_RELATED_WIDTH = 10;
+const FULL_ISSUE_WIDTH = 10;
+const COMPACT_ISSUE_WIDTH = 8;
 const FULL_AVAILABILITY_STATUS_WIDTH = 8;
-const COMPACT_AVAILABILITY_STATUS_WIDTH = 3;
+const COMPACT_AVAILABILITY_STATUS_WIDTH = 8;
 const ROW_FIXED_WIDTH = 6;
 const DETAIL_FULL_CHROME_LINES = 13;
 const DETAIL_COMPACT_CHROME_LINES = 6;
@@ -173,7 +177,7 @@ const DETAIL_SECTIONS: DetailSection[] = [
   { id: 'paths', label: 'Paths' },
   { id: 'source', label: 'Source' },
   { id: 'description', label: 'Description' },
-  { id: 'warnings', label: 'Warnings' },
+  { id: 'findings', label: 'Findings' },
   { id: 'actions', label: 'Actions' },
 ];
 const PROJECT_STATE_WIDTH = 15;
@@ -187,16 +191,18 @@ export function getInventoryLayout(input: InventoryLayoutInput): InventoryLayout
       visibleRows: 0,
       rowWidth: Math.max(0, input.size.columns),
       statusBarVariant: 'minimal',
-      columns: { name: 0, provider: 0, status: 0 },
+      columns: { name: 0, provider: 0, state: 0, related: 0, issue: 0 },
     };
   }
 
   const provider = mode === 'full' ? FULL_PROVIDER_WIDTH : COMPACT_PROVIDER_WIDTH;
-  const status = mode === 'full' ? FULL_STATUS_WIDTH : COMPACT_STATUS_WIDTH;
+  const state = mode === 'full' ? FULL_AVAILABILITY_STATUS_WIDTH : COMPACT_AVAILABILITY_STATUS_WIDTH;
+  const related = mode === 'full' ? FULL_RELATED_WIDTH : COMPACT_RELATED_WIDTH;
+  const issue = mode === 'full' ? FULL_ISSUE_WIDTH : COMPACT_ISSUE_WIDTH;
   const contentWidth = Math.max(0, input.size.columns - HORIZONTAL_PADDING);
-  const availableNameWidth = contentWidth - ROW_FIXED_WIDTH - provider - status;
+  const availableNameWidth = contentWidth - ROW_FIXED_WIDTH - provider - state - related - issue;
   const name = Math.max(MIN_NAME_WIDTH, Math.min(MAX_NAME_WIDTH, availableNameWidth));
-  const rowWidth = ROW_FIXED_WIDTH + name + provider + status;
+  const rowWidth = ROW_FIXED_WIDTH + name + provider + state + related + issue;
   const searchLines = input.searching ? 2 : 0;
   const filterLines = !input.searching && input.hasSearchQuery ? 1 : 0;
   const chromeLines = mode === 'full' ? FULL_CHROME_LINES : COMPACT_CHROME_LINES;
@@ -206,7 +212,7 @@ export function getInventoryLayout(input: InventoryLayoutInput): InventoryLayout
     visibleRows: Math.max(1, input.size.rows - chromeLines - searchLines - filterLines),
     rowWidth,
     statusBarVariant: mode === 'full' ? 'full' : 'compact',
-    columns: { name, provider, status },
+    columns: { name, provider, state, related, issue },
   };
 }
 

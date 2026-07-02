@@ -28,9 +28,9 @@ npx skillpack-tui
 
 ## Quick Start
 
-Launch `skillpack` to see discovered skills grouped into Skill Groups with provider status and Health Signals. Use the arrow keys to navigate, `Tab` / `Shift+Tab` to filter by provider, and `/` to search.
+Launch `skillpack` to see discovered provider instances with availability state, confirmed related providers, and Inventory Issues. Use the arrow keys to navigate, `Tab` / `Shift+Tab` to filter by provider, and `/` to search.
 
-Press `Enter` to inspect a Skill Group, then use left/right to choose a provider instance before taking instance-level actions. Press `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a Global Skill, or `u` to open manual updates. Plugin-owned skills ask for confirmation because the toggle affects every skill from the owning plugin.
+Press `Enter` to inspect a provider instance, then use left/right to switch related provider instances when relationship context exists. Press `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a Global Skill, or `u` to open manual updates. Plugin-owned skills ask for confirmation because the toggle affects every skill from the owning plugin.
 
 ## Keyboard Shortcuts
 
@@ -39,7 +39,7 @@ Press `Enter` to inspect a Skill Group, then use left/right to choose a provider
 | Key | Action |
 | --- | --- |
 | `↑` / `↓` | Navigate skills |
-| `Enter` | Open Skill Group detail view |
+| `Enter` | Open detail view |
 | `Tab` / `Shift+Tab` | Switch provider tab |
 | `/` | Search |
 | `Esc` | Clear search |

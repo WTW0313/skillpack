@@ -80,14 +80,16 @@ export function AppProvider({ manager, config, children }: AppProviderProps) {
     });
     setSelectedSkill((prev) => {
       if (!prev) return null;
-      const nextGroup = newInventory.find((group) => group.id === selectedGroup?.id);
+      const nextGroup = newInventory.find((group) => group.instances.some((instance) => (
+        instance.provider === prev.provider && instance.path === prev.path
+      )));
       const nextInstance = nextGroup?.instances.find((instance) => (
         instance.provider === prev.provider && instance.path === prev.path
       ));
       return nextInstance ?? nextGroup?.instances[0] ?? null;
     });
     setLoading(false);
-  }, [manager, config, selectedGroup?.id]);
+  }, [manager, config]);
 
   return (
     <AppContext.Provider value={{

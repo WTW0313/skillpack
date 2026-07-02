@@ -43,9 +43,10 @@ export function DetailView() {
   const isRemovable = selectedSkill?.actions.includes('remove') ?? false;
   const canToggle = selectedSkill?.actions.some((action) => action === 'enable' || action === 'disable') ?? false;
   const disableStrategy = selectedSkill?.disableStrategy;
-  const groupHealthSignals = selectedGroup?.healthSignals ?? [];
-  const instanceHealthSignals = selectedSkill?.healthSignals ?? [];
-  const hasWarnings = groupHealthSignals.length > 0 || instanceHealthSignals.length > 0;
+  const relationshipNotices = selectedGroup?.notices ?? [];
+  const instanceIssues = selectedSkill?.issues ?? [];
+  const instanceNotices = selectedSkill?.notices ?? [];
+  const hasFindings = relationshipNotices.length > 0 || instanceIssues.length > 0 || instanceNotices.length > 0;
   const selectedInstanceIndex = selectedGroup && selectedSkill
     ? selectedGroup.instances.findIndex((instance) => (
       instance.provider === selectedSkill.provider && instance.path === selectedSkill.path
@@ -67,7 +68,7 @@ export function DetailView() {
   const detailLayout = getDetailLayout({
     size: { columns, rows },
     hasDescription: descLines.length > 0,
-    hasWarnings,
+    hasFindings,
   });
 
   const fullVisibleDescRows = useMemo(() => {
@@ -82,14 +83,14 @@ export function DetailView() {
     if (disableStrategy) used += 1;
     if (isUpdatable) used += 1; // update row
     if (addedAt) used += 1;
-    if (hasWarnings) used += 1 + 1 + groupHealthSignals.length + instanceHealthSignals.length; // gap + heading + signals
+    if (hasFindings) used += 1 + 2 + relationshipNotices.length + instanceIssues.length + instanceNotices.length; // gap + headings + findings
     used += 1;    // gap before description
     used += 1;    // separator
     used += 1;    // "description" label
     used += 1;    // status bar
     if (error) used += 1;
     return Math.max(0, rows - used);
-  }, [selectedSkill, groupHealthSignals.length, instanceHealthSignals.length, hasWarnings, error, rows, isUpdatable, disableStrategy]);
+  }, [selectedSkill, relationshipNotices.length, instanceIssues.length, instanceNotices.length, hasFindings, error, rows, isUpdatable, disableStrategy]);
 
   const visibleDescRows = detailLayout.sectioned
     ? Math.max(1, detailLayout.visibleRows - 1)
@@ -170,7 +171,7 @@ export function DetailView() {
   }, { isActive: !confirming });
 
   if (!selectedGroup || !selectedSkill) {
-    return <Box><Text color="red">No Skill Group selected</Text></Box>;
+    return <Box><Text color="red">No skill selected</Text></Box>;
   }
 
   if (confirming === 'remove') {
@@ -246,6 +247,45 @@ export function DetailView() {
 
   const visibleDesc = wrappedDescLines.slice(descScroll, descScroll + visibleDescRows);
   const descScrollable = wrappedDescLines.length > visibleDescRows;
+  const notices = [...relationshipNotices, ...instanceNotices];
+
+  const renderFindings = (): ReactNode => {
+    if (!hasFindings) return <Text dimColor>No findings.</Text>;
+
+    return (
+      <Box flexDirection="column">
+        {instanceIssues.length > 0 && (
+          <>
+            <Text color="yellow">{glyphs.warning} Issues</Text>
+            {instanceIssues.map((issue, index) => (
+              <Text key={`issue:${issue.code}:${index}`} dimColor wrap="truncate">
+                {issue.code}: {issue.message}
+              </Text>
+            ))}
+          </>
+        )}
+        {notices.length > 0 && (
+          <Box flexDirection="column" marginTop={instanceIssues.length > 0 ? 1 : 0}>
+            <Text dimColor>Notices</Text>
+            {notices.map((item, index) => (
+              <Text key={`notice:${item.code}:${index}`} dimColor wrap="truncate">
+                {item.code}: {item.message}
+              </Text>
+            ))}
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
+  const renderActionRow = (keyLabel: string | null, label: string, enabled = true): ReactNode => (
+    <Box gap={1}>
+      <Text color={enabled && keyLabel ? 'magenta' : undefined} bold={enabled && Boolean(keyLabel)} dimColor={!enabled}>
+        {keyLabel ? keyLabel.padEnd(5) : ''.padEnd(5)}
+      </Text>
+      <Text dimColor={!enabled}>{label}</Text>
+    </Box>
+  );
 
   if (detailLayout.sectioned) {
     const renderSection = (): ReactNode => {
@@ -348,26 +388,21 @@ export function DetailView() {
               ))}
             </Box>
           );
-        case 'warnings':
-          return hasWarnings ? (
-            <Box flexDirection="column">
-              <Text color="yellow">Health Signals</Text>
-              {[...groupHealthSignals, ...instanceHealthSignals].map((signal, index) => (
-                <Text key={`${signal.code}:${index}`} dimColor wrap="truncate">
-                  {signal.code}: {signal.message}
-                </Text>
-              ))}
-            </Box>
-          ) : (
-            <Text dimColor>No warnings.</Text>
-          );
+        case 'findings':
+          return renderFindings();
         case 'actions':
           return (
             <Box flexDirection="column">
-              <Text>{canToggle ? 'space toggle availability' : 'toggle unavailable'}</Text>
-              <Text>{isUpdatable ? 'u check/apply update' : 'update unavailable'}</Text>
-              <Text>{isRemovable ? 'd delete skills.sh Global Skill' : 'delete unavailable'}</Text>
-              <Text>o open folder</Text>
+              {canToggle
+                ? renderActionRow('space', 'toggle availability')
+                : renderActionRow(null, 'toggle unavailable', false)}
+              {isUpdatable
+                ? renderActionRow('u', 'check/apply update')
+                : renderActionRow(null, 'update unavailable', false)}
+              {isRemovable
+                ? renderActionRow('d', 'delete skills.sh Global Skill')
+                : renderActionRow(null, 'delete unavailable', false)}
+              {renderActionRow('o', 'open folder')}
             </Box>
           );
       }
@@ -378,7 +413,7 @@ export function DetailView() {
         <Box>
           <Text dimColor>‹ esc  </Text>
           <Text bold color="magenta">{glyphs.brand}</Text>
-          <Text bold> {selectedGroup.name}</Text>
+          <Text bold> {selectedSkill.name}</Text>
         </Box>
 
         <Box marginTop={1} flexDirection="column">
@@ -431,7 +466,7 @@ export function DetailView() {
       <Box>
         <Text dimColor>‹ esc  </Text>
         <Text bold color="magenta">{glyphs.brand}</Text>
-        <Text bold> {selectedGroup.name}</Text>
+        <Text bold> {selectedSkill.name}</Text>
       </Box>
 
       {/* Metadata */}
@@ -546,15 +581,10 @@ export function DetailView() {
         </Box>
       </Box>
 
-      {/* Health Signals */}
-      {hasWarnings && (
+      {/* Findings */}
+      {hasFindings && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">{glyphs.warning} Health Signals</Text>
-          {[...groupHealthSignals, ...instanceHealthSignals].map((signal, index) => (
-            <Text key={`${signal.code}:${index}`} dimColor>
-              {'  '}{signal.code}: {signal.message}
-            </Text>
-          ))}
+          {renderFindings()}
         </Box>
       )}
 

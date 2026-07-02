@@ -61,14 +61,15 @@ export function ListView() {
     const counts: Record<string, number> = {};
     for (const tab of TABS) {
       if (tab === 'All') {
-        counts[tab] = inventory.length;
+        counts[tab] = inventory.reduce((count, group) => count + group.instances.length, 0);
       } else {
         const providerMap: Record<string, string> = {
           Codex: 'codex', Claude: 'claude', Global: 'global',
         };
-        counts[tab] = inventory.filter((group) => (
-          group.instances.some((instance) => instance.provider === providerMap[tab])
-        )).length;
+        counts[tab] = inventory.reduce(
+          (count, group) => count + group.instances.filter((instance) => instance.provider === providerMap[tab]).length,
+          0,
+        );
       }
     }
     return counts;
@@ -94,8 +95,8 @@ export function ListView() {
     if (input === 'i') { setView('install'); return; }
     if (input === 'u') { setView('updates'); return; }
     if (key.return && skills[cursor]) {
-      setSelectedGroup(skills[cursor]);
-      setSelectedSkill(skills[cursor].instances[0] ?? null);
+      setSelectedGroup(skills[cursor].group);
+      setSelectedSkill(skills[cursor].instance);
       setView('detail');
       return;
     }
@@ -125,7 +126,7 @@ export function ListView() {
       {/* Header */}
       <Box paddingX={1}>
         <Text bold color="magenta">{glyphs.brand} Skillpack</Text>
-        <Text dimColor>  {skills.length} skill{skills.length !== 1 ? 's' : ''}</Text>
+        <Text dimColor>  {skills.length} instance{skills.length !== 1 ? 's' : ''}</Text>
         {showScroll && (
           <Text dimColor>  {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, skills.length)} of {skills.length}</Text>
         )}
@@ -162,8 +163,10 @@ export function ListView() {
         <Box gap={1}>
           <Text>{' '}</Text>
           <Text dimColor>{fitCell('NAME', layout.columns.name)}</Text>
-          <Text dimColor>{fitCell('PROVIDERS', layout.columns.provider)}</Text>
-          <Text dimColor>{fitCell('HEALTH', layout.columns.status)}</Text>
+          <Text dimColor>{fitCell('PROVIDER', layout.columns.provider)}</Text>
+          <Text dimColor>{fitCell('STATUS', layout.columns.state)}</Text>
+          <Text dimColor>{fitCell('RELATED', layout.columns.related)}</Text>
+          <Text dimColor>{fitCell('ISSUE', layout.columns.issue)}</Text>
         </Box>
       </Box>
 

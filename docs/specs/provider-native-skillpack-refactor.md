@@ -4,13 +4,13 @@
 
 Refactor Skillpack into an understanding-first TUI for managing agent skills across Codex, Claude, Global skills from skills.sh, and read-only Project Skills.
 
-Skillpack should not become the canonical owner of skill content. Each Skill Provider keeps its provider-native state. Skillpack scans that state, groups related instances into a Skill Inventory, exposes deterministic Health Signals, and allows only the lifecycle actions that are safe for each provider.
+Skillpack should not become the canonical owner of skill content. Each Skill Provider keeps its provider-native state. Skillpack scans that state, renders provider instances as the actionable Skill Inventory rows, uses Skill Groups as relationship context, exposes deterministic Inventory Issues separately from Inventory Notices, and allows only the lifecycle actions that are safe for each provider.
 
 ## Product Shape
 
 The TUI has five top-level sections:
 
-- **Inventory**: grouped view of provider-native skills from Codex, Claude, and Global.
+- **Inventory**: provider-instance list for Codex, Claude, and Global, ordered with relationship context.
 - **Project Skills**: read-only inventory of skills stored in the current project repository.
 - **Settings**: read-only configuration diagnostics, including Scan Roots, providers, and sources.
 - **Install**: skills.sh search and install into Global Skills only.
@@ -21,8 +21,10 @@ The main experience is Inventory. It should answer:
 - Which skills exist?
 - Which providers can load them?
 - Are they enabled or disabled?
-- Are grouped instances confirmed by provenance or inferred by name?
-- Are any provider instances broken, unmanaged, duplicated, or stale?
+- Which provider instances have confirmed related providers?
+- Which relationships are only weak name matches?
+- Are any provider instances broken?
+- Which provider instances have non-problem notices such as unmanaged provenance or available updates?
 
 ## Scope
 
@@ -30,8 +32,9 @@ In scope:
 
 - Scan Codex, Claude, Global, and Project Skill locations using provider-specific rules.
 - Scan Codex provider-local skills from `~/.codex/skills` and active-looking Codex plugin skills from `~/.codex/plugins/cache` by default. Stale or duplicate cached plugin copies should not appear in the main inventory by default.
-- Build Skill Groups from provider instances using provenance-aware Skill Identity.
-- Show provider badges, Health Signals, and provenance summaries in the main Inventory.
+- Build Skill Groups from provider instances using provenance-aware Skill Identity as relationship context.
+- Show provider, availability state, confirmed related providers, and Inventory Issues in the main Inventory.
+- Show weak name-only relationships and Inventory Notices in detail views.
 - Show Project Skills in a separate read-only view.
 - Show Scan Roots in a separate read-only Settings view instead of inline in Inventory.
 - Enable or disable Codex and Claude provider instances through provider-specific Disable Strategies.
@@ -76,7 +79,8 @@ A discovered skill in one provider. It includes:
 - parsed SKILL.md metadata when valid
 - enabled/disabled state
 - source/provenance metadata
-- Health Signals
+- Inventory Issues
+- Inventory Notices
 - supported actions
 
 ### Scan Root
@@ -101,26 +105,31 @@ Settings should not show editable JSON, raw config file contents, or provider-na
 
 ### Skill Group
 
-The primary Inventory row. A Skill Group contains provider instances that likely represent the same Skill.
+A relationship object that contains provider instances believed to represent the same Skill. Skill Groups support detail context and relationship-aware ordering, but they are not the primary Inventory row.
 
 Grouping confidence should be explicit:
 
 - **confirmed**: shared real path, skills.sh lock metadata, or known source identity ties instances together.
 - **inferred**: normalized names match, but provenance is unavailable.
 
-### Health Signal
+### Inventory Issue
 
-V1 Health Signals are deterministic:
+V1 Inventory Issues are deterministic findings that affect safe operation or likely require attention:
 
-- grouped across multiple providers
-- inferred identity
-- enabled or disabled per provider
 - missing or invalid `SKILL.md`
 - broken symlink
-- skills.sh update available
-- unmanaged Global Skill without skills.sh lock metadata
+- provider/plugin identity mismatch
 
 Security/risk scoring is out of scope.
+
+### Inventory Notice
+
+Inventory Notices are non-problem context. They should not render as warnings in the main list.
+
+- confirmed related providers
+- weak name-only relationships
+- skills.sh update available
+- unmanaged Global Skill without skills.sh lock metadata
 
 ### Disable Strategy
 
@@ -159,14 +168,15 @@ A missing Codex plugin config entry means the active-looking plugin root is enab
 
 ### Inventory
 
-Rows are Skill Groups, not individual provider instances.
+Rows are Provider Instances. Skill Groups remain relationship context for ordering and detail views.
 
 Recommended columns:
 
 - name
-- provider badges with enabled/disabled state
-- Health Signals
-- source/provenance summary
+- provider
+- enabled/disabled state
+- confirmed related providers
+- Inventory Issue
 
 Provider filters can exist inside Inventory:
 
@@ -186,7 +196,8 @@ The detail view uses an explain-before-action pattern:
 - path and resolved path
 - enabled/disabled state
 - Disable Strategy
-- Health Signals
+- Inventory Issues
+- Inventory Notices
 - skills.sh metadata when present
 - actions valid for the selected provider instance
 
@@ -200,7 +211,7 @@ Project Skills appear in a separate read-only section. They should show:
 - project-relative path
 - description
 - validity of `SKILL.md`
-- whether the skill name overlaps with non-project Skill Groups
+- whether the skill name overlaps with non-project Provider Instances
 
 No mutation actions are available.
 
@@ -229,7 +240,7 @@ Updates are manual:
 
 The current core model is provider-centric and action-heavy. The refactor should reshape it around inventory facts:
 
-- Replace duplicate-only grouping with Skill Group construction.
+- Replace duplicate-only grouping with relationship-aware Skill Group construction.
 - Replace provider capabilities with action availability per provider instance.
 - Remove create/edit APIs from the manager and TUI.
 - Remove GitHub install source from v1 registration and UI.
@@ -247,6 +258,6 @@ Use core tests as the primary seam. The most valuable external behavior tests ar
 - Project Skills are excluded from controllable Inventory and appear in read-only Project Skills output
 - skills.sh-managed Global Skills expose install/update/remove actions
 - provider-local Codex/Claude skills do not expose remove/update/install/edit/create actions
-- invalid skills and broken symlinks produce Health Signals instead of silently disappearing
+- invalid skills and broken symlinks produce Inventory Issues instead of silently disappearing
 
 TUI tests do not exist yet. V1 can keep TUI verification manual unless a test harness is introduced, but the core should expose enough derived state that the TUI remains thin.

@@ -11,7 +11,8 @@ function skill(provider: string): SkillInventoryInstance {
     enabled: true,
     source: { type: 'skillssh' },
     actions: provider === 'global' ? ['update', 'remove'] : [],
-    healthSignals: [],
+    issues: [],
+    notices: [],
   };
 }
 

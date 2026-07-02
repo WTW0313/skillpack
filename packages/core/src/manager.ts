@@ -142,10 +142,11 @@ export class SkillManager {
       origin: skill.origin,
       source: skill.source,
       actions: [],
-      healthSignals: (skill.scanIssues ?? []).map((issue) => ({
+      issues: (skill.scanIssues ?? []).map((issue) => ({
         code: issue.code,
         message: issue.message,
       })),
+      notices: [],
     }));
   }
   getSkillsByProvider(providerId: string): Skill[] { return this.skills.filter((s) => s.provider === providerId); }

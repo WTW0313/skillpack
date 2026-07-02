@@ -2,17 +2,24 @@ import type { Skill, SkillSource } from './skill.js';
 
 export type SkillIdentityConfidence = 'confirmed' | 'inferred';
 
-export type HealthSignalCode =
-  | 'grouped-across-providers'
-  | 'inferred-identity'
+export type InventoryIssueCode =
   | 'invalid-skill-md'
   | 'broken-symlink'
-  | 'plugin-identity-mismatch'
+  | 'plugin-identity-mismatch';
+
+export type InventoryNoticeCode =
+  | 'related-providers'
+  | 'name-only-relationship'
   | 'unmanaged-global-skill'
   | 'update-available';
 
-export interface HealthSignal {
-  code: HealthSignalCode;
+export interface InventoryIssue {
+  code: InventoryIssueCode;
+  message: string;
+}
+
+export interface InventoryNotice {
+  code: InventoryNoticeCode;
   message: string;
 }
 
@@ -35,7 +42,8 @@ export interface SkillInventoryInstance {
   source?: SkillSource;
   disableStrategy?: DisableStrategy;
   actions: SkillAction[];
-  healthSignals: HealthSignal[];
+  issues: InventoryIssue[];
+  notices: InventoryNotice[];
 }
 
 export interface SkillGroup {
@@ -50,7 +58,8 @@ export interface SkillGroup {
     enabled: boolean;
   }>;
   instances: SkillInventoryInstance[];
-  healthSignals: HealthSignal[];
+  issues: InventoryIssue[];
+  notices: InventoryNotice[];
 }
 
 export function normalizeSkillName(name: string): string {
@@ -91,18 +100,22 @@ function actionsFor(skill: Skill, disableStrategy: DisableStrategy | undefined):
   return disableStrategy ? [toggleAction] : [];
 }
 
-function healthSignalsFor(skill: Skill, options: BuildSkillInventoryOptions): HealthSignal[] {
-  const signals: HealthSignal[] = (skill.scanIssues ?? []).map((issue) => ({
+function issuesFor(skill: Skill): InventoryIssue[] {
+  return (skill.scanIssues ?? []).map((issue) => ({
     code: issue.code,
     message: issue.message,
   }));
+}
+
+function noticesFor(skill: Skill, options: BuildSkillInventoryOptions): InventoryNotice[] {
+  const notices: InventoryNotice[] = [];
   if (skill.provider === 'global' && skill.source?.type !== 'skillssh') {
-    signals.push({ code: 'unmanaged-global-skill', message: 'Global Skill is not managed by skills.sh metadata' });
+    notices.push({ code: 'unmanaged-global-skill', message: 'Global Skill is not managed by skills.sh metadata' });
   }
   if (options.hasUpdate?.(skill)) {
-    signals.push({ code: 'update-available', message: 'skills.sh update is available' });
+    notices.push({ code: 'update-available', message: 'skills.sh update is available' });
   }
-  return signals;
+  return notices;
 }
 
 export interface BuildSkillInventoryOptions {
@@ -124,7 +137,8 @@ function toInstance(skill: Skill, options: BuildSkillInventoryOptions): SkillInv
     source: skill.source,
     disableStrategy,
     actions: actionsFor(skill, disableStrategy),
-    healthSignals: healthSignalsFor(skill, options),
+    issues: issuesFor(skill),
+    notices: noticesFor(skill, options),
   };
 }
 
@@ -167,17 +181,13 @@ export function buildSkillInventory(skills: Skill[], options: BuildSkillInventor
 
   return [...groups.entries()].map(([id, group]) => {
     const instances = group.skills.map((skill) => toInstance(skill, options));
-    const healthSignals = instances.flatMap((instance) => instance.healthSignals);
+    const notices: InventoryNotice[] = [];
     if (instances.length > 1) {
-      healthSignals.push({
-        code: 'grouped-across-providers',
-        message: 'Skill appears in multiple providers',
-      });
-    }
-    if (group.identity.confidence === 'inferred') {
-      healthSignals.push({
-        code: 'inferred-identity',
-        message: 'Skill identity is inferred from normalized name',
+      notices.push({
+        code: group.identity.confidence === 'confirmed' ? 'related-providers' : 'name-only-relationship',
+        message: group.identity.confidence === 'confirmed'
+          ? 'Skill has confirmed related provider instances'
+          : 'Skill has same-name provider instances without confirming provenance',
       });
     }
 
@@ -193,7 +203,8 @@ export function buildSkillInventory(skills: Skill[], options: BuildSkillInventor
         enabled: instance.enabled,
       })),
       instances,
-      healthSignals,
+      issues: instances.flatMap((instance) => instance.issues),
+      notices,
     };
   });
 }

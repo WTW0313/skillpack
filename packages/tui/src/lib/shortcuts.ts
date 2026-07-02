@@ -7,7 +7,7 @@ export interface Shortcut extends ShortcutLayoutItem {}
 const SHORTCUTS: Record<string, Shortcut[]> = {
   list: [
     { key: '↑↓', label: 'navigate', compactLabel: 'nav' },
-    { key: 'enter', label: 'group detail', compactLabel: 'detail' },
+    { key: 'enter', label: 'detail' },
     { key: '/', label: 'search' },
     { key: '?', label: 'help' },
     { key: 'tab', label: 'tabs' },

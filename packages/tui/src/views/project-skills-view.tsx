@@ -47,7 +47,7 @@ export function ProjectSkillsView() {
   );
   const showScroll = projectSkills.length > visibleRows;
   const inventoryNames = useMemo(
-    () => new Set(inventory.map((group) => group.name.toLowerCase())),
+    () => new Set(inventory.flatMap((group) => group.instances.map((instance) => instance.name.toLowerCase()))),
     [inventory],
   );
 
@@ -80,7 +80,7 @@ export function ProjectSkillsView() {
         ) : (
           visibleSkills.map((skill, index) => {
             const selected = scrollOffset + index === cursor;
-            const hasIssues = skill.healthSignals.length > 0;
+            const hasIssues = skill.issues.length > 0;
             const overlapsInventory = inventoryNames.has(skill.name.toLowerCase());
             const state = hasIssues ? 'needs attention' : overlapsInventory ? 'overlaps' : 'read-only';
             return (
