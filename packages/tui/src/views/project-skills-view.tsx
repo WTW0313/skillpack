@@ -8,7 +8,7 @@ import { fitCell, getBoundedContentLayout, getGlyphSet, getProjectSkillsColumns 
 
 export function ProjectSkillsView() {
   const { exit } = useApp();
-  const { projectSkills, setView } = useAppContext();
+  const { projectSkills, inventory, setView } = useAppContext();
   const { columns, rows } = useTerminalSize();
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -46,6 +46,10 @@ export function ProjectSkillsView() {
     [projectSkills, scrollOffset, visibleRows],
   );
   const showScroll = projectSkills.length > visibleRows;
+  const inventoryNames = useMemo(
+    () => new Set(inventory.map((group) => group.name.toLowerCase())),
+    [inventory],
+  );
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -62,6 +66,7 @@ export function ProjectSkillsView() {
         <Box gap={1}>
           <Text>{' '}</Text>
           <Text dimColor>{fitCell('NAME', tableColumns.name)}</Text>
+          {tableColumns.description > 0 && <Text dimColor>{fitCell('DESCRIPTION', tableColumns.description)}</Text>}
           <Text dimColor>{fitCell('PROJECT PATH', tableColumns.path)}</Text>
           <Text dimColor>{fitCell('STATE', tableColumns.state)}</Text>
         </Box>
@@ -76,6 +81,8 @@ export function ProjectSkillsView() {
           visibleSkills.map((skill, index) => {
             const selected = scrollOffset + index === cursor;
             const hasIssues = skill.healthSignals.length > 0;
+            const overlapsInventory = inventoryNames.has(skill.name.toLowerCase());
+            const state = hasIssues ? 'needs attention' : overlapsInventory ? 'overlaps' : 'read-only';
             return (
               <Box key={skill.path} gap={1}>
                 <Text color={selected ? 'magenta' : undefined}>
@@ -84,9 +91,12 @@ export function ProjectSkillsView() {
                 <Text bold={selected} color={selected ? 'white' : undefined}>
                   {fitCell(skill.name, tableColumns.name)}
                 </Text>
+                {tableColumns.description > 0 && (
+                  <Text dimColor>{fitCell(skill.description || '-', tableColumns.description)}</Text>
+                )}
                 <Text dimColor>{fitCell(formatDisplayPath(skill.path), tableColumns.path)}</Text>
-                <Text color={hasIssues ? 'yellow' : 'green'}>
-                  {fitCell(hasIssues ? 'needs attention' : 'read-only', tableColumns.state)}
+                <Text color={hasIssues || overlapsInventory ? 'yellow' : 'green'}>
+                  {fitCell(state, tableColumns.state)}
                 </Text>
               </Box>
             );

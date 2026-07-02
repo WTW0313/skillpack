@@ -26,7 +26,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function DetailView() {
-  const { selectedSkill, setView, refresh, manager } = useAppContext();
+  const { selectedGroup, selectedSkill, setSelectedSkill, setView, refresh, manager } = useAppContext();
   const { columns, rows } = useTerminalSize();
   const [confirming, setConfirming] = useState<'remove' | 'plugin-toggle' | 'update' | null>(null);
   const [activeSection, setActiveSection] = useState<DetailSectionId>('summary');
@@ -39,19 +39,18 @@ export function DetailView() {
   const [updating, setUpdating] = useState(false);
   const glyphs = getGlyphSet();
 
-  const sourceType = selectedSkill?.source?.type;
-  const isUpdatable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
-  const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
-  const canToggle = selectedSkill
-    ? Boolean(manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill))
-    : false;
-  const disableStrategy = selectedSkill
-    ? manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill)
-    : undefined;
-
-  const duplicate = selectedSkill
-    ? manager.getDuplicates().find((d) => d.skillName === selectedSkill.name)
-    : undefined;
+  const isUpdatable = selectedSkill?.actions.includes('update') ?? false;
+  const isRemovable = selectedSkill?.actions.includes('remove') ?? false;
+  const canToggle = selectedSkill?.actions.some((action) => action === 'enable' || action === 'disable') ?? false;
+  const disableStrategy = selectedSkill?.disableStrategy;
+  const groupHealthSignals = selectedGroup?.healthSignals ?? [];
+  const instanceHealthSignals = selectedSkill?.healthSignals ?? [];
+  const hasWarnings = groupHealthSignals.length > 0 || instanceHealthSignals.length > 0;
+  const selectedInstanceIndex = selectedGroup && selectedSkill
+    ? selectedGroup.instances.findIndex((instance) => (
+      instance.provider === selectedSkill.provider && instance.path === selectedSkill.path
+    ))
+    : -1;
 
   const addedAt = selectedSkill?.source?.installedAt ?? selectedSkill?.source?.createdAt;
 
@@ -68,7 +67,7 @@ export function DetailView() {
   const detailLayout = getDetailLayout({
     size: { columns, rows },
     hasDescription: descLines.length > 0,
-    hasWarnings: Boolean(duplicate),
+    hasWarnings,
   });
 
   const fullVisibleDescRows = useMemo(() => {
@@ -83,14 +82,14 @@ export function DetailView() {
     if (disableStrategy) used += 1;
     if (isUpdatable) used += 1; // update row
     if (addedAt) used += 1;
-    if (duplicate) used += 1 + 1 + duplicate.instances.length; // gap + heading + instances
+    if (hasWarnings) used += 1 + 1 + groupHealthSignals.length + instanceHealthSignals.length; // gap + heading + signals
     used += 1;    // gap before description
     used += 1;    // separator
     used += 1;    // "description" label
     used += 1;    // status bar
     if (error) used += 1;
     return Math.max(0, rows - used);
-  }, [selectedSkill, duplicate, error, rows, isUpdatable, disableStrategy]);
+  }, [selectedSkill, groupHealthSignals.length, instanceHealthSignals.length, hasWarnings, error, rows, isUpdatable, disableStrategy]);
 
   const visibleDescRows = detailLayout.sectioned
     ? Math.max(1, detailLayout.visibleRows - 1)
@@ -102,6 +101,16 @@ export function DetailView() {
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
+    if ((key.leftArrow || key.rightArrow) && selectedGroup && selectedSkill && selectedGroup.instances.length > 1) {
+      const currentIndex = selectedInstanceIndex >= 0 ? selectedInstanceIndex : 0;
+      const direction = key.rightArrow ? 1 : -1;
+      const nextIndex = (currentIndex + direction + selectedGroup.instances.length) % selectedGroup.instances.length;
+      setSelectedSkill(selectedGroup.instances[nextIndex]);
+      setUpdateInfo(null);
+      setError(null);
+      setNotice(null);
+      return;
+    }
     if (key.tab && detailLayout.sectioned) {
       const idx = detailLayout.sections.findIndex((section) => section.id === activeSection);
       const next = key.shift
@@ -125,7 +134,7 @@ export function DetailView() {
       setError(null);
       setNotice(null);
       setBusy(true);
-      manager.toggleSkill(selectedSkill)
+      manager.toggleInventoryInstance(selectedSkill)
         .then(() => refresh())
         .then(() => setNotice('Availability updated.'))
         .catch((err: Error) => setError(err.message))
@@ -144,7 +153,10 @@ export function DetailView() {
       } else if (!updateInfo) {
         setCheckingUpdate(true);
         manager.checkSkillUpdate(selectedSkill)
-          .then((info) => setUpdateInfo(info ?? { hasUpdate: false }))
+          .then(async (info) => {
+            setUpdateInfo(info ?? { hasUpdate: false });
+            await refresh();
+          })
           .catch((err: Error) => setError(err.message))
           .finally(() => setCheckingUpdate(false));
       }
@@ -157,8 +169,8 @@ export function DetailView() {
     }
   }, { isActive: !confirming });
 
-  if (!selectedSkill) {
-    return <Box><Text color="red">No skill selected</Text></Box>;
+  if (!selectedGroup || !selectedSkill) {
+    return <Box><Text color="red">No Skill Group selected</Text></Box>;
   }
 
   if (confirming === 'remove') {
@@ -190,7 +202,7 @@ export function DetailView() {
           onConfirm={() => {
             setError(null);
             setBusy(true);
-            manager.toggleSkill(selectedSkill)
+            manager.toggleInventoryInstance(selectedSkill)
               .then(() => refresh())
               .then(() => setNotice('Plugin availability updated.'))
               .catch((err: Error) => setError(err.message))
@@ -242,8 +254,16 @@ export function DetailView() {
           return (
             <>
               <Box gap={1}>
+                <Text dimColor>{'identity'.padEnd(10)}</Text>
+                <Text>{selectedGroup.identity.confidence}</Text>
+                <Text dimColor>{selectedGroup.identity.reasons.join(', ')}</Text>
+              </Box>
+              <Box gap={1}>
                 <Text dimColor>{'agent'.padEnd(10)}</Text>
                 <Text>{selectedSkill.provider}</Text>
+                {selectedGroup.instances.length > 1 && (
+                  <Text dimColor>{selectedInstanceIndex + 1}/{selectedGroup.instances.length}</Text>
+                )}
               </Box>
               <Box gap={1}>
                 <Text dimColor>{'status'.padEnd(10)}</Text>
@@ -263,6 +283,14 @@ export function DetailView() {
                   <Text>{formatRelativeTime(addedAt)}</Text>
                 </Box>
               )}
+              <Box flexDirection="column" marginTop={1}>
+                <Text dimColor>provider instances</Text>
+                {selectedGroup.instances.map((instance) => (
+                  <Text key={`${instance.provider}:${instance.path}`} color={instance.path === selectedSkill.path ? 'magenta' : undefined}>
+                    {instance.provider} {instance.enabled ? 'enabled' : 'disabled'}
+                  </Text>
+                ))}
+              </Box>
             </>
           );
         case 'paths':
@@ -321,12 +349,12 @@ export function DetailView() {
             </Box>
           );
         case 'warnings':
-          return duplicate ? (
+          return hasWarnings ? (
             <Box flexDirection="column">
-              <Text color="yellow">Duplicates</Text>
-              {duplicate.instances.map((inst) => (
-                <Text key={`${inst.provider}:${inst.path}`} dimColor wrap="truncate">
-                  {inst.provider} {'->'} {inst.path}
+              <Text color="yellow">Health Signals</Text>
+              {[...groupHealthSignals, ...instanceHealthSignals].map((signal, index) => (
+                <Text key={`${signal.code}:${index}`} dimColor wrap="truncate">
+                  {signal.code}: {signal.message}
                 </Text>
               ))}
             </Box>
@@ -350,7 +378,7 @@ export function DetailView() {
         <Box>
           <Text dimColor>‹ esc  </Text>
           <Text bold color="magenta">{glyphs.brand}</Text>
-          <Text bold> {selectedSkill.name}</Text>
+          <Text bold> {selectedGroup.name}</Text>
         </Box>
 
         <Box marginTop={1} flexDirection="column">
@@ -403,11 +431,29 @@ export function DetailView() {
       <Box>
         <Text dimColor>‹ esc  </Text>
         <Text bold color="magenta">{glyphs.brand}</Text>
-        <Text bold> {selectedSkill.name}</Text>
+        <Text bold> {selectedGroup.name}</Text>
       </Box>
 
       {/* Metadata */}
       <Box marginTop={1} flexDirection="column" gap={0}>
+        <Box gap={1}>
+          <Text dimColor>{'identity'.padEnd(10)}</Text>
+          <Text>{selectedGroup.identity.confidence}</Text>
+          <Text dimColor>{selectedGroup.identity.reasons.join(', ')}</Text>
+        </Box>
+        <Box gap={1}>
+          <Text dimColor>{'providers'.padEnd(10)}</Text>
+          <Text>{selectedGroup.instances.map((instance) => (
+            `${instance.provider}:${instance.enabled ? 'enabled' : 'disabled'}`
+          )).join('  ')}</Text>
+        </Box>
+        {selectedGroup.instances.length > 1 && (
+          <Box gap={1}>
+            <Text dimColor>{'selected'.padEnd(10)}</Text>
+            <Text>{selectedInstanceIndex + 1}/{selectedGroup.instances.length}</Text>
+            <Text dimColor>use left/right to switch provider instance</Text>
+          </Box>
+        )}
         <Box gap={1}>
           <Text dimColor>{'agent'.padEnd(10)}</Text>
           <Text>{selectedSkill.provider}</Text>
@@ -500,13 +546,13 @@ export function DetailView() {
         </Box>
       </Box>
 
-      {/* Duplicates */}
-      {duplicate && (
+      {/* Health Signals */}
+      {hasWarnings && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">{glyphs.warning} Duplicates</Text>
-          {duplicate.instances.map((inst) => (
-            <Text key={`${inst.provider}:${inst.path}`} dimColor>
-              {'  '}{inst.provider} → {inst.path}
+          <Text bold color="yellow">{glyphs.warning} Health Signals</Text>
+          {[...groupHealthSignals, ...instanceHealthSignals].map((signal, index) => (
+            <Text key={`${signal.code}:${index}`} dimColor>
+              {'  '}{signal.code}: {signal.message}
             </Text>
           ))}
         </Box>

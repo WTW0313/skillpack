@@ -1,14 +1,13 @@
 import { BaseProvider, type ProviderCapabilities } from './provider.js';
-import type { Skill, SkillTemplate } from '../models/index.js';
-import type { InstallRequest } from '../models/source.js';
-import { generateSkillMd, parseSkillMd } from '../parser.js';
+import type { Skill } from '../models/index.js';
+import { parseSkillMd } from '../parser.js';
 import {
   readCodexPluginConfig,
   readCodexSkillConfigEnabled,
   writeCodexPluginEnabled,
   writeCodexSkillConfigEnabled,
 } from './provider-settings.js';
-import { mkdir, writeFile, rm, cp, readdir, access, readFile, stat, realpath } from 'node:fs/promises';
+import { readdir, access, readFile, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
@@ -73,7 +72,7 @@ export class CodexProvider extends BaseProvider {
   readonly pluginCachePaths: string[];
   readonly configPath: string;
   readonly capabilities: ProviderCapabilities = {
-    canInstall: true, canUninstall: true, canUpdate: true, canToggle: true, canCreate: true,
+    canToggle: true,
   };
 
   constructor(basePaths?: string[], configPath?: string) {
@@ -152,27 +151,6 @@ export class CodexProvider extends BaseProvider {
     const skill = (await this.scan()).find((item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name);
     if (!skill) throw new Error(`Skill "${name}" not found in ${this.displayName}`);
     await this.setEnabled(skill, true);
-  }
-
-  override async install(name: string, request: InstallRequest): Promise<void> {
-    const dest = path.join(this.skillPaths[0] ?? this.basePaths[0], name);
-    await cp(request.tempDir, dest, { recursive: true });
-  }
-
-  override async uninstall(name: string): Promise<void> {
-    await rm(path.join(this.skillPaths[0] ?? this.basePaths[0], name), { recursive: true, force: true });
-  }
-
-  override async create(template: SkillTemplate): Promise<Skill> {
-    const skillDir = path.join(this.skillPaths[0] ?? this.basePaths[0], template.name);
-    await mkdir(skillDir, { recursive: true });
-    await writeFile(path.join(skillDir, 'SKILL.md'), generateSkillMd(template), 'utf-8');
-    return {
-      name: template.name, description: template.description,
-      provider: this.id, path: skillDir, enabled: true, scope: 'global',
-      metadata: template.metadata ?? {},
-      source: { type: 'local', createdAt: new Date().toISOString() },
-    };
   }
 
   private async scanPluginCache(): Promise<Skill[]> {

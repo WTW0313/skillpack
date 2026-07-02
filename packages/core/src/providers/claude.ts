@@ -19,7 +19,7 @@ export class ClaudeProvider extends BaseProvider {
   readonly displayName = 'Claude';
   readonly basePaths: string[];
   readonly capabilities: ProviderCapabilities = {
-    canInstall: false, canUninstall: false, canUpdate: false, canToggle: true, canCreate: false,
+    canToggle: true,
   };
   readonly flatPaths: string[];
   readonly settingsPath: string;

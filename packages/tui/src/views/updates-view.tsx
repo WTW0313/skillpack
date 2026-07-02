@@ -3,6 +3,7 @@ import { Box, Text, useApp, useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { useAppContext } from '../context/app-context.js';
 import { StatusBar } from '../components/status-bar.js';
+import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { fitCell, getBoundedContentLayout, getGlyphSet } from '../lib/responsive-layout.js';
 import type { Skill, UpdateInfo } from '@skillpack/core';
@@ -22,6 +23,7 @@ export function UpdatesView() {
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [error, setError] = useState('');
+  const [confirmingUpdate, setConfirmingUpdate] = useState(false);
   const glyphs = getGlyphSet();
   const { columns, rows } = useTerminalSize();
   const layout = getBoundedContentLayout({
@@ -54,6 +56,7 @@ export function UpdatesView() {
       setCursor(0);
       setScrollOffset(0);
       setState('checked');
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setState('idle');
@@ -78,6 +81,7 @@ export function UpdatesView() {
   useInput((input, key) => {
     if (input === 'q') { exit(); return; }
     if (key.escape) { setView('list'); return; }
+    if (confirmingUpdate) return;
     if (state === 'checking' || state === 'updating') return;
     if (input === 'r') {
       void runCheck();
@@ -86,8 +90,8 @@ export function UpdatesView() {
     if (key.return) {
       if (state === 'idle') {
         void runCheck();
-      } else {
-        void applySelected();
+      } else if (updates[cursor]) {
+        setConfirmingUpdate(true);
       }
       return;
     }
@@ -98,6 +102,22 @@ export function UpdatesView() {
       setCursor((c) => Math.max(c - 1, 0));
     }
   });
+
+  if (confirmingUpdate) {
+    const selected = updates[cursor];
+    return (
+      <Box flexDirection="column" padding={1}>
+        <ConfirmDialog
+          message={`Update "${selected?.skill.name ?? 'selected skill'}" from ${selected?.update.currentVersion ?? '?'} to ${selected?.update.latestVersion ?? 'latest'}?`}
+          onConfirm={() => {
+            setConfirmingUpdate(false);
+            void applySelected();
+          }}
+          onCancel={() => setConfirmingUpdate(false)}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>

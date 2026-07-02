@@ -5,11 +5,9 @@ import { getVisibleShortcuts } from '../lib/responsive-layout.js';
 import { getShortcutsForView } from '../lib/shortcuts.js';
 
 export function StatusBar() {
-  const { view, selectedSkill, manager } = useAppContext();
+  const { view, selectedSkill } = useAppContext();
   const { columns, rows } = useTerminalSize();
-  const canToggle = selectedSkill
-    ? Boolean(manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill))
-    : false;
+  const canToggle = selectedSkill?.actions.some((action) => action === 'enable' || action === 'disable') ?? false;
   const shortcuts = getShortcutsForView({ view, selectedSkill, canToggle });
   const visibleShortcuts = getVisibleShortcuts(shortcuts, { columns, rows });
 

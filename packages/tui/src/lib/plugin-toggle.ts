@@ -1,10 +1,14 @@
 import type { Skill } from '@skillpack/core';
 
-export function isPluginOwnedSkill(skill: Skill | null | undefined): skill is Skill & { origin: NonNullable<Skill['origin']> } {
+type PluginToggleSkill = Pick<Skill, 'name' | 'provider' | 'origin'>;
+
+export function isPluginOwnedSkill<T extends PluginToggleSkill | null | undefined>(
+  skill: T,
+): skill is NonNullable<T> & { origin: NonNullable<Skill['origin']> } {
   return skill?.origin?.type === 'plugin';
 }
 
-export function getAffectedPluginSkills(skills: Skill[], skill: Skill): Skill[] {
+export function getAffectedPluginSkills<T extends PluginToggleSkill>(skills: T[], skill: PluginToggleSkill): T[] {
   if (!isPluginOwnedSkill(skill)) return [];
   return skills
     .filter((candidate) => (
@@ -15,7 +19,7 @@ export function getAffectedPluginSkills(skills: Skill[], skill: Skill): Skill[] 
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export function formatPluginToggleMessage(skill: Skill, skills: Skill[]): string {
+export function formatPluginToggleMessage<T extends PluginToggleSkill>(skill: PluginToggleSkill, skills: T[]): string {
   if (!isPluginOwnedSkill(skill)) return '';
   const action = skill.origin.pluginEnabled ? 'Disable' : 'Enable';
   const affected = getAffectedPluginSkills(skills, skill);

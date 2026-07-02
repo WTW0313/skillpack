@@ -1,4 +1,5 @@
 import type { IInstallSource } from './source.js';
+import type { UpdateCheckSkill } from './source.js';
 import type { RemoteSkill, UpdateInfo, DownloadResult } from '../models/source.js';
 import type { Skill } from '../models/skill.js';
 import { execFile } from 'node:child_process';
@@ -91,7 +92,7 @@ export class SkillsShSource implements IInstallSource {
     return { tempDir: '', skillName, files: [] };
   }
 
-  async checkUpdate(skill: Skill): Promise<UpdateInfo | null> {
+  async checkUpdate(skill: UpdateCheckSkill): Promise<UpdateInfo | null> {
     if (skill.source?.type !== 'skillssh') return null;
     try {
       return parseUpdateForSkill(await this.runCheckCommand(), skill);
@@ -147,7 +148,7 @@ export class SkillsShSource implements IInstallSource {
   }
 }
 
-function parseUpdateForSkill(clean: string, skill: Skill): UpdateInfo | null {
+function parseUpdateForSkill(clean: string, skill: UpdateCheckSkill): UpdateInfo | null {
   for (const line of clean.split('\n')) {
     if (!line.includes(skill.name)) continue;
     if (/update|available|outdated/i.test(line)) {

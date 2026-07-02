@@ -28,9 +28,9 @@ npx skillpack-tui
 
 ## Quick Start
 
-Launch `skillpack` to see discovered skills grouped by provider. Use the arrow keys to navigate, `Tab` / `Shift+Tab` to switch provider tabs, and `/` to search.
+Launch `skillpack` to see discovered skills grouped into Skill Groups with provider status and Health Signals. Use the arrow keys to navigate, `Tab` / `Shift+Tab` to filter by provider, and `/` to search.
 
-Press `Space` to toggle a Codex or Claude skill on or off, `Enter` to view details, `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a Global Skill, or `u` to open manual updates. Plugin-owned skills ask for confirmation because the toggle affects every skill from the owning plugin.
+Press `Enter` to inspect a Skill Group, then use left/right to choose a provider instance before taking instance-level actions. Press `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a Global Skill, or `u` to open manual updates. Plugin-owned skills ask for confirmation because the toggle affects every skill from the owning plugin.
 
 ## Keyboard Shortcuts
 
@@ -39,8 +39,7 @@ Press `Space` to toggle a Codex or Claude skill on or off, `Enter` to view detai
 | Key | Action |
 | --- | --- |
 | `↑` / `↓` | Navigate skills |
-| `Space` | Enable or disable selected Codex or Claude skill; plugin-owned skills ask for confirmation |
-| `Enter` | Open skill detail view |
+| `Enter` | Open Skill Group detail view |
 | `Tab` / `Shift+Tab` | Switch provider tab |
 | `/` | Search |
 | `Esc` | Clear search |
@@ -55,6 +54,7 @@ Press `Space` to toggle a Codex or Claude skill on or off, `Enter` to view detai
 | Key | Action |
 | --- | --- |
 | `Esc` | Return to list view |
+| `←` / `→` | Switch provider instance |
 | `Space` | Enable or disable Codex or Claude skill; plugin-owned skills ask for confirmation |
 | `o` / `O` | Open skill folder |
 | `d` | Remove a skills.sh-managed Global Skill |

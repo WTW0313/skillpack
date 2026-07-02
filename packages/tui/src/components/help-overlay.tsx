@@ -13,10 +13,8 @@ function formatViewTitle(view: string): string {
 }
 
 export function HelpOverlay(_props: HelpOverlayProps) {
-  const { view, selectedSkill, manager } = useAppContext();
-  const canToggle = selectedSkill
-    ? Boolean(manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill))
-    : false;
+  const { view, selectedSkill } = useAppContext();
+  const canToggle = selectedSkill?.actions.some((action) => action === 'enable' || action === 'disable') ?? false;
   const shortcuts = getShortcutsForView({ view, selectedSkill, canToggle });
 
   return (

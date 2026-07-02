@@ -77,8 +77,8 @@ export function wrapTextLines(lines: string[], width: number): string[] {
 }
 
 export function formatInventoryStatus(enabled: boolean, variant: 'full' | 'compact'): string {
-  if (variant === 'compact') return fitCell(enabled ? 'on' : 'off', COMPACT_STATUS_WIDTH);
-  return fitCell(enabled ? 'enabled' : 'disabled', FULL_STATUS_WIDTH);
+  if (variant === 'compact') return fitCell(enabled ? 'on' : 'off', COMPACT_AVAILABILITY_STATUS_WIDTH);
+  return fitCell(enabled ? 'enabled' : 'disabled', FULL_AVAILABILITY_STATUS_WIDTH);
 }
 
 export interface InventoryLayoutInput {
@@ -140,6 +140,7 @@ export interface BoundedContentLayout {
 
 export interface ProjectSkillsColumns {
   name: number;
+  description: number;
   path: number;
   state: number;
   rowWidth: number;
@@ -158,10 +159,12 @@ const COMPACT_CHROME_LINES = 5;
 const HORIZONTAL_PADDING = 2;
 const MIN_NAME_WIDTH = 12;
 const MAX_NAME_WIDTH = 30;
-const FULL_PROVIDER_WIDTH = 10;
-const COMPACT_PROVIDER_WIDTH = 8;
-const FULL_STATUS_WIDTH = 8;
-const COMPACT_STATUS_WIDTH = 3;
+const FULL_PROVIDER_WIDTH = 24;
+const COMPACT_PROVIDER_WIDTH = 18;
+const FULL_STATUS_WIDTH = 18;
+const COMPACT_STATUS_WIDTH = 14;
+const FULL_AVAILABILITY_STATUS_WIDTH = 8;
+const COMPACT_AVAILABILITY_STATUS_WIDTH = 3;
 const ROW_FIXED_WIDTH = 6;
 const DETAIL_FULL_CHROME_LINES = 13;
 const DETAIL_COMPACT_CHROME_LINES = 6;
@@ -269,13 +272,17 @@ export function getProjectSkillsColumns(size: TerminalSize): ProjectSkillsColumn
   const contentWidth = Math.max(0, size.columns - HORIZONTAL_PADDING);
   const state = mode === 'compact' ? 14 : PROJECT_STATE_WIDTH;
   const fixedWidth = 5 + state;
-  const name = Math.max(12, Math.min(30, Math.floor((contentWidth - fixedWidth) * 0.4)));
-  const path = Math.max(12, contentWidth - fixedWidth - name);
+  const name = Math.max(12, Math.min(24, Math.floor((contentWidth - fixedWidth) * 0.3)));
+  const description = mode === 'compact'
+    ? 0
+    : Math.max(12, Math.min(24, Math.floor((contentWidth - fixedWidth - name) * 0.45)));
+  const path = Math.max(12, contentWidth - fixedWidth - name - description);
   return {
     name,
+    description,
     path,
     state,
-    rowWidth: fixedWidth + name + path,
+    rowWidth: fixedWidth + name + description + path,
   };
 }
 

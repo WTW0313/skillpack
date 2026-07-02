@@ -171,8 +171,8 @@ describe('getInventoryLayout', () => {
     expect(full.visibleRows).toBe(17);
     expect(full.statusBarVariant).toBe('full');
     expect(full.columns.name).toBe(30);
-    expect(full.columns.provider).toBe(10);
-    expect(full.columns.status).toBe(8);
+    expect(full.columns.provider).toBe(24);
+    expect(full.columns.status).toBe(18);
 
     const compact = getInventoryLayout({
       size: { columns: 60, rows: 18 },

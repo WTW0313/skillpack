@@ -8,23 +8,19 @@ import { TabBar } from '../components/tab-bar.js';
 import { SkillRow } from '../components/skill-row.js';
 import { SearchInput } from '../components/search-input.js';
 import { StatusBar } from '../components/status-bar.js';
-import { ConfirmDialog } from '../components/confirm-dialog.js';
-import { formatPluginToggleMessage, isPluginOwnedSkill } from '../lib/plugin-toggle.js';
 import { fitCell, getGlyphSet, getInventoryLayout } from '../lib/responsive-layout.js';
-import type { Skill } from '@skillpack/core';
 
 export function ListView() {
   const { exit } = useApp();
   const {
-    loading, activeTab, setActiveTab, setView, setSelectedSkill,
-    searchQuery, setSearchQuery, refresh, manager, skills: allSkills,
+    loading, activeTab, setActiveTab, setView, setSelectedGroup, setSelectedSkill,
+    searchQuery, setSearchQuery, refresh, inventory,
   } = useAppContext();
   const { skills, tabs } = useFilteredSkills();
   const { columns, rows } = useTerminalSize();
   const [cursor, setCursor] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [searching, setSearching] = useState(false);
-  const [confirmingPluginToggle, setConfirmingPluginToggle] = useState<Skill | null>(null);
   const glyphs = getGlyphSet();
 
   const prevSkillsLenRef = useRef(skills.length);
@@ -63,19 +59,20 @@ export function ListView() {
 
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    const inventorySkills = allSkills.filter((s) => s.scope !== 'project');
     for (const tab of TABS) {
       if (tab === 'All') {
-        counts[tab] = inventorySkills.length;
+        counts[tab] = inventory.length;
       } else {
         const providerMap: Record<string, string> = {
           Codex: 'codex', Claude: 'claude', Global: 'global',
         };
-        counts[tab] = inventorySkills.filter((s) => s.provider === providerMap[tab]).length;
+        counts[tab] = inventory.filter((group) => (
+          group.instances.some((instance) => instance.provider === providerMap[tab])
+        )).length;
       }
     }
     return counts;
-  }, [allSkills]);
+  }, [inventory]);
 
   useInput((input, key) => {
     if (input === 'q') { exit(); return; }
@@ -84,7 +81,7 @@ export function ListView() {
       return;
     }
     if (key.downArrow) {
-      setCursor((c) => Math.min(c + 1, skills.length - 1));
+      setCursor((c) => Math.min(c + 1, Math.max(0, skills.length - 1)));
       return;
     }
     if (key.upArrow) {
@@ -95,21 +92,10 @@ export function ListView() {
     if (input === 'p') { setView('project'); return; }
     if (input === 's') { setView('settings'); return; }
     if (input === 'i') { setView('install'); return; }
-
-    if (input === ' ' && skills[cursor]) {
-      const selected = skills[cursor];
-      const canToggle = Boolean(manager.getProvider(selected.provider)?.getDisableStrategy(selected));
-      if (canToggle) {
-        if (isPluginOwnedSkill(selected)) {
-          setConfirmingPluginToggle(selected);
-          return;
-        }
-        manager.toggleSkill(selected).then(() => refresh()).catch(() => {});
-      }
-      return;
-    }
+    if (input === 'u') { setView('updates'); return; }
     if (key.return && skills[cursor]) {
-      setSelectedSkill(skills[cursor]);
+      setSelectedGroup(skills[cursor]);
+      setSelectedSkill(skills[cursor].instances[0] ?? null);
       setView('detail');
       return;
     }
@@ -120,27 +106,10 @@ export function ListView() {
         : (idx + 1) % tabs.length;
       setActiveTab(tabs[next]);
     }
-  }, { isActive: !searching && !confirmingPluginToggle });
+  }, { isActive: !searching });
 
   if (loading) {
     return <Box><Spinner label="Scanning skills…" /></Box>;
-  }
-
-  if (confirmingPluginToggle) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <ConfirmDialog
-          message={formatPluginToggleMessage(confirmingPluginToggle, allSkills)}
-          onConfirm={() => {
-            manager.toggleSkill(confirmingPluginToggle)
-              .then(() => refresh())
-              .catch(() => {})
-              .finally(() => setConfirmingPluginToggle(null));
-          }}
-          onCancel={() => setConfirmingPluginToggle(null)}
-        />
-      </Box>
-    );
   }
 
   const showScroll = skills.length > visibleRows;
@@ -193,8 +162,8 @@ export function ListView() {
         <Box gap={1}>
           <Text>{' '}</Text>
           <Text dimColor>{fitCell('NAME', layout.columns.name)}</Text>
-          <Text dimColor>{fitCell('AGENT', layout.columns.provider)}</Text>
-          <Text dimColor>{fitCell('STATE', layout.columns.status)}</Text>
+          <Text dimColor>{fitCell('PROVIDERS', layout.columns.provider)}</Text>
+          <Text dimColor>{fitCell('HEALTH', layout.columns.status)}</Text>
         </Box>
       </Box>
 
@@ -224,12 +193,10 @@ export function ListView() {
           ) : (
             visibleSkills.map((skill, index) => (
               <SkillRow
-                key={`${skill.provider}:${skill.name}`}
+                key={skill.id}
                 skill={skill}
                 isSelected={scrollOffset + index === cursor}
-                isDuplicate={manager.isDuplicate(skill.name)}
                 columns={layout.columns}
-                statusVariant={layout.statusBarVariant === 'compact' ? 'compact' : 'full'}
               />
             ))
           )}

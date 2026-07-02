@@ -146,11 +146,54 @@ describe('Skill Inventory', () => {
       enabled: true,
       scope: 'global',
       metadata: {},
-      source: { type: 'skillssh' },
+      source: { type: 'skillssh', repo: 'owner/repo' },
     }]);
 
     expect(inventory).toHaveLength(1);
+    expect(inventory[0].identity.confidence).toBe('confirmed');
     expect(inventory[0].instances[0].actions).toEqual(['update', 'remove']);
+  });
+
+  it('does not expose toggle actions when the provider has no Disable Strategy', () => {
+    const inventory = buildSkillInventory([{
+      name: 'plugin-skill',
+      description: '',
+      provider: 'codex',
+      path: path.join(root, 'codex', 'plugin-skill'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      origin: {
+        type: 'plugin',
+        pluginId: 'github@openai-curated',
+        pluginName: 'github',
+        marketplace: 'openai-curated',
+        pluginEnabled: true,
+        identityStatus: 'mismatched',
+      },
+      source: { type: 'local' },
+    }], {
+      getDisableStrategy: () => undefined,
+    });
+
+    expect(inventory[0].instances[0].actions).toEqual([]);
+  });
+
+  it('surfaces remembered skills.sh update checks as health signals', () => {
+    const inventory = buildSkillInventory([{
+      name: 'managed-global',
+      description: '',
+      provider: 'global',
+      path: path.join(root, 'global', 'managed-global'),
+      enabled: true,
+      scope: 'global',
+      metadata: {},
+      source: { type: 'skillssh', repo: 'owner/repo' },
+    }], {
+      hasUpdate: () => true,
+    });
+
+    expect(inventory[0].healthSignals.map((signal) => signal.code)).toContain('update-available');
   });
 
   it('exposes the provider Disable Strategy for mutable inventory instances', async () => {

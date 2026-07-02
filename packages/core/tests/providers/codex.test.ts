@@ -59,20 +59,6 @@ describe('CodexProvider', () => {
     expect(skills).toHaveLength(0);
   });
 
-  it('creates a new skill', async () => {
-    const skill = await provider.create({ name: 'new-skill', description: 'Brand new' });
-    expect(skill.name).toBe('new-skill');
-    expect(skill.source?.type).toBe('local');
-  });
-
-  it('uninstalls a skill', async () => {
-    const skillDir = path.join(dir, 'to-delete');
-    await writeSkill(skillDir, 'to-delete', 'Delete me');
-    await provider.uninstall('to-delete');
-    const skills = await provider.scan();
-    expect(skills).toHaveLength(0);
-  });
-
   it('reads enabled state from Codex config entries', async () => {
     const skillDir = path.join(dir, 'my-skill');
     await writeSkill(skillDir, 'my-skill', 'Toggle me');

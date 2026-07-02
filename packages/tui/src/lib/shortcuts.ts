@@ -1,4 +1,4 @@
-import type { Skill } from '@skillpack/core';
+import type { SkillInventoryInstance } from '@skillpack/core';
 import type { ViewType } from '../context/app-context.js';
 import type { ShortcutLayoutItem } from './responsive-layout.js';
 
@@ -7,14 +7,14 @@ export interface Shortcut extends ShortcutLayoutItem {}
 const SHORTCUTS: Record<string, Shortcut[]> = {
   list: [
     { key: '↑↓', label: 'navigate', compactLabel: 'nav' },
-    { key: 'space', label: 'toggle when supported', compactLabel: 'toggle' },
-    { key: 'enter', label: 'detail' },
+    { key: 'enter', label: 'group detail', compactLabel: 'detail' },
     { key: '/', label: 'search' },
     { key: '?', label: 'help' },
     { key: 'tab', label: 'tabs' },
     { key: 'p', label: 'project' },
     { key: 's', label: 'settings' },
     { key: 'i', label: 'install' },
+    { key: 'u', label: 'updates' },
     { key: 'q', label: 'quit' },
   ],
   install: [
@@ -49,6 +49,7 @@ const DETAIL_BASE: Shortcut[] = [
   { key: 'esc', label: 'back' },
   { key: '?', label: 'help' },
   { key: 'tab', label: 'sections' },
+  { key: '←→', label: 'provider instance', compactLabel: 'provider' },
 ];
 
 const DETAIL_TAIL: Shortcut[] = [
@@ -57,7 +58,7 @@ const DETAIL_TAIL: Shortcut[] = [
 
 interface ShortcutContext {
   view: ViewType;
-  selectedSkill: Skill | null;
+  selectedSkill: SkillInventoryInstance | null;
   canToggle: boolean;
 }
 

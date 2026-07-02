@@ -57,16 +57,17 @@ export function normalizeSkillName(name: string): string {
   return name.trim().toLowerCase().replace(/[\s_]+/g, '-');
 }
 
-function strongIdentityFor(skill: Skill): { key: string; reason: string } | null {
+function strongIdentityFor(skill: Skill): { key: string; reason: string; confirmsSingleInstance: boolean } | null {
   const realPath = skill.resolvedPath ?? skill.path;
-  if (skill.resolvedPath) {
-    return { key: `realpath:${realPath}`, reason: 'shared real path' };
-  }
   if (skill.source?.type === 'skillssh' && (skill.source.skillFolderHash || skill.source.repo)) {
     return {
       key: `skillssh:${skill.source.skillFolderHash ?? skill.source.repo}`,
       reason: 'skills.sh provenance',
+      confirmsSingleInstance: true,
     };
+  }
+  if (skill.resolvedPath) {
+    return { key: `realpath:${realPath}`, reason: 'shared real path', confirmsSingleInstance: false };
   }
   return null;
 }
@@ -79,7 +80,7 @@ function inferredIdentityFor(skill: Skill): { key: string; confidence: SkillIden
   };
 }
 
-function actionsFor(skill: Skill): SkillAction[] {
+function actionsFor(skill: Skill, disableStrategy: DisableStrategy | undefined): SkillAction[] {
   const toggleState = skill.origin?.type === 'plugin' ? skill.origin.pluginEnabled : skill.enabled;
   const toggleAction: SkillAction = toggleState ? 'disable' : 'enable';
   if (skill.scope === 'project') return [];
@@ -87,10 +88,10 @@ function actionsFor(skill: Skill): SkillAction[] {
     return ['update', 'remove'];
   }
   if (skill.provider === 'global') return [];
-  return [toggleAction];
+  return disableStrategy ? [toggleAction] : [];
 }
 
-function healthSignalsFor(skill: Skill): HealthSignal[] {
+function healthSignalsFor(skill: Skill, options: BuildSkillInventoryOptions): HealthSignal[] {
   const signals: HealthSignal[] = (skill.scanIssues ?? []).map((issue) => ({
     code: issue.code,
     message: issue.message,
@@ -98,14 +99,19 @@ function healthSignalsFor(skill: Skill): HealthSignal[] {
   if (skill.provider === 'global' && skill.source?.type !== 'skillssh') {
     signals.push({ code: 'unmanaged-global-skill', message: 'Global Skill is not managed by skills.sh metadata' });
   }
+  if (options.hasUpdate?.(skill)) {
+    signals.push({ code: 'update-available', message: 'skills.sh update is available' });
+  }
   return signals;
 }
 
 export interface BuildSkillInventoryOptions {
   getDisableStrategy?: (skill: Skill) => DisableStrategy | undefined;
+  hasUpdate?: (skill: Skill) => boolean;
 }
 
 function toInstance(skill: Skill, options: BuildSkillInventoryOptions): SkillInventoryInstance {
+  const disableStrategy = options.getDisableStrategy?.(skill);
   return {
     name: skill.name,
     description: skill.description,
@@ -116,15 +122,15 @@ function toInstance(skill: Skill, options: BuildSkillInventoryOptions): SkillInv
     enabled: skill.enabled,
     origin: skill.origin,
     source: skill.source,
-    disableStrategy: options.getDisableStrategy?.(skill),
-    actions: actionsFor(skill),
-    healthSignals: healthSignalsFor(skill),
+    disableStrategy,
+    actions: actionsFor(skill, disableStrategy),
+    healthSignals: healthSignalsFor(skill, options),
   };
 }
 
 export function buildSkillInventory(skills: Skill[], options: BuildSkillInventoryOptions = {}): SkillGroup[] {
   const inventorySkills = skills.filter((s) => s.scope !== 'project');
-  const strongGroups = new Map<string, { reason: string; skills: Skill[] }>();
+  const strongGroups = new Map<string, { reason: string; confirmsSingleInstance: boolean; skills: Skill[] }>();
   for (const skill of inventorySkills) {
     const identity = strongIdentityFor(skill);
     if (!identity) continue;
@@ -132,14 +138,18 @@ export function buildSkillInventory(skills: Skill[], options: BuildSkillInventor
     if (existing) {
       existing.skills.push(skill);
     } else {
-      strongGroups.set(identity.key, { reason: identity.reason, skills: [skill] });
+      strongGroups.set(identity.key, {
+        reason: identity.reason,
+        confirmsSingleInstance: identity.confirmsSingleInstance,
+        skills: [skill],
+      });
     }
   }
 
   const assigned = new Set<Skill>();
   const groups = new Map<string, { identity: { confidence: SkillIdentityConfidence; reason: string }; skills: Skill[] }>();
   for (const [key, group] of strongGroups) {
-    if (group.skills.length < 2) continue;
+    if (group.skills.length < 2 && !group.confirmsSingleInstance) continue;
     for (const skill of group.skills) assigned.add(skill);
     groups.set(key, { identity: { confidence: 'confirmed', reason: group.reason }, skills: group.skills });
   }

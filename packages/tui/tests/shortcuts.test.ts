@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { getShortcutsForView } from '../src/lib/shortcuts.js';
-import type { Skill } from '@skillpack/core';
+import type { SkillInventoryInstance } from '@skillpack/core';
 
-function skill(provider: string): Skill {
+function skill(provider: string): SkillInventoryInstance {
   return {
     name: 'demo',
     description: '',
     provider,
     path: `/fake/${provider}/demo`,
     enabled: true,
-    scope: 'global',
-    metadata: {},
     source: { type: 'skillssh' },
+    actions: provider === 'global' ? ['update', 'remove'] : [],
+    healthSignals: [],
   };
 }
 
 describe('getShortcutsForView', () => {
-  it('does not show a list update shortcut', () => {
+  it('shows the manual Updates section shortcut in the list', () => {
     const shortcuts = getShortcutsForView({ view: 'list', selectedSkill: null, canToggle: false });
 
-    expect(shortcuts.map((shortcut) => shortcut.key)).not.toContain('u');
+    expect(shortcuts.map((shortcut) => shortcut.key)).toContain('u');
   });
 
   it('shows Detail update shortcut only for skills.sh-managed Global Skills', () => {

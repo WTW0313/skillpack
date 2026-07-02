@@ -22,6 +22,7 @@ export class SkillManager {
   private duplicateDetector = new DuplicateDetector();
   private skillsLock = new SkillsLockReader();
   private globalSkillsDir = path.join(os.homedir(), '.agents', 'skills');
+  private updateAvailability = new Map<string, UpdateInfo>();
 
   registerProvider(provider: ISkillProvider): void { this.providers.set(provider.id, provider); }
   registerSource(source: IInstallSource): void { this.sources.set(source.id, source); }
@@ -126,6 +127,7 @@ export class SkillManager {
   getInventory(): SkillGroup[] {
     return buildSkillInventory(this.skills, {
       getDisableStrategy: (skill) => this.providers.get(skill.provider)?.getDisableStrategy(skill),
+      hasUpdate: (skill) => this.updateAvailability.get(skillKey(skill))?.hasUpdate === true,
     });
   }
   getProjectSkills(): SkillInventoryInstance[] {
@@ -170,7 +172,7 @@ export class SkillManager {
     await provider.setEnabled(instance, targetEnabled);
   }
 
-  async uninstallSkill(skill: Skill): Promise<void> {
+  async uninstallSkill(skill: Pick<Skill, 'name' | 'provider' | 'source'>): Promise<void> {
     if (skill.provider === 'global' && skill.source?.type === 'skillssh') {
       const source = this.sources.get('skillssh') as import('./sources/skillssh.js').SkillsShSource | undefined;
       if (!source) throw new Error('skills.sh source not registered');
@@ -207,6 +209,7 @@ export class SkillManager {
 
     if (skillshSource?.checkUpdates) {
       updates.push(...await skillshSource.checkUpdates(skillshSkills));
+      this.rememberUpdateResults(skillshSkills, updates);
       return updates;
     }
 
@@ -214,19 +217,24 @@ export class SkillManager {
       const update = await this.checkSkillUpdate(skill);
       if (update) updates.push({ skill, update });
     }
+    this.rememberUpdateResults(skillshSkills, updates);
     return updates;
   }
 
-  async checkSkillUpdate(skill: Skill): Promise<UpdateInfo | null> {
+  async checkSkillUpdate(skill: Pick<Skill, 'name' | 'provider' | 'path' | 'source' | 'version'>): Promise<UpdateInfo | null> {
     if (!isSkillShManagedGlobalSkill(skill)) return null;
     for (const source of this.sources.values()) {
       const update = await source.checkUpdate(skill);
-      if (update?.hasUpdate) return update;
+      if (update?.hasUpdate) {
+        this.updateAvailability.set(skillKey(skill), update);
+        return update;
+      }
     }
+    this.updateAvailability.delete(skillKey(skill));
     return null;
   }
 
-  async updateSkill(skill: Skill): Promise<void> {
+  async updateSkill(skill: Pick<Skill, 'name' | 'provider' | 'path' | 'source'>): Promise<void> {
     if (!skill.source || skill.source.type === 'local') {
       throw new Error('Cannot update an unmanaged on-disk skill');
     }
@@ -238,6 +246,17 @@ export class SkillManager {
     const source = this.sources.get('skillssh') as import('./sources/skillssh.js').SkillsShSource | undefined;
     if (!source) throw new Error('skills.sh source not registered');
     await source.updateViaCli(skill.name);
+    this.updateAvailability.delete(skillKey(skill));
+  }
+
+  private rememberUpdateResults(
+    checkedSkills: Array<Pick<Skill, 'provider' | 'path'>>,
+    updates: Array<{ skill: Pick<Skill, 'provider' | 'path'>; update: UpdateInfo }>,
+  ): void {
+    for (const skill of checkedSkills) this.updateAvailability.delete(skillKey(skill));
+    for (const { skill, update } of updates) {
+      if (update.hasUpdate) this.updateAvailability.set(skillKey(skill), update);
+    }
   }
 
   private async collectScanPathDiagnostics(cwd?: string, projectSkillsDirs?: string[]): Promise<ScanPathDiagnostic[]> {
@@ -282,6 +301,10 @@ function resolveProjectSkillsPath(cwd: string, dir: string): string {
   return path.isAbsolute(dir) ? dir : path.join(cwd, dir);
 }
 
-function isSkillShManagedGlobalSkill(skill: Skill): boolean {
+function isSkillShManagedGlobalSkill(skill: Pick<Skill, 'provider' | 'source'>): boolean {
   return skill.provider === 'global' && skill.source?.type === 'skillssh';
+}
+
+function skillKey(skill: Pick<Skill, 'provider' | 'path'>): string {
+  return `${skill.provider}\0${skill.path}`;
 }
