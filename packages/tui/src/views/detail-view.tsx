@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode } from 'react';
+import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { execSync } from 'node:child_process';
@@ -7,7 +7,7 @@ import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { StatusBar } from '../components/status-bar.js';
 import { formatPluginToggleMessage, isPluginOwnedSkill } from '../lib/plugin-toggle.js';
-import { getDetailLayout, getGlyphSet, type DetailSectionId } from '../lib/responsive-layout.js';
+import { getDetailLayout, getGlyphSet, wrapTextLines, type DetailSectionId } from '../lib/responsive-layout.js';
 import type { UpdateInfo } from '@skillpack/core';
 
 function formatRelativeTime(iso: string): string {
@@ -40,7 +40,7 @@ export function DetailView() {
   const glyphs = getGlyphSet();
 
   const sourceType = selectedSkill?.source?.type;
-  const isUpdatable = sourceType === 'skillssh';
+  const isUpdatable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
   const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
   const canToggle = selectedSkill
     ? Boolean(manager.getProvider(selectedSkill.provider)?.getDisableStrategy(selectedSkill))
@@ -59,6 +59,11 @@ export function DetailView() {
     if (!selectedSkill?.description) return [];
     return selectedSkill.description.split('\n');
   }, [selectedSkill]);
+  const descriptionWidth = Math.max(1, columns - 4);
+  const wrappedDescLines = useMemo(
+    () => wrapTextLines(descLines, descriptionWidth),
+    [descLines, descriptionWidth],
+  );
 
   const detailLayout = getDetailLayout({
     size: { columns, rows },
@@ -90,6 +95,10 @@ export function DetailView() {
   const visibleDescRows = detailLayout.sectioned
     ? Math.max(1, detailLayout.visibleRows - 1)
     : fullVisibleDescRows;
+
+  useEffect(() => {
+    setDescScroll((s) => Math.min(s, Math.max(0, wrappedDescLines.length - visibleDescRows)));
+  }, [wrappedDescLines.length, visibleDescRows]);
 
   useInput((input, key) => {
     if (key.escape) { setView('list'); return; }
@@ -141,7 +150,7 @@ export function DetailView() {
       }
     }
     if (key.downArrow && (!detailLayout.sectioned || activeSection === 'description')) {
-      setDescScroll((s) => Math.min(s + 1, Math.max(0, descLines.length - visibleDescRows)));
+      setDescScroll((s) => Math.min(s + 1, Math.max(0, wrappedDescLines.length - visibleDescRows)));
     }
     if (key.upArrow && (!detailLayout.sectioned || activeSection === 'description')) {
       setDescScroll((s) => Math.max(0, s - 1));
@@ -223,8 +232,8 @@ export function DetailView() {
     );
   }
 
-  const visibleDesc = descLines.slice(descScroll, descScroll + visibleDescRows);
-  const descScrollable = descLines.length > visibleDescRows;
+  const visibleDesc = wrappedDescLines.slice(descScroll, descScroll + visibleDescRows);
+  const descScrollable = wrappedDescLines.length > visibleDescRows;
 
   if (detailLayout.sectioned) {
     const renderSection = (): ReactNode => {
@@ -304,10 +313,10 @@ export function DetailView() {
           ) : (
             <Box flexDirection="column">
               {descScrollable && (
-                <Text dimColor>{descScroll + 1}-{Math.min(descScroll + visibleDescRows, descLines.length)} of {descLines.length}</Text>
+                <Text dimColor>{descScroll + 1}-{Math.min(descScroll + visibleDescRows, wrappedDescLines.length)} of {wrappedDescLines.length}</Text>
               )}
               {visibleDesc.map((line, i) => (
-                <Text key={i} wrap="truncate">{line}</Text>
+                <Text key={i}>{line}</Text>
               ))}
             </Box>
           );
@@ -513,14 +522,14 @@ export function DetailView() {
             <Box gap={1}>
               <Text dimColor>description</Text>
               {descScroll > 0 && <Text>▲</Text>}
-              <Text dimColor>{descScroll + 1}–{Math.min(descScroll + visibleDescRows, descLines.length)} of {descLines.length}</Text>
-              {descScroll + visibleDescRows < descLines.length && <Text>▼</Text>}
+              <Text dimColor>{descScroll + 1}–{Math.min(descScroll + visibleDescRows, wrappedDescLines.length)} of {wrappedDescLines.length}</Text>
+              {descScroll + visibleDescRows < wrappedDescLines.length && <Text>▼</Text>}
             </Box>
           )}
           {!descScrollable && <Text dimColor>description</Text>}
           <Box flexDirection="column" marginTop={0}>
             {visibleDesc.map((line, i) => (
-              <Text key={i} wrap="truncate">{line}</Text>
+              <Text key={i}>{line}</Text>
             ))}
           </Box>
         </Box>

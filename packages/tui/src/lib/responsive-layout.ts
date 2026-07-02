@@ -37,6 +37,45 @@ export function fitCell(value: string, width: number): string {
   return `${value.slice(0, width - 1)}…`;
 }
 
+export function wrapTextLines(lines: string[], width: number): string[] {
+  if (width <= 0) return [];
+
+  const wrapped: string[] = [];
+  for (const line of lines) {
+    if (line.length === 0) {
+      wrapped.push('');
+      continue;
+    }
+
+    let current = '';
+    for (const word of line.trim().split(/\s+/)) {
+      if (word.length > width) {
+        if (current.length > 0) {
+          wrapped.push(current);
+          current = '';
+        }
+        for (let offset = 0; offset < word.length; offset += width) {
+          wrapped.push(word.slice(offset, offset + width));
+        }
+        continue;
+      }
+
+      if (current.length === 0) {
+        current = word;
+      } else if (current.length + 1 + word.length <= width) {
+        current = `${current} ${word}`;
+      } else {
+        wrapped.push(current);
+        current = word;
+      }
+    }
+
+    if (current.length > 0) wrapped.push(current);
+  }
+
+  return wrapped;
+}
+
 export function formatInventoryStatus(enabled: boolean, variant: 'full' | 'compact'): string {
   if (variant === 'compact') return fitCell(enabled ? 'on' : 'off', COMPACT_STATUS_WIDTH);
   return fitCell(enabled ? 'enabled' : 'disabled', FULL_STATUS_WIDTH);

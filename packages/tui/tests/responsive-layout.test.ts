@@ -11,6 +11,7 @@ import {
   getInventoryLayout,
   getTerminalMode,
   measureShortcutLine,
+  wrapTextLines,
 } from '../src/lib/responsive-layout.js';
 
 describe('getTerminalMode', () => {
@@ -28,6 +29,27 @@ describe('getGlyphSet', () => {
     expect(getGlyphSet(false).warning).toBe('⚠');
     expect(getGlyphSet(true).selected).toBe('>');
     expect(getGlyphSet(true).warning).toBe('!');
+  });
+});
+
+describe('wrapTextLines', () => {
+  it('wraps long description lines into visual rows', () => {
+    expect(wrapTextLines(['alpha beta gamma delta'], 12)).toEqual([
+      'alpha beta',
+      'gamma delta',
+    ]);
+  });
+
+  it('splits words longer than the available width', () => {
+    expect(wrapTextLines(['supercalifragilistic'], 8)).toEqual([
+      'supercal',
+      'ifragili',
+      'stic',
+    ]);
+  });
+
+  it('preserves explicit blank description lines', () => {
+    expect(wrapTextLines(['first', '', 'second'], 20)).toEqual(['first', '', 'second']);
   });
 });
 
