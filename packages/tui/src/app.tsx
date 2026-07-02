@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useApp } from 'ink';
 import { useInput } from 'ink';
 import { Spinner } from '@inkjs/ui';
 import { AppProvider, useAppContext } from './context/app-context.js';
@@ -44,6 +44,24 @@ function AppFrame() {
   return helpOpen ? <HelpOverlay onClose={() => setHelpOpen(false)} /> : <Router />;
 }
 
+function TooSmallTerminalView({ rows }: { rows: number }) {
+  const { exit } = useApp();
+
+  useInput((input) => {
+    if (input === 'q') exit();
+  });
+
+  return (
+    <Box flexDirection="column" height={rows} paddingX={1}>
+      <Text bold>skillpack</Text>
+      <Text dimColor>Terminal too small</Text>
+      <Text dimColor>Resize to at least 60x18.</Text>
+      <Box flexGrow={1} />
+      <Text dimColor>q quit</Text>
+    </Box>
+  );
+}
+
 export interface AppSurfaceProps {
   manager: SkillManager | null;
   config: SkillpackConfig | null;
@@ -72,15 +90,7 @@ function AppSurfaceContent({ manager, config, error }: Omit<AppSurfaceProps, 'te
   }
 
   if (terminalMode === 'too-small') {
-    return (
-      <Box flexDirection="column" height={rows} paddingX={1}>
-        <Text bold>skillpack</Text>
-        <Text dimColor>Terminal too small</Text>
-        <Text dimColor>Resize to at least 60x18.</Text>
-        <Box flexGrow={1} />
-        <Text dimColor>q quit</Text>
-      </Box>
-    );
+    return <TooSmallTerminalView rows={rows} />;
   }
 
   return (

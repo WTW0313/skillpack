@@ -94,6 +94,15 @@ describe.sequential('Terminal UI Tests', () => {
     expect(frame).toMatchSnapshot();
   });
 
+  it('keeps the too-small terminal state interactive until the user quits', async () => {
+    const app = renderApp({ terminalSize: { columns: 59, rows: 18 } });
+    await waitForFrame(app, (output) => output.includes('Terminal too small'));
+
+    app.stdin.write('q');
+
+    await waitForFrame(app, (output) => output === '');
+  });
+
   it('calls the toggle mutation from detail without running a real provider mutation', async () => {
     const manager = createMockManager();
     const app = renderApp({ manager });
