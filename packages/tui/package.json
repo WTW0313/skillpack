@@ -1,6 +1,6 @@
 {
   "name": "skillpack-tui",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Unified TUI manager for agent skills across Codex, Claude, and Global",
   "type": "module",
   "bin": {
