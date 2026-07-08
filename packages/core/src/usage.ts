@@ -50,6 +50,19 @@ export interface ProviderSkillRankingRow {
   historical: boolean;
 }
 
+export interface ProviderSkillDailyUsage {
+  date: string;
+  rows: ProviderSkillUsageRow[];
+}
+
+export interface ProviderSkillUsageRow {
+  skillName: string;
+  countedInvocations: number;
+  failedInvocations: number;
+  lastInvokedAt?: string;
+  historical: boolean;
+}
+
 export interface UsageImportDiagnostic {
   provider: string;
   message: string;
@@ -116,6 +129,7 @@ export interface ProviderSkillUsageOverview {
   displayName: string;
   coverageState: UsageCoverageState;
   heatmap: SkillUsageHeatmapCell[];
+  dailySkillUsage: ProviderSkillDailyUsage[];
   ranking: ProviderSkillRankingRow[];
   diagnostics: UsageImportDiagnostic[];
 }
@@ -226,18 +240,21 @@ export class SkillUsageManager {
             displayName: provider.displayName,
             coverageState: coverageStateFor(provider, 0),
             heatmap: [],
+            dailySkillUsage: [],
             ranking: [],
             diagnostics: this.latestDiagnostics.get(provider.provider) ?? [],
           };
         }
         const records = await this.readProviderRecords(provider.provider, range);
         const heatmap = buildHeatmap(records, range);
+        const dailySkillUsage = buildDailySkillUsage(records, range, input.currentSkills);
         const ranking = buildRanking(records, input.currentSkills);
         return {
           provider: provider.provider,
           displayName: provider.displayName,
           coverageState: coverageStateFor(provider, records.length),
           heatmap,
+          dailySkillUsage,
           ranking,
           diagnostics: this.latestDiagnostics.get(provider.provider) ?? [],
         };
@@ -675,27 +692,74 @@ function buildRanking(
   records: SkillInvocationRecord[],
   currentSkills: CurrentSkillReference[] | undefined,
 ): ProviderSkillRankingRow[] {
-  const rows = new Map<string, ProviderSkillRankingRow>();
+  const rows = new Map<string, ProviderSkillUsageRow>();
   for (const record of records) {
-    const row = rows.get(record.skillName) ?? {
-      skillName: record.skillName,
-      countedInvocations: 0,
-      failedInvocations: 0,
-      historical: currentSkills !== undefined,
-    };
-    if (record.status === 'failed') {
-      row.failedInvocations += 1;
-    } else {
-      row.countedInvocations += 1;
-    }
-    if (!row.lastInvokedAt || record.startedAt > row.lastInvokedAt) row.lastInvokedAt = record.startedAt;
-    if (!isHistoricalSkill(record, currentSkills)) row.historical = false;
+    const row = rows.get(record.skillName) ?? createUsageRow(record.skillName, currentSkills);
+    addRecordToUsageRow(row, record, currentSkills);
     rows.set(record.skillName, row);
   }
 
-  return [...rows.values()].sort((a, b) => (
-    b.countedInvocations - a.countedInvocations || a.skillName.localeCompare(b.skillName)
-  )).slice(0, 10);
+  return [...rows.values()].sort(compareUsageRows).slice(0, 10);
+}
+
+function buildDailySkillUsage(
+  records: SkillInvocationRecord[],
+  range: SkillUsageRange,
+  currentSkills: CurrentSkillReference[] | undefined,
+): ProviderSkillDailyUsage[] {
+  const byDate = new Map<string, Map<string, ProviderSkillUsageRow>>();
+  for (const date of datesInRange(range)) byDate.set(date, new Map());
+
+  for (const record of records) {
+    const date = record.startedAt.slice(0, 10);
+    const rows = byDate.get(date) ?? new Map<string, ProviderSkillUsageRow>();
+    const row = rows.get(record.skillName) ?? createUsageRow(record.skillName, currentSkills);
+    addRecordToUsageRow(row, record, currentSkills);
+    rows.set(record.skillName, row);
+    byDate.set(date, rows);
+  }
+
+  return [...byDate.entries()].map(([date, rows]) => ({
+    date,
+    rows: [...rows.values()].sort(compareUsageRows),
+  })).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function createUsageRow(skillName: string, currentSkills: CurrentSkillReference[] | undefined): ProviderSkillUsageRow {
+  return {
+    skillName,
+    countedInvocations: 0,
+    failedInvocations: 0,
+    historical: currentSkills !== undefined,
+  };
+}
+
+function addRecordToUsageRow(
+  row: ProviderSkillUsageRow,
+  record: SkillInvocationRecord,
+  currentSkills: CurrentSkillReference[] | undefined,
+): void {
+  if (record.status === 'failed') {
+    row.failedInvocations += 1;
+  } else {
+    row.countedInvocations += 1;
+  }
+  if (!row.lastInvokedAt || record.startedAt > row.lastInvokedAt) row.lastInvokedAt = record.startedAt;
+  if (!isHistoricalSkill(record, currentSkills)) row.historical = false;
+}
+
+function compareUsageRows(a: ProviderSkillUsageRow, b: ProviderSkillUsageRow): number {
+  return b.countedInvocations - a.countedInvocations
+    || b.failedInvocations - a.failedInvocations
+    || compareOptionalTimestampDesc(a.lastInvokedAt, b.lastInvokedAt)
+    || a.skillName.localeCompare(b.skillName);
+}
+
+function compareOptionalTimestampDesc(left: string | undefined, right: string | undefined): number {
+  if (left === right) return 0;
+  if (left === undefined) return 1;
+  if (right === undefined) return -1;
+  return right.localeCompare(left);
 }
 
 function isHistoricalSkill(

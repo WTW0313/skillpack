@@ -92,12 +92,16 @@ _Avoid_: Skill Inventory, Skill Availability, inventory status, session history,
 A Skill Usage aggregate that ranks skills within a Skill Provider by exact Counted Invocation count, with failed invocation count and recency as supporting context.
 _Avoid_: Global leaderboard, inventory order
 
+**Selected-Day Usage Detail**:
+The Skill Usage detail for one selected heatmap day, scoped to one Session-Producing Provider and grouped by skill with exact Counted Invocation and failure context for that day.
+_Avoid_: Session transcript, raw invocation history, provider-wide total
+
 **Skill Usage Heatmap**:
-A Skill Usage aggregate that shows exact Counted Invocation volume over time. The overview heatmap compares Skill Providers by day using one scale across the selected range, while provider drilldowns can compare skills by day within one provider.
+A Skill Usage aggregate that shows Counted Invocation volume over time using colored block intensity, with exact counts exposed through Selected-Day Usage Detail. The overview heatmap compares Skill Providers by day using one scale across the selected range, while provider drilldowns can compare skills by day within one provider.
 _Avoid_: Inventory status grid, provider availability matrix
 
 **Skill Usage View**:
-The top-level TUI workflow for Skill Usage, combining a provider-by-day heatmap with Provider Skill Ranking for the selected Skill Provider and time range.
+The top-level TUI workflow for Skill Usage, combining provider selection, a provider/day heatmap, Selected-Day Usage Detail, and Provider Skill Ranking for the selected Skill Provider and time range.
 _Avoid_: Skill Inventory tab, update view, session browser
 
 **Skill Usage Import**:

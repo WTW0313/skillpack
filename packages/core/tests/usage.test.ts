@@ -42,6 +42,7 @@ describe('SkillUsageManager', () => {
           displayName: 'Codex',
           coverageState: 'unsupported',
           heatmap: [],
+          dailySkillUsage: [],
           ranking: [],
           diagnostics: [],
         }],
@@ -130,11 +131,11 @@ describe('SkillUsageManager', () => {
       });
       expect(sevenDayOverview.providers[0].ranking).toMatchObject([
         { skillName: 'browser:control-in-app-browser', countedInvocations: 1 },
-        { skillName: 'frontend-testing', countedInvocations: 1 },
         { skillName: 'github:github', countedInvocations: 1 },
         { skillName: 'openai-docs', countedInvocations: 1 },
         { skillName: 'other-project-only', countedInvocations: 1 },
         { skillName: 'vercel-react-best-practices', countedInvocations: 1 },
+        { skillName: 'frontend-testing', countedInvocations: 1 },
       ]);
 
       const thirtyDayOverview = await usage.getOverview({
@@ -202,6 +203,79 @@ describe('SkillUsageManager', () => {
           ],
         }],
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns per-day skill usage details and fixed ranking order', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const usageRoot = path.join(root, 'usage');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-07T08:00:00Z'),
+        taskStarted('turn-beta-1', '2026-07-07T08:00:01Z'),
+        turnContext('turn-beta-1', projectRoot, '2026-07-07T08:00:02Z'),
+        functionCall('call-beta-1', 'cat /Users/twwu/.agents/skills/skill-beta/SKILL.md', '2026-07-07T08:01:00Z'),
+        functionOutput('call-beta-1', 0, '2026-07-07T08:01:01Z'),
+        taskStarted('turn-alpha-success', '2026-07-07T09:00:01Z'),
+        turnContext('turn-alpha-success', projectRoot, '2026-07-07T09:00:02Z'),
+        functionCall('call-alpha-success', 'cat /Users/twwu/.agents/skills/skill-alpha/SKILL.md', '2026-07-07T09:01:00Z'),
+        functionOutput('call-alpha-success', 0, '2026-07-07T09:01:01Z'),
+        taskStarted('turn-zeta', '2026-07-07T10:00:01Z'),
+        turnContext('turn-zeta', projectRoot, '2026-07-07T10:00:02Z'),
+        functionCall('call-zeta', 'cat /Users/twwu/.agents/skills/skill-zeta/SKILL.md', '2026-07-07T10:01:00Z'),
+        functionOutput('call-zeta', 0, '2026-07-07T10:01:01Z'),
+        taskStarted('turn-alpha-failed', '2026-07-07T11:00:01Z'),
+        turnContext('turn-alpha-failed', projectRoot, '2026-07-07T11:00:02Z'),
+        functionCall('call-alpha-failed', 'cat /Users/twwu/.agents/skills/skill-alpha/SKILL.md', '2026-07-07T11:01:00Z'),
+        functionOutput('call-alpha-failed', 1, '2026-07-07T11:01:01Z'),
+        taskStarted('turn-beta-2', '2026-07-07T12:00:01Z'),
+        turnContext('turn-beta-2', projectRoot, '2026-07-07T12:00:02Z'),
+        functionCall('call-beta-2', 'cat /Users/twwu/.agents/skills/skill-beta/SKILL.md', '2026-07-07T12:01:00Z'),
+        functionOutput('call-beta-2', 0, '2026-07-07T12:01:01Z'),
+      ]));
+      const currentSkills = [{
+        provider: 'global',
+        name: 'skill-beta',
+        path: '/Users/twwu/.agents/skills/skill-beta',
+        resolvedPath: '/Users/twwu/.agents/skills/skill-beta',
+      }];
+      const usage = new SkillUsageManager({
+        dataDir: usageRoot,
+        now: new Date('2026-07-08T12:00:00Z'),
+        providers: [
+          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
+        ],
+      });
+
+      await usage.importProvider('codex', currentSkills);
+
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-08T12:00:00Z'),
+        currentSkills,
+      });
+      const provider = overview.providers[0];
+
+      expect(provider.ranking.map((row) => ({
+        skillName: row.skillName,
+        countedInvocations: row.countedInvocations,
+        failedInvocations: row.failedInvocations,
+        historical: row.historical,
+      }))).toEqual([
+        { skillName: 'skill-beta', countedInvocations: 2, failedInvocations: 0, historical: false },
+        { skillName: 'skill-alpha', countedInvocations: 1, failedInvocations: 1, historical: true },
+        { skillName: 'skill-zeta', countedInvocations: 1, failedInvocations: 0, historical: true },
+      ]);
+      expect(provider.dailySkillUsage.find((day) => day.date === '2026-07-07')?.rows).toEqual([
+        { skillName: 'skill-beta', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-07T12:01:00Z', historical: false },
+        { skillName: 'skill-alpha', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-07T11:01:00Z', historical: true },
+        { skillName: 'skill-zeta', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:01:00Z', historical: true },
+      ]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -294,16 +368,16 @@ describe('SkillUsageManager', () => {
         now: new Date('2026-07-08T12:00:00Z'),
       });
       expect(overview.providers[0].ranking.map((row) => row.skillName)).toEqual([
-        'skill-00',
-        'skill-01',
-        'skill-02',
-        'skill-03',
-        'skill-04',
-        'skill-05',
-        'skill-06',
-        'skill-07',
-        'skill-08',
+        'skill-10',
         'skill-09',
+        'skill-08',
+        'skill-07',
+        'skill-06',
+        'skill-05',
+        'skill-04',
+        'skill-03',
+        'skill-02',
+        'skill-01',
       ]);
     } finally {
       await rm(root, { recursive: true, force: true });

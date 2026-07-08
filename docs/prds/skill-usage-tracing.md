@@ -25,8 +25,8 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 7. As a Skillpack user, I want Skillpack to persist only minimal invocation facts, so that prompts, responses, tool arguments, file contents, and transcripts are not copied.
 8. As a Skillpack user, I want failed invocations recorded but excluded from default rankings, so that broken skills do not look popular.
 9. As a Skillpack user, I want failure counts shown as separate context, so that I can notice repeated failed usage without confusing it with normal activity.
-10. As a Skillpack user, I want heatmap cells to show exact counts or capped labels, so that usage remains understandable without color.
-11. As a Skillpack user, I want the selected heatmap cell to show its exact provider, date, and count, so that compact cells are still inspectable.
+10. As a Skillpack user, I want heatmap cells to use clear colored activity blocks, so that usage patterns remain quickly scannable.
+11. As a Skillpack user, I want the selected heatmap cell detail to show its exact provider, date, and count, so that compact cells remain inspectable without permanent count labels.
 12. As a Skillpack user, I want the default usage window to be 7 days, so that the first view reflects recent runtime behavior.
 13. As a Skillpack user, I want the Provider Skill Ranking capped to the top 10 skills, so that the output stays focused and scannable.
 14. As a Skillpack user, I want Project Skills included when they are invoked, so that repository-owned skills are not omitted from usage analysis.
@@ -81,9 +81,35 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 - Skill Usage Records are retained until Skill Usage Reset.
 - Skill Usage Reset deletes Skillpack's derived Skill Usage Log and Usage Import Cursors only.
 - The TUI gets a top-level Skill Usage View reachable with `g`.
-- The Skill Usage View combines a provider-by-day heatmap with Provider Skill Ranking for the selected provider and range.
-- The heatmap uses fixed-width cells with readable count labels plus optional color or glyph intensity.
-- The selected heatmap cell shows exact date, provider, and count.
+- The Skill Usage View uses provider tabs to switch the selected Session-Producing Provider.
+- Unsupported and not-configured provider tabs remain selectable, but they show an explanatory empty state instead of fabricated heatmap or table data.
+- The Skill Usage View combines a GitHub-style provider/day heatmap, selected-day usage detail, and an always-present Provider Skill Ranking table.
+- The Usage view uses `tab` and `shift+tab` to switch providers, `1`/`2`/`3` to select the 7/30/90 day ranges, up/down arrows to move the selected heatmap day by one day, and left/right arrows to move by one week.
+- Heatmap navigation does not wrap at range boundaries.
+- When week navigation targets a date that is not present in the heatmap, Skillpack selects the nearest available date in the target week instead of leaving selection unchanged.
+- Switching provider or range selects the latest day in the selected range.
+- The latest day remains selected by default even when it has zero invocations; Skillpack does not auto-jump to the most recent active day.
+- When the Usage view scrolls, page up/page down move the viewport and home/end jump to the top or bottom.
+- The Usage view does not introduce a focus mode in v1; keyboard navigation always controls provider/range/day selection unless using page-scroll keys.
+- Provider tabs appear at the top of the Usage view, followed by a range segmented control for 7d, 30d, and 90d.
+- Usage view keyboard shortcuts are surfaced in the StatusBar rather than repeated inside the main content.
+- The bottom Provider Skill Ranking table is not row-selectable and does not support alternate sorting in v1.
+- The bottom Provider Skill Ranking table sorts by Counted Invocation count descending, failed invocation count descending, last-used timestamp descending, then skill name ascending.
+- The bottom Provider Skill Ranking table columns are Skill, Counted, Failed, Last Used, and Status.
+- The heatmap uses fixed-width colored block cells to show relative Counted Invocation volume across the selected provider and range; exact counts are shown in Selected-Day Usage Detail instead of permanent cell labels.
+- Heatmap color intensity is normalized within the selected provider and selected range, using that view's maximum single-day Counted Invocation count.
+- Failed invocations do not contribute to heatmap color intensity; they are shown in Selected-Day Usage Detail and Provider Skill Ranking context.
+- The heatmap shows month labels and does not show weekday labels.
+- The heatmap uses a GitHub-style calendar layout with weeks as columns and days aligned by weekday rows.
+- The heatmap uses a high-contrast colored palette for activity levels; zero-count cells should be visually quiet but not rendered as a grayscale intensity ramp.
+- The selected heatmap cell shows exact date, provider, Counted Invocation count, failed invocation count, and per-skill aggregate usage for that day.
+- Selected-Day Usage Detail is grouped by skill and does not expose session-level or turn-level raw invocation history.
+- Selected-Day Usage Detail appears to the right of the heatmap on wide terminals and below the heatmap on narrower terminals.
+- Selected-Day Usage Detail columns are Skill, Counted, Failed, and Status, where Status distinguishes current and historical skills.
+- Selected-Day Usage Detail should show all skills used on the selected day whenever possible.
+- When Selected-Day Usage Detail or the bottom Provider Skill Ranking table cannot fit in the terminal, the Usage view becomes scrollable instead of truncating those aggregates.
+- The bottom Provider Skill Ranking table is scoped to the selected provider and selected range; Skill Usage does not show a cross-provider total table in v1.
+- The bottom Provider Skill Ranking table remains capped to the top 10 skills even when the Usage view is scrollable.
 - The default time range is 7 days.
 - Raw invocation history and export are out of scope for v1.
 

@@ -229,7 +229,7 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('y');
 
-    await waitForFrame(app, (output) => output.includes('Usage coverage') && output.includes('Codex [unsupported]'));
+    await waitForFrame(app, (output) => output.includes('Providers') && output.includes('[Codex unsupported]'));
     expect(persistedConsent).toBe(true);
   });
 
@@ -243,6 +243,7 @@ describe.sequential('Terminal UI Tests', () => {
             displayName: 'Codex',
             coverageState: 'zero',
             heatmap: [],
+            dailySkillUsage: [],
             ranking: [],
             diagnostics: [],
           },
@@ -251,6 +252,7 @@ describe.sequential('Terminal UI Tests', () => {
             displayName: 'Claude',
             coverageState: 'unsupported',
             heatmap: [],
+            dailySkillUsage: [],
             ranking: [],
             diagnostics: [],
           },
@@ -260,14 +262,117 @@ describe.sequential('Terminal UI Tests', () => {
     const app = renderApp({
       manager,
       config: testConfig({ usage: { importConsent: true } }),
+      terminalSize: { columns: 120, rows: 40 },
     });
     await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
 
     app.stdin.write('g');
 
-    await waitForFrame(app, (output) => output.includes('Codex [zero]') && output.includes('Claude [unsupported]'));
+    await waitForFrame(app, (output) => output.includes('[Codex zero]') && output.includes('Claude unsupported'));
     expect(manager.importSkillUsage).toHaveBeenCalledTimes(1);
     expect(manager.getSkillUsageOverview).toHaveBeenCalledWith({ rangeDays: 7 });
+  });
+
+  it('renders the redesigned Skill Usage layout and keyboard model', async () => {
+    const manager = createMockManager();
+    manager.getSkillUsageOverview.mockImplementation(async ({ rangeDays }) => ({
+      range: { days: rangeDays, from: rangeDays === 30 ? '2026-06-09' : '2026-07-02', to: '2026-07-08' },
+      providers: [
+        {
+          provider: 'codex',
+          displayName: 'Codex',
+          coverageState: 'active',
+          heatmap: [
+            { date: '2026-07-02', countedInvocations: 0, failedInvocations: 0 },
+            { date: '2026-07-03', countedInvocations: 1, failedInvocations: 0 },
+            { date: '2026-07-04', countedInvocations: 0, failedInvocations: 0 },
+            { date: '2026-07-05', countedInvocations: 4, failedInvocations: 0 },
+            { date: '2026-07-06', countedInvocations: 2, failedInvocations: 0 },
+            { date: '2026-07-07', countedInvocations: 1, failedInvocations: 0 },
+            { date: '2026-07-08', countedInvocations: 3, failedInvocations: 1 },
+          ],
+          dailySkillUsage: [
+            {
+              date: '2026-07-07',
+              rows: [
+                { skillName: 'openai-docs', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z', historical: false },
+              ],
+            },
+            {
+              date: '2026-07-08',
+              rows: [
+                { skillName: 'frontend-testing', countedInvocations: 2, failedInvocations: 1, lastInvokedAt: '2026-07-08T11:00:00Z', historical: false },
+                { skillName: 'github:github', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-08T10:00:00Z', historical: false },
+              ],
+            },
+          ],
+          ranking: [
+            { skillName: 'frontend-testing', countedInvocations: 5, failedInvocations: 1, lastInvokedAt: '2026-07-08T11:00:00Z', historical: false },
+            { skillName: 'github:github', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-08T10:00:00Z', historical: false },
+          ],
+          diagnostics: [],
+        },
+        {
+          provider: 'claude',
+          displayName: 'Claude',
+          coverageState: 'unsupported',
+          heatmap: [],
+          dailySkillUsage: [],
+          ranking: [],
+          diagnostics: [],
+        },
+      ],
+    }));
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+      terminalSize: { columns: 120, rows: 40 },
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+
+    await waitForFrame(app, (output) => (
+      output.includes('Providers')
+      && output.includes('[Codex]')
+      && output.includes('Claude unsupported')
+      && output.includes('Range')
+      && output.includes('[7d]')
+      && output.includes('Usage heatmap')
+      && output.includes('Jul')
+      && output.includes('[■]')
+      && !output.includes('[3]')
+      && output.includes('2026-07-08 · Codex')
+      && output.includes('Counted 3 · Failed 1')
+      && output.includes('Selected day')
+      && output.includes('frontend-testing')
+      && output.includes('github:github')
+      && output.includes('Provider Skill Ranking')
+      && output.includes('Last Used')
+    ));
+
+    app.stdin.write(keypress.up);
+    await waitForFrame(app, (output) => output.includes('2026-07-07 · Codex') && output.includes('openai-docs'));
+
+    app.stdin.write(keypress.down);
+    await waitForFrame(app, (output) => output.includes('2026-07-08 · Codex') && output.includes('frontend-testing'));
+
+    app.stdin.write(keypress.left);
+    await waitForFrame(app, (output) => output.includes('2026-07-02 · Codex') && output.includes('No skill usage on this day.'));
+
+    app.stdin.write(keypress.right);
+    await waitForFrame(app, (output) => output.includes('2026-07-08 · Codex') && output.includes('frontend-testing'));
+
+    app.stdin.write('2');
+    await waitForFrame(app, (output) => output.includes('[30d]'));
+    expect(manager.getSkillUsageOverview).toHaveBeenLastCalledWith({ rangeDays: 30 });
+
+    app.stdin.write(keypress.tab);
+    await waitForFrame(app, (output) => (
+      output.includes('[Claude unsupported]')
+      && output.includes('Usage import is not supported for Claude yet.')
+      && output.includes('No usage records for this provider and range.')
+    ));
   });
 
   it('shows Skill Usage heatmap counts and Provider Skill Ranking', async () => {
@@ -282,6 +387,20 @@ describe.sequential('Terminal UI Tests', () => {
             { date: '2026-07-06', countedInvocations: 2, failedInvocations: 0 },
             { date: '2026-07-07', countedInvocations: 1, failedInvocations: 0 },
           ],
+          dailySkillUsage: [
+            {
+              date: '2026-07-06',
+              rows: [
+                { skillName: 'tdd', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z', historical: false },
+              ],
+            },
+            {
+              date: '2026-07-07',
+              rows: [
+                { skillName: 'grilling', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z', historical: false },
+              ],
+            },
+          ],
           ranking: [
             { skillName: 'tdd', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z', historical: false },
             { skillName: 'grilling', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z', historical: false },
@@ -293,32 +412,44 @@ describe.sequential('Terminal UI Tests', () => {
     const app = renderApp({
       manager,
       config: testConfig({ usage: { importConsent: true } }),
+      terminalSize: { columns: 120, rows: 40 },
     });
     await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
 
     app.stdin.write('g');
 
     await waitForFrame(app, (output) => (
-      output.includes('[  2]')
-      && output.includes('2026-07-06 Codex counted 2')
-      && output.includes('tdd -> 2')
-      && output.includes('grilling -> 1')
+      output.includes('Usage heatmap')
+      && output.includes('2026-07-07 · Codex')
+      && output.includes('Counted 1 · Failed 0')
+      && output.includes('Provider Skill Ranking')
+      && output.includes('Last Used')
+      && output.includes('tdd')
+      && output.includes('grilling')
     ));
 
-    app.stdin.write(keypress.right);
-    await waitForFrame(app, (output) => output.includes('2026-07-07 Codex counted 1'));
+    app.stdin.write(keypress.up);
+    await waitForFrame(app, (output) => output.includes('2026-07-06 · Codex') && output.includes('Counted 2 · Failed 0'));
   });
 
   it('shows failure context, Historical Skills, and Usage Import Diagnostics', async () => {
     const manager = createMockManager({
       usageOverview: {
-        range: { days: 30, from: '2026-06-08', to: '2026-07-07' },
+        range: { days: 7, from: '2026-06-30', to: '2026-07-06' },
         providers: [{
           provider: 'codex',
           displayName: 'Codex',
           coverageState: 'active',
           heatmap: [
             { date: '2026-07-06', countedInvocations: 1, failedInvocations: 1 },
+          ],
+          dailySkillUsage: [
+            {
+              date: '2026-07-06',
+              rows: [
+                { skillName: 'deleted-skill', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z', historical: true },
+              ],
+            },
           ],
           ranking: [
             { skillName: 'deleted-skill', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z', historical: true },
@@ -332,15 +463,17 @@ describe.sequential('Terminal UI Tests', () => {
     const app = renderApp({
       manager,
       config: testConfig({ usage: { importConsent: true } }),
+      terminalSize: { columns: 120, rows: 40 },
     });
     await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
 
     app.stdin.write('g');
 
     await waitForFrame(app, (output) => (
-      output.includes('[ !1]')
-      && output.includes('2026-07-06 Codex counted 1 failed 1')
-      && output.includes('deleted-skill -> 1 failed 1 historical')
+      output.includes('2026-07-06 · Codex')
+      && output.includes('Counted 1 · Failed 1')
+      && output.includes('deleted-skill')
+      && output.includes('historical')
       && output.includes('Skipped ambiguous skill invocation evidence')
     ));
   });
@@ -355,6 +488,7 @@ describe.sequential('Terminal UI Tests', () => {
             displayName: 'Codex',
             coverageState: 'zero',
             heatmap: [],
+            dailySkillUsage: [],
             ranking: [],
             diagnostics: [],
           },
@@ -364,6 +498,14 @@ describe.sequential('Terminal UI Tests', () => {
             coverageState: 'active',
             heatmap: [
               { date: '2026-07-07', countedInvocations: 3, failedInvocations: 0 },
+            ],
+            dailySkillUsage: [
+              {
+                date: '2026-07-07',
+                rows: [
+                  { skillName: 'claude-skill', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z', historical: false },
+                ],
+              },
             ],
             ranking: [
               { skillName: 'claude-skill', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z', historical: false },
@@ -380,14 +522,14 @@ describe.sequential('Terminal UI Tests', () => {
     await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
 
     app.stdin.write('g');
-    await waitForFrame(app, (output) => output.includes('> Codex [zero]') && output.includes('  Claude [active]'));
+    await waitForFrame(app, (output) => output.includes('[Codex zero]') && output.includes('Claude'));
 
-    app.stdin.write(keypress.down);
+    app.stdin.write(keypress.tab);
 
     await waitForFrame(app, (output) => (
-      output.includes('  Codex [zero]')
-      && output.includes('> Claude [active]')
-      && output.includes('claude-skill -> 3')
+      output.includes('Codex zero')
+      && output.includes('[Claude]')
+      && output.includes('claude-skill')
     ));
   });
 
@@ -400,6 +542,7 @@ describe.sequential('Terminal UI Tests', () => {
         displayName: 'Codex',
         coverageState: 'zero',
         heatmap: [],
+        dailySkillUsage: [],
         ranking: [],
         diagnostics: [],
       }],
@@ -413,9 +556,9 @@ describe.sequential('Terminal UI Tests', () => {
     app.stdin.write('g');
     await waitForFrame(app, (output) => output.includes('Skill Usage') && output.includes('7 days'));
 
-    app.stdin.write(keypress.tab);
+    app.stdin.write('2');
 
-    await waitForFrame(app, (output) => output.includes('Skill Usage') && output.includes('30 days'));
+    await waitForFrame(app, (output) => output.includes('Skill Usage') && output.includes('30 days') && output.includes('[30d]'));
     expect(manager.getSkillUsageOverview).toHaveBeenCalledWith({ rangeDays: 30 });
   });
 
@@ -428,7 +571,7 @@ describe.sequential('Terminal UI Tests', () => {
     await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
 
     app.stdin.write('g');
-    await waitForFrame(app, (output) => output.includes('Usage coverage'));
+    await waitForFrame(app, (output) => output.includes('Providers'));
 
     app.stdin.write('r');
     await waitForFrame(app, () => manager.importSkillUsage.mock.calls.length === 2);
@@ -445,10 +588,14 @@ describe.sequential('Terminal UI Tests', () => {
     await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
 
     app.stdin.write('g');
-    await waitForFrame(app, (output) => output.includes('Usage coverage'));
+    await waitForFrame(app, (output) => output.includes('Providers'));
 
     app.stdin.write('x');
     await waitForFrame(app, (output) => output.includes('Reset Skill Usage data?'));
+
+    app.stdin.write('q');
+    await waitForFrame(app, (output) => output.includes('Reset Skill Usage data?'));
+    expect(manager.resetSkillUsage).not.toHaveBeenCalled();
 
     app.stdin.write('y');
     await waitForFrame(app, () => manager.resetSkillUsage.mock.calls.length === 1);

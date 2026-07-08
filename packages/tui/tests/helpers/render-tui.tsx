@@ -32,6 +32,11 @@ export const keypress = {
   left: '\x1B[D',
   right: '\x1B[C',
   tab: '\t',
+  shiftTab: '\x1B[Z',
+  pageDown: '\x1B[6~',
+  pageUp: '\x1B[5~',
+  home: '\x1B[H',
+  end: '\x1B[F',
 };
 
 export function stripAnsi(value: string): string {
