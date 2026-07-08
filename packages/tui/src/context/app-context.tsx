@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type {
   SkillManager,
   Skill,
@@ -9,7 +9,7 @@ import type {
   ScanPathDiagnostic,
 } from '@skillpack/core';
 
-export type ViewType = 'list' | 'detail' | 'install' | 'project' | 'settings' | 'updates';
+export type ViewType = 'list' | 'detail' | 'install' | 'project' | 'settings' | 'updates' | 'usage';
 
 interface AppState {
   manager: SkillManager;
@@ -25,6 +25,9 @@ interface AppState {
   selectedSkill: SkillInventoryInstance | null;
   searchQuery: string;
   loading: boolean;
+  usageImporting: boolean;
+  usageImportError: string | null;
+  usageImportRevision: number;
 }
 
 interface AppContextValue extends AppState {
@@ -34,6 +37,8 @@ interface AppContextValue extends AppState {
   setSelectedSkill: (skill: SkillInventoryInstance | null) => void;
   setSearchQuery: (query: string) => void;
   setLoading: (loading: boolean) => void;
+  setUsageImportConsent: (importConsent: boolean) => Promise<void>;
+  importSkillUsage: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -48,10 +53,12 @@ export function useAppContext(): AppContextValue {
 interface AppProviderProps {
   manager: SkillManager;
   config: SkillpackConfig;
+  onUsageImportConsentChange?: (importConsent: boolean) => Promise<SkillpackConfig>;
   children: ReactNode;
 }
 
-export function AppProvider({ manager, config, children }: AppProviderProps) {
+export function AppProvider({ manager, config, onUsageImportConsentChange, children }: AppProviderProps) {
+  const [currentConfig, setCurrentConfig] = useState<SkillpackConfig>(config);
   const [skills, setSkills] = useState<Skill[]>(manager.getAllSkills());
   const [inventory, setInventory] = useState<SkillGroup[]>(manager.getInventory());
   const [projectSkills, setProjectSkills] = useState<SkillInventoryInstance[]>(manager.getProjectSkills());
@@ -63,10 +70,48 @@ export function AppProvider({ manager, config, children }: AppProviderProps) {
   const [selectedSkill, setSelectedSkill] = useState<SkillInventoryInstance | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [usageImporting, setUsageImporting] = useState(false);
+  const [usageImportError, setUsageImportError] = useState<string | null>(null);
+  const [usageImportRevision, setUsageImportRevision] = useState(0);
+
+  const setUsageImportConsent = useCallback(async (importConsent: boolean) => {
+    const nextConfig = onUsageImportConsentChange
+      ? await onUsageImportConsentChange(importConsent)
+      : {
+        ...currentConfig,
+        usage: {
+          ...currentConfig.usage,
+          importConsent,
+        },
+      };
+    setCurrentConfig(nextConfig);
+  }, [currentConfig, onUsageImportConsentChange]);
+
+  const importSkillUsage = useCallback(async () => {
+    setUsageImporting(true);
+    setUsageImportError(null);
+    try {
+      await manager.importSkillUsage();
+      setUsageImportRevision((value) => value + 1);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setUsageImportError(message);
+      throw err;
+    } finally {
+      setUsageImporting(false);
+    }
+  }, [manager]);
+
+  useEffect(() => {
+    if (!currentConfig.usage.importConsent) return;
+    importSkillUsage().catch((err) => {
+      setUsageImportError(err instanceof Error ? err.message : String(err));
+    });
+  }, [currentConfig.usage.importConsent, importSkillUsage]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    await manager.scanAll(process.cwd(), config.projectSkillsDirs);
+    await manager.scanAll(process.cwd(), currentConfig.projectSkillsDirs);
     const newSkills = manager.getAllSkills();
     const newInventory = manager.getInventory();
     setSkills(newSkills);
@@ -89,13 +134,14 @@ export function AppProvider({ manager, config, children }: AppProviderProps) {
       return nextInstance ?? nextGroup?.instances[0] ?? null;
     });
     setLoading(false);
-  }, [manager, config]);
+  }, [manager, currentConfig]);
 
   return (
     <AppContext.Provider value={{
-      manager, config, skills, inventory, projectSkills, scanPaths, duplicates, activeTab, view,
-      selectedGroup, selectedSkill, searchQuery, loading,
-      setActiveTab, setView, setSelectedGroup, setSelectedSkill, setSearchQuery, setLoading, refresh,
+      manager, config: currentConfig, skills, inventory, projectSkills, scanPaths, duplicates, activeTab, view,
+      selectedGroup, selectedSkill, searchQuery, loading, usageImporting, usageImportError, usageImportRevision,
+      setActiveTab, setView, setSelectedGroup, setSelectedSkill, setSearchQuery, setLoading,
+      setUsageImportConsent, importSkillUsage, refresh,
     }}>
       {children}
     </AppContext.Provider>

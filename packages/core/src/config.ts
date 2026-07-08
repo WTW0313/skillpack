@@ -11,17 +11,24 @@ export interface SourceConfig {
   enabled: boolean;
 }
 
+export interface UsageConfig {
+  importConsent: boolean;
+  artifactRoots: Record<string, string[]>;
+}
+
 export interface SkillpackConfig {
   editor: string;
   autoCheckUpdates: boolean;
   projectSkillsDirs: string[];
   providers: Record<string, ProviderConfig>;
   sources: Record<string, SourceConfig>;
+  usage: UsageConfig;
 }
 
 type PartialSkillpackConfig = Partial<Omit<SkillpackConfig, 'providers' | 'sources'>> & {
   providers?: Record<string, Partial<ProviderConfig>>;
   sources?: Record<string, Partial<SourceConfig>>;
+  usage?: Partial<UsageConfig>;
 };
 
 export interface ConfigManagerOptions {
@@ -41,6 +48,13 @@ export function createDefaultConfig(homeDir = os.homedir()): SkillpackConfig {
     },
     sources: {
       skillssh: { enabled: true },
+    },
+    usage: {
+      importConsent: false,
+      artifactRoots: {
+        codex: [path.join(homeDir, '.codex', 'sessions'), path.join(homeDir, '.codex', 'archived_sessions')],
+        claude: [path.join(homeDir, '.claude', 'projects')],
+      },
     },
   };
 }
@@ -81,6 +95,12 @@ export class ConfigManager {
     return this.config;
   }
 
+  async setUsageImportConsent(importConsent: boolean): Promise<SkillpackConfig> {
+    this.config.usage.importConsent = importConsent;
+    await this.save();
+    return this.config;
+  }
+
   private async autoDetectProviders(): Promise<void> {
     for (const [id, provider] of Object.entries(this.config.providers)) {
       let found = false;
@@ -113,6 +133,12 @@ function cloneConfig(config: SkillpackConfig): SkillpackConfig {
         { enabled: source.enabled },
       ]),
     ),
+    usage: {
+      importConsent: config.usage.importConsent,
+      artifactRoots: Object.fromEntries(
+        Object.entries(config.usage.artifactRoots).map(([id, roots]) => [id, [...roots]]),
+      ),
+    },
   };
 }
 
@@ -135,6 +161,18 @@ function mergeConfig(defaultConfig: SkillpackConfig, userConfig: PartialSkillpac
     const base = config.sources[id] ?? { enabled: true };
     config.sources[id] = {
       enabled: override.enabled ?? base.enabled,
+    };
+  }
+
+  if (userConfig.usage !== undefined) {
+    config.usage = {
+      importConsent: userConfig.usage.importConsent ?? config.usage.importConsent,
+      artifactRoots: {
+        ...config.usage.artifactRoots,
+        ...Object.fromEntries(
+          Object.entries(userConfig.usage.artifactRoots ?? {}).map(([id, roots]) => [id, [...roots]]),
+        ),
+      },
     };
   }
 

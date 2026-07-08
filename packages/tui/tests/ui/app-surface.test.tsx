@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { inventoryGroup, inventoryInstance } from '../fixtures/inventory.js';
+import { inventoryGroup, inventoryInstance, testConfig } from '../fixtures/inventory.js';
 import { createMockManager } from '../helpers/mock-manager.js';
 import { keypress, renderTui, waitForFrame, type RenderTuiResult } from '../helpers/render-tui.js';
 
@@ -176,5 +176,283 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('i');
     await waitForFrame(app, (output) => output.includes('Install Skill') && output.includes('Search skills.sh'));
+  });
+
+  it('shows Usage Artifact Roots in Settings', async () => {
+    const app = renderApp({
+      config: testConfig({
+        usage: {
+          artifactRoots: {
+            codex: ['/tmp/codex-usage'],
+            claude: ['/tmp/claude-usage'],
+          },
+        },
+      }),
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('s');
+
+    await waitForFrame(app, (output) => (
+      output.includes('Usage Artifact Roots')
+      && output.includes('codex')
+      && output.includes('/tmp/codex-usage')
+    ));
+  });
+
+  it('opens the Usage view from inventory', async () => {
+    const app = renderApp();
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+
+    await waitForFrame(app, (output) => (
+      output.includes('Skill Usage') && output.includes('Enable usage import?')
+    ));
+
+    app.stdin.write(keypress.escape);
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && output.includes('alpha'));
+  });
+
+  it('persists Usage Import Consent from the Usage view', async () => {
+    let persistedConsent: boolean | null = null;
+    const app = renderApp({
+      onUsageImportConsentChange: async (importConsent) => {
+        persistedConsent = importConsent;
+        return testConfig({ usage: { importConsent } });
+      },
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+    await waitForFrame(app, (output) => output.includes('Enable usage import?'));
+
+    app.stdin.write('y');
+
+    await waitForFrame(app, (output) => output.includes('Usage coverage') && output.includes('Codex [unsupported]'));
+    expect(persistedConsent).toBe(true);
+  });
+
+  it('shows Usage Coverage State from aggregate results', async () => {
+    const manager = createMockManager({
+      usageOverview: {
+        range: { days: 30, from: '2026-06-08', to: '2026-07-07' },
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            coverageState: 'zero',
+            heatmap: [],
+            ranking: [],
+            diagnostics: [],
+          },
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            coverageState: 'unsupported',
+            heatmap: [],
+            ranking: [],
+            diagnostics: [],
+          },
+        ],
+      },
+    });
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+
+    await waitForFrame(app, (output) => output.includes('Codex [zero]') && output.includes('Claude [unsupported]'));
+    expect(manager.importSkillUsage).toHaveBeenCalledTimes(1);
+    expect(manager.getSkillUsageOverview).toHaveBeenCalledWith({ rangeDays: 7 });
+  });
+
+  it('shows Skill Usage heatmap counts and Provider Skill Ranking', async () => {
+    const manager = createMockManager({
+      usageOverview: {
+        range: { days: 30, from: '2026-06-08', to: '2026-07-07' },
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          coverageState: 'active',
+          heatmap: [
+            { date: '2026-07-06', countedInvocations: 2, failedInvocations: 0 },
+            { date: '2026-07-07', countedInvocations: 1, failedInvocations: 0 },
+          ],
+          ranking: [
+            { skillName: 'tdd', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z', historical: false },
+            { skillName: 'grilling', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z', historical: false },
+          ],
+          diagnostics: [],
+        }],
+      },
+    });
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+
+    await waitForFrame(app, (output) => (
+      output.includes('[  2]')
+      && output.includes('2026-07-06 Codex counted 2')
+      && output.includes('tdd -> 2')
+      && output.includes('grilling -> 1')
+    ));
+
+    app.stdin.write(keypress.right);
+    await waitForFrame(app, (output) => output.includes('2026-07-07 Codex counted 1'));
+  });
+
+  it('shows failure context, Historical Skills, and Usage Import Diagnostics', async () => {
+    const manager = createMockManager({
+      usageOverview: {
+        range: { days: 30, from: '2026-06-08', to: '2026-07-07' },
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          coverageState: 'active',
+          heatmap: [
+            { date: '2026-07-06', countedInvocations: 1, failedInvocations: 1 },
+          ],
+          ranking: [
+            { skillName: 'deleted-skill', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z', historical: true },
+          ],
+          diagnostics: [
+            { provider: 'codex', message: 'Skipped ambiguous skill invocation evidence in session.jsonl:1' },
+          ],
+        }],
+      },
+    });
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+
+    await waitForFrame(app, (output) => (
+      output.includes('[ !1]')
+      && output.includes('2026-07-06 Codex counted 1 failed 1')
+      && output.includes('deleted-skill -> 1 failed 1 historical')
+      && output.includes('Skipped ambiguous skill invocation evidence')
+    ));
+  });
+
+  it('switches the selected Skill Usage provider', async () => {
+    const manager = createMockManager({
+      usageOverview: {
+        range: { days: 7, from: '2026-07-01', to: '2026-07-07' },
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            coverageState: 'zero',
+            heatmap: [],
+            ranking: [],
+            diagnostics: [],
+          },
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            coverageState: 'active',
+            heatmap: [
+              { date: '2026-07-07', countedInvocations: 3, failedInvocations: 0 },
+            ],
+            ranking: [
+              { skillName: 'claude-skill', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z', historical: false },
+            ],
+            diagnostics: [],
+          },
+        ],
+      },
+    });
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+    await waitForFrame(app, (output) => output.includes('> Codex [zero]') && output.includes('  Claude [active]'));
+
+    app.stdin.write(keypress.down);
+
+    await waitForFrame(app, (output) => (
+      output.includes('  Codex [zero]')
+      && output.includes('> Claude [active]')
+      && output.includes('claude-skill -> 3')
+    ));
+  });
+
+  it('cycles Skill Usage ranges from 7 to 30 days', async () => {
+    const manager = createMockManager();
+    manager.getSkillUsageOverview.mockImplementation(async ({ rangeDays }) => ({
+      range: { days: rangeDays, from: '2026-01-01', to: '2026-01-30' },
+      providers: [{
+        provider: 'codex',
+        displayName: 'Codex',
+        coverageState: 'zero',
+        heatmap: [],
+        ranking: [],
+        diagnostics: [],
+      }],
+    }));
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+    await waitForFrame(app, (output) => output.includes('Skill Usage') && output.includes('7 days'));
+
+    app.stdin.write(keypress.tab);
+
+    await waitForFrame(app, (output) => output.includes('Skill Usage') && output.includes('30 days'));
+    expect(manager.getSkillUsageOverview).toHaveBeenCalledWith({ rangeDays: 30 });
+  });
+
+  it('manually rescans Skill Usage for the selected range', async () => {
+    const manager = createMockManager();
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+    await waitForFrame(app, (output) => output.includes('Usage coverage'));
+
+    app.stdin.write('r');
+    await waitForFrame(app, () => manager.importSkillUsage.mock.calls.length === 2);
+
+    expect(manager.getSkillUsageOverview).toHaveBeenLastCalledWith({ rangeDays: 7 });
+  });
+
+  it('confirms Skill Usage Reset before deleting derived usage data', async () => {
+    const manager = createMockManager();
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+    await waitForFrame(app, (output) => output.includes('Usage coverage'));
+
+    app.stdin.write('x');
+    await waitForFrame(app, (output) => output.includes('Reset Skill Usage data?'));
+
+    app.stdin.write('y');
+    await waitForFrame(app, () => manager.resetSkillUsage.mock.calls.length === 1);
+
+    expect(manager.getSkillUsageOverview).toHaveBeenLastCalledWith({ rangeDays: 7 });
   });
 });

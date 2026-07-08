@@ -6,15 +6,26 @@ export interface Shortcut extends ShortcutLayoutItem {}
 
 const SHORTCUTS: Record<string, Shortcut[]> = {
   list: [
-    { key: '↑↓', label: 'navigate', compactLabel: 'nav' },
+    { key: '↑↓', label: 'nav' },
     { key: 'enter', label: 'detail' },
-    { key: '/', label: 'search' },
+    { key: '/', label: 'search', compactLabel: 'find' },
     { key: '?', label: 'help' },
     { key: 'tab', label: 'tabs' },
+    { key: 'g', label: 'usage' },
     { key: 'p', label: 'project' },
     { key: 's', label: 'settings' },
     { key: 'i', label: 'install' },
     { key: 'u', label: 'updates' },
+    { key: 'q', label: 'quit' },
+  ],
+  usage: [
+    { key: 'esc', label: 'back' },
+    { key: '?', label: 'help' },
+    { key: '↑↓', label: 'provider' },
+    { key: '←→', label: 'cell' },
+    { key: 'tab', label: 'range' },
+    { key: 'r', label: 'rescan' },
+    { key: 'x', label: 'reset' },
     { key: 'q', label: 'quit' },
   ],
   install: [

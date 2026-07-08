@@ -12,6 +12,7 @@ export interface RenderTuiOptions {
   manager?: MockSkillManager;
   inventory?: SkillGroup[];
   config?: SkillpackConfig;
+  onUsageImportConsentChange?: (importConsent: boolean) => Promise<SkillpackConfig>;
   terminalSize?: TerminalSize;
   error?: string | null;
 }
@@ -55,6 +56,7 @@ export function renderTui(options: RenderTuiOptions = {}): RenderTuiResult {
       manager={manager as SkillManager}
       config={config}
       error={options.error ?? null}
+      onUsageImportConsentChange={options.onUsageImportConsentChange}
       terminalSize={options.terminalSize ?? { columns: 80, rows: 24 }}
     />,
   );

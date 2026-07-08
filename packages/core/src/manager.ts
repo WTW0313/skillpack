@@ -11,6 +11,19 @@ import { DuplicateDetector } from './duplicates.js';
 import { SkillsLockReader } from './skills-lock.js';
 import { parseSkillMd } from './parser.js';
 import { buildSkillInventory } from './models/inventory.js';
+import {
+  type CurrentSkillReference,
+  SkillUsageManager,
+  type SkillUsageImportResult,
+  type SkillUsageOverview,
+  type SkillUsageOverviewInput,
+  type SkillUsageProviderConfig,
+} from './usage.js';
+
+export interface SkillManagerOptions {
+  usageDataDir?: string;
+  usageProviders?: SkillUsageProviderConfig[];
+}
 
 export class SkillManager {
   private providers = new Map<string, ISkillProvider>();
@@ -23,6 +36,14 @@ export class SkillManager {
   private skillsLock = new SkillsLockReader();
   private globalSkillsDir = path.join(os.homedir(), '.agents', 'skills');
   private updateAvailability = new Map<string, UpdateInfo>();
+  private skillUsage: SkillUsageManager;
+
+  constructor(options: SkillManagerOptions = {}) {
+    this.skillUsage = new SkillUsageManager({
+      dataDir: options.usageDataDir,
+      providers: options.usageProviders ?? defaultUsageProviders(),
+    });
+  }
 
   registerProvider(provider: ISkillProvider): void { this.providers.set(provider.id, provider); }
   registerSource(source: IInstallSource): void { this.sources.set(source.id, source); }
@@ -152,6 +173,18 @@ export class SkillManager {
   getSkillsByProvider(providerId: string): Skill[] { return this.skills.filter((s) => s.provider === providerId); }
   getDuplicates(): DuplicateInfo[] { return this.duplicates; }
   isDuplicate(skillName: string): boolean { return this.duplicates.some((d) => d.skillName === skillName); }
+  getSkillUsageOverview(input: SkillUsageOverviewInput): Promise<SkillUsageOverview> {
+    return this.skillUsage.getOverview({
+      ...input,
+      currentSkills: input.currentSkills ?? this.getCurrentSkillReferences(),
+    });
+  }
+  importSkillUsage(): Promise<SkillUsageImportResult[]> {
+    return this.skillUsage.importAllProviders(this.getCurrentSkillReferences());
+  }
+  resetSkillUsage(): Promise<void> {
+    return this.skillUsage.reset();
+  }
 
   async toggleSkill(skill: Skill): Promise<void> {
     const provider = this.providers.get(skill.provider);
@@ -287,6 +320,16 @@ export class SkillManager {
 
     return [...providerDiagnostics, ...projectDiagnostics];
   }
+
+  private getCurrentSkillReferences(): CurrentSkillReference[] {
+    return [...this.skills, ...this.projectSkills].map((skill) => ({
+      provider: skill.provider,
+      name: skill.name,
+      path: skill.path,
+      resolvedPath: skill.resolvedPath,
+      source: skill.source,
+    }));
+  }
 }
 
 async function pathExists(targetPath: string): Promise<boolean> {
@@ -308,4 +351,16 @@ function isSkillShManagedGlobalSkill(skill: Pick<Skill, 'provider' | 'source'>):
 
 function skillKey(skill: Pick<Skill, 'provider' | 'path'>): string {
   return `${skill.provider}\0${skill.path}`;
+}
+
+function defaultUsageProviders(): SkillUsageProviderConfig[] {
+  return [
+    {
+      provider: 'codex',
+      displayName: 'Codex',
+      supported: true,
+      artifactRoots: [path.join(os.homedir(), '.codex', 'sessions'), path.join(os.homedir(), '.codex', 'archived_sessions')],
+    },
+    { provider: 'claude', displayName: 'Claude', supported: false, artifactRoots: [path.join(os.homedir(), '.claude', 'projects')] },
+  ];
 }

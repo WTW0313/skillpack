@@ -23,6 +23,12 @@ describe('getShortcutsForView', () => {
     expect(shortcuts.map((shortcut) => shortcut.key)).toContain('u');
   });
 
+  it('shows the Usage section shortcut in the list', () => {
+    const shortcuts = getShortcutsForView({ view: 'list', selectedSkill: null, canToggle: false });
+
+    expect(shortcuts.map((shortcut) => shortcut.key)).toContain('g');
+  });
+
   it('shows Detail update shortcut only for skills.sh-managed Global Skills', () => {
     const codexShortcuts = getShortcutsForView({ view: 'detail', selectedSkill: skill('codex'), canToggle: false });
     const globalShortcuts = getShortcutsForView({ view: 'detail', selectedSkill: skill('global'), canToggle: false });

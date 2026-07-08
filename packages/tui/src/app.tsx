@@ -10,6 +10,7 @@ import { InstallView } from './views/install-view.js';
 import { ProjectSkillsView } from './views/project-skills-view.js';
 import { SettingsView } from './views/settings-view.js';
 import { UpdatesView } from './views/updates-view.js';
+import { UsageView } from './views/usage-view.js';
 import { TerminalSizeProvider, useTerminalSize } from './hooks/use-terminal-size.js';
 import { getTerminalMode, type TerminalSize } from './lib/responsive-layout.js';
 import { HelpOverlay } from './components/help-overlay.js';
@@ -25,6 +26,7 @@ function Router() {
     case 'project': return <ProjectSkillsView />;
     case 'settings': return <SettingsView />;
     case 'updates': return <UpdatesView />;
+    case 'usage': return <UsageView />;
   }
 }
 
@@ -65,11 +67,12 @@ function TooSmallTerminalView({ rows }: { rows: number }) {
 export interface AppSurfaceProps {
   manager: SkillManager | null;
   config: SkillpackConfig | null;
+  onUsageImportConsentChange?: (importConsent: boolean) => Promise<SkillpackConfig>;
   error: string | null;
   terminalSize?: TerminalSize;
 }
 
-function AppSurfaceContent({ manager, config, error }: Omit<AppSurfaceProps, 'terminalSize'>) {
+function AppSurfaceContent({ manager, config, onUsageImportConsentChange, error }: Omit<AppSurfaceProps, 'terminalSize'>) {
   const { columns, rows } = useTerminalSize();
   const terminalMode = getTerminalMode({ columns, rows });
 
@@ -94,7 +97,7 @@ function AppSurfaceContent({ manager, config, error }: Omit<AppSurfaceProps, 'te
   }
 
   return (
-    <AppProvider manager={manager} config={config}>
+    <AppProvider manager={manager} config={config} onUsageImportConsentChange={onUsageImportConsentChange}>
       <Box flexDirection="column" height={rows}>
         <AppFrame />
       </Box>
@@ -102,8 +105,15 @@ function AppSurfaceContent({ manager, config, error }: Omit<AppSurfaceProps, 'te
   );
 }
 
-export function AppSurface({ manager, config, error, terminalSize }: AppSurfaceProps) {
-  const content = <AppSurfaceContent manager={manager} config={config} error={error} />;
+export function AppSurface({ manager, config, onUsageImportConsentChange, error, terminalSize }: AppSurfaceProps) {
+  const content = (
+    <AppSurfaceContent
+      manager={manager}
+      config={config}
+      onUsageImportConsentChange={onUsageImportConsentChange}
+      error={error}
+    />
+  );
 
   return terminalSize
     ? <TerminalSizeProvider size={terminalSize}>{content}</TerminalSizeProvider>
@@ -111,7 +121,7 @@ export function AppSurface({ manager, config, error, terminalSize }: AppSurfaceP
 }
 
 export function App() {
-  const { manager, config, error } = useSkillManager();
+  const { manager, config, error, setUsageImportConsent } = useSkillManager();
 
-  return <AppSurface manager={manager} config={config} error={error} />;
+  return <AppSurface manager={manager} config={config} onUsageImportConsentChange={setUsageImportConsent} error={error} />;
 }

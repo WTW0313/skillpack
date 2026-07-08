@@ -5,8 +5,12 @@ import type {
   SkillpackConfig,
 } from '@skillpack/core';
 
-export function testConfig(overrides: Partial<SkillpackConfig> = {}): SkillpackConfig {
-  return {
+type TestConfigOverrides = Partial<Omit<SkillpackConfig, 'usage'>> & {
+  usage?: Partial<SkillpackConfig['usage']>;
+};
+
+export function testConfig(overrides: TestConfigOverrides = {}): SkillpackConfig {
+  const config: SkillpackConfig = {
     editor: 'vi',
     autoCheckUpdates: false,
     projectSkillsDirs: ['.codex/skills', '.claude/skills', '.agents/skills'],
@@ -18,7 +22,21 @@ export function testConfig(overrides: Partial<SkillpackConfig> = {}): SkillpackC
     sources: {
       skillssh: { enabled: true },
     },
+    usage: {
+      importConsent: false,
+      artifactRoots: {
+        codex: [],
+        claude: [],
+      },
+    },
+  };
+  return {
+    ...config,
     ...overrides,
+    usage: {
+      ...config.usage,
+      ...overrides.usage,
+    },
   };
 }
 

@@ -10,11 +10,13 @@ export interface SkillManagerResult {
   manager: SkillManager | null;
   config: SkillpackConfig | null;
   error: string | null;
+  setUsageImportConsent: (importConsent: boolean) => Promise<SkillpackConfig>;
 }
 
 export function useSkillManager(): SkillManagerResult {
   const [manager, setManager] = useState<SkillManager | null>(null);
   const [config, setConfig] = useState<SkillpackConfig | null>(null);
+  const [configManager, setConfigManager] = useState<ConfigManager | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,7 +26,22 @@ export function useSkillManager(): SkillManagerResult {
       try {
         const configManager = new ConfigManager();
         const cfg = await configManager.load();
-        const mgr = new SkillManager();
+        const mgr = new SkillManager({
+          usageProviders: [
+            {
+              provider: 'codex',
+              displayName: 'Codex',
+              supported: true,
+              artifactRoots: cfg.usage.artifactRoots.codex ?? [],
+            },
+            {
+              provider: 'claude',
+              displayName: 'Claude',
+              supported: false,
+              artifactRoots: cfg.usage.artifactRoots.claude ?? [],
+            },
+          ],
+        });
 
         const providerFactories: Record<string, () => InstanceType<typeof CodexProvider | typeof ClaudeProvider | typeof GlobalProvider>> = {
           codex: () => new CodexProvider(cfg.providers.codex?.paths),
@@ -54,6 +71,7 @@ export function useSkillManager(): SkillManagerResult {
         if (!cancelled) {
           setManager(mgr);
           setConfig(cfg);
+          setConfigManager(configManager);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -64,5 +82,12 @@ export function useSkillManager(): SkillManagerResult {
     return () => { cancelled = true; };
   }, []);
 
-  return { manager, config, error };
+  async function setUsageImportConsent(importConsent: boolean): Promise<SkillpackConfig> {
+    if (!configManager) throw new Error('Config manager is not ready');
+    const nextConfig = await configManager.setUsageImportConsent(importConsent);
+    setConfig(nextConfig);
+    return nextConfig;
+  }
+
+  return { manager, config, error, setUsageImportConsent };
 }
