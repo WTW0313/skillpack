@@ -128,10 +128,17 @@ describe('shortcut layout', () => {
     { key: 'q', label: 'quit' },
   ];
 
-  it('keeps all shortcuts at full width', () => {
-    const visible = getVisibleShortcuts(shortcuts, { columns: 120, rows: 24 });
+  it('keeps all shortcuts when the footer is wide enough', () => {
+    const visible = getVisibleShortcuts(shortcuts, { columns: 160, rows: 24 });
 
     expect(visible.map((shortcut) => shortcut.key)).toEqual(shortcuts.map((shortcut) => shortcut.key));
+  });
+
+  it('keeps full-mode shortcuts within the footer width', () => {
+    const visible = getVisibleShortcuts(shortcuts, { columns: 80, rows: 24 });
+
+    expect(visible.length).toBeLessThan(shortcuts.length);
+    expect(measureShortcutLine(visible)).toBeLessThanOrEqual(75);
   });
 
   it('keeps compact shortcuts within the footer width and preserves help', () => {

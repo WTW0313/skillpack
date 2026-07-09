@@ -94,6 +94,7 @@ export function ListView() {
     if (input === 's') { setView('settings'); return; }
     if (input === 'i') { setView('install'); return; }
     if (input === 'u') { setView('updates'); return; }
+    if (input === 'g') { setView('usage'); return; }
     if (key.return && skills[cursor]) {
       setSelectedGroup(skills[cursor].group);
       setSelectedSkill(skills[cursor].instance);

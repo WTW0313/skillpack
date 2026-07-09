@@ -23,8 +23,8 @@ exports[`Terminal UI Tests > renders a stable inventory frame 1`] = `
 
 
 
- ──↑↓ navigat  enter detai  / searc  ? hel  tab tab  p projec  s setting  i        u update  q quit
-                                                                        install"
+
+ ── ↑↓ nav  enter detail  / search  ? help  tab tabs  g usage  p project"
 `;
 
 exports[`Terminal UI Tests > renders a stable too-small terminal frame 1`] = `

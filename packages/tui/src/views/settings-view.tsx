@@ -1,10 +1,11 @@
 import { Box, Text, useApp, useInput } from 'ink';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAppContext } from '../context/app-context.js';
 import { StatusBar } from '../components/status-bar.js';
 import { formatDisplayPath } from '../lib/format-path.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { fitCell, getBoundedContentLayout, getSettingsColumns } from '../lib/responsive-layout.js';
+import type { Shortcut } from '../lib/shortcuts.js';
 
 interface SettingsRow {
   key: string;
@@ -49,6 +50,10 @@ export function SettingsView() {
     enabled: source.enabled,
   })), [config.sources]);
 
+  const usageRootRows = useMemo(() => Object.entries(config.usage.artifactRoots).flatMap(([provider, roots]) => (
+    roots.map((root) => ({ provider, root }))
+  )), [config.usage.artifactRoots]);
+
   const contentRows: SettingsRow[] = useMemo(() => {
     const result: SettingsRow[] = [
       { key: 'scan-heading', element: <Text bold>Scan Roots</Text> },
@@ -86,6 +91,26 @@ export function SettingsView() {
       }
     }
 
+    result.push({ key: 'usage-roots-gap', element: <Text> </Text> });
+    result.push({ key: 'usage-roots-heading', element: <Text bold>Usage Artifact Roots</Text> });
+    if (usageRootRows.length === 0) {
+      result.push({ key: 'usage-roots-empty', element: <Text dimColor>  No Usage Artifact Roots configured.</Text> });
+    } else {
+      for (const row of usageRootRows) {
+        result.push({
+          key: `usage-root:${row.provider}:${row.root}`,
+          element: (
+            <Box gap={1}>
+              <Text>{fitCell(row.provider, tableColumns.scope)}</Text>
+              <Text dimColor>{fitCell('usage-root', tableColumns.kind)}</Text>
+              <Text color="green">{fitCell('configured', tableColumns.status)}</Text>
+              <Text dimColor>{fitCell(formatDisplayPath(row.root), tableColumns.path)}</Text>
+            </Box>
+          ),
+        });
+      }
+    }
+
     result.push({ key: 'provider-gap', element: <Text> </Text> });
     result.push({ key: 'provider-heading', element: <Text bold>Providers</Text> });
     for (const provider of providerRows) {
@@ -116,11 +141,21 @@ export function SettingsView() {
     }
 
     return result;
-  }, [providerRows, scanPaths, sourceRows, tableColumns]);
+  }, [providerRows, scanPaths, sourceRows, tableColumns, usageRootRows]);
 
   const visibleRows = layout.visibleRows;
   const visibleContent = contentRows.slice(scrollOffset, scrollOffset + visibleRows);
   const showScroll = contentRows.length > visibleRows;
+  const settingsShortcuts: Shortcut[] = useMemo(() => [
+    { key: 'esc', label: 'back' },
+    { key: '?', label: 'help' },
+    ...(showScroll ? [{ key: '↑↓', label: 'scroll' }] : []),
+    { key: 'q', label: 'quit' },
+  ], [showScroll]);
+
+  useEffect(() => {
+    setScrollOffset((offset) => Math.min(offset, Math.max(0, contentRows.length - visibleRows)));
+  }, [contentRows.length, visibleRows]);
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -140,7 +175,7 @@ export function SettingsView() {
       </Box>
 
       <Box flexGrow={1} />
-      <StatusBar />
+      <StatusBar shortcuts={settingsShortcuts} />
     </Box>
   );
 }

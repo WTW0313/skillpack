@@ -12,6 +12,7 @@ export interface RenderTuiOptions {
   manager?: MockSkillManager;
   inventory?: SkillGroup[];
   config?: SkillpackConfig;
+  onUsageImportConsentChange?: (importConsent: boolean) => Promise<SkillpackConfig>;
   terminalSize?: TerminalSize;
   error?: string | null;
 }
@@ -31,6 +32,11 @@ export const keypress = {
   left: '\x1B[D',
   right: '\x1B[C',
   tab: '\t',
+  shiftTab: '\x1B[Z',
+  pageDown: '\x1B[6~',
+  pageUp: '\x1B[5~',
+  home: '\x1B[H',
+  end: '\x1B[F',
 };
 
 export function stripAnsi(value: string): string {
@@ -55,6 +61,7 @@ export function renderTui(options: RenderTuiOptions = {}): RenderTuiResult {
       manager={manager as SkillManager}
       config={config}
       error={options.error ?? null}
+      onUsageImportConsentChange={options.onUsageImportConsentChange}
       terminalSize={options.terminalSize ?? { columns: 80, rows: 24 }}
     />,
   );

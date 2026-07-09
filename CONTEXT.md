@@ -52,6 +52,94 @@ _Avoid_: Installed skill, Skillpack-created skill
 The cross-provider view of discovered skills, their provenance, availability, and health.
 _Avoid_: Skill editor, authoring workspace
 
+**Skill Invocation**:
+A runtime event where a Skill Provider's agent session actually selects or loads a Skill for use during work.
+_Avoid_: Skill scan, Skill Availability, installed skill
+
+**Skill Invocation Record**:
+A minimal normalized fact derived from provider session artifacts about one Skill Invocation.
+_Avoid_: Session transcript, prompt, response
+
+**Invocation Record ID**:
+A deterministic identifier for a Skill Invocation Record, derived from provider session evidence so repeated imports can be idempotent.
+_Avoid_: Random event ID, row number
+
+**Skill Usage Log**:
+The append-only JSONL storage for Skill Invocation Records, partitioned by Session-Producing Provider and month.
+_Avoid_: Session transcript store, provider log, database
+
+**Invocation Identity Confidence**:
+The confidence Skillpack has when matching a Skill Invocation Record to a known Skill or Provider Instance, based on provider evidence such as path, resolved path, source provenance, or name.
+_Avoid_: Skill Identity, duplicate confidence
+
+**Skill Invocation Status**:
+The evidence-based runtime state for a Skill Invocation, indicating whether provider session artifacts say the skill was loaded, used, failed, or unknown.
+_Avoid_: Skill Availability, Inventory Issue, inventory status
+
+**Skill Source Path**:
+The `SKILL.md` path recorded from provider session evidence for an invoked skill, falling back to a resolved path only when the evidence path is unavailable.
+_Avoid_: Historical status, Scan Root, inventory path
+
+**Counted Invocation**:
+A Skill Invocation Record included in default Skill Usage aggregates. Failed invocations are excluded from default intensity and ranking counts but can be shown as separate failure context.
+_Avoid_: Successful invocation, completed task
+
+**Skill Usage**:
+User-facing aggregates derived from Skill Invocations, used to understand which skills are being used across Skill Providers, including Project Skills when provider session evidence identifies them.
+_Avoid_: Skill Inventory, Skill Availability, inventory status, session history, cross-provider skill rollup
+
+**Provider Skill Ranking**:
+A Skill Usage aggregate that ranks invoked skill source paths within a Skill Provider by exact Counted Invocation count, with failed invocation count and recency as supporting context.
+_Avoid_: Global leaderboard, inventory order
+
+**Selected-Day Usage Detail**:
+The Skill Usage detail for one selected heatmap day, scoped to one Session-Producing Provider and grouped by skill source path with exact Counted Invocation and failure context for that day.
+_Avoid_: Session transcript, raw invocation history, provider-wide total
+
+**Skill Usage Heatmap**:
+A Skill Usage aggregate that shows Counted Invocation volume over time using colored block intensity, with exact counts exposed through Selected-Day Usage Detail. The overview heatmap compares Skill Providers by day using one scale across the selected range, while provider drilldowns can compare skills by day within one provider.
+_Avoid_: Inventory status grid, provider availability matrix
+
+**Skill Usage View**:
+The top-level TUI workflow for Skill Usage, combining provider selection, a provider/day heatmap, Selected-Day Usage Detail, and Provider Skill Ranking for the selected Skill Provider and time range.
+_Avoid_: Skill Inventory tab, update view, session browser
+
+**Skill Usage Import**:
+The read-only process that derives Skill Invocation Records from provider-owned session artifacts.
+_Avoid_: Runtime instrumentation, session sync
+
+**Usage Import Diagnostic**:
+A non-inventory finding from Skill Usage Import, such as skipped ambiguous provider evidence or unsupported session artifacts.
+_Avoid_: Inventory Issue, provider warning
+
+**Usage Provider Adapter**:
+A provider-specific importer that reads known session artifact formats and derives valid Skill Invocation Records.
+_Avoid_: Heuristic log parser, runtime hook
+
+**Usage Coverage State**:
+Whether Skillpack can derive Skill Usage for a Skill Provider, distinguishing supported providers with zero Counted Invocations from providers that are unsupported or not configured for import.
+_Avoid_: Skill Availability, zero usage
+
+**Usage Import Consent**:
+The user's persisted opt-in that allows Skillpack to read provider-owned session artifacts for Skill Usage Import.
+_Avoid_: Config default, provider permission
+
+**Skill Usage Reset**:
+A user action that deletes Skillpack's derived Skill Usage Log and Usage Import Cursors without modifying provider-owned session artifacts.
+_Avoid_: Provider history deletion, uninstall
+
+**Session-Producing Provider**:
+A Skill Provider with agent session artifacts from which Skillpack can derive Skill Invocation Records.
+_Avoid_: Shared skill location, install source
+
+**Usage Import Cursor**:
+Provider-specific progress metadata that lets Skillpack incrementally import new session evidence without rereading all provider session artifacts on every startup.
+_Avoid_: Session state, Skillpack-owned provider state
+
+**Usage Artifact Root**:
+A provider-specific directory or file root Skillpack reads during Skill Usage Import to find supported session artifacts.
+_Avoid_: Scan Root, skill directory
+
 **Provider Instance**:
 A discovered skill as represented by one Skill Provider, including that provider's availability and provenance for the skill.
 _Avoid_: Skill Group row, duplicate

@@ -8,6 +8,7 @@ import type {
   SkillInventoryInstance,
   SkillManager,
   UpdateInfo,
+  SkillUsageOverview,
 } from '@skillpack/core';
 import { basicInventory, skillsFromInventory } from '../fixtures/inventory.js';
 
@@ -25,6 +26,9 @@ export type MockSkillManager = SkillManager & {
   checkUpdates: ReturnType<typeof vi.fn>;
   searchRemote: ReturnType<typeof vi.fn>;
   installFromSource: ReturnType<typeof vi.fn>;
+  importSkillUsage: ReturnType<typeof vi.fn>;
+  resetSkillUsage: ReturnType<typeof vi.fn>;
+  getSkillUsageOverview: ReturnType<typeof vi.fn>;
 };
 
 export interface MockSkillManagerOptions {
@@ -36,6 +40,7 @@ export interface MockSkillManagerOptions {
   remoteResults?: RemoteSkill[];
   updateInfo?: UpdateInfo | null;
   updates?: Array<{ skill: Skill; update: UpdateInfo }>;
+  usageOverview?: SkillUsageOverview;
 }
 
 export function createMockManager(options: MockSkillManagerOptions = {}): MockSkillManager {
@@ -47,6 +52,29 @@ export function createMockManager(options: MockSkillManagerOptions = {}): MockSk
   const remoteResults = options.remoteResults ?? [];
   const updates = options.updates ?? [];
   const updateInfo = options.updateInfo ?? { hasUpdate: false };
+  const usageOverview = options.usageOverview ?? {
+    range: { days: 30, from: '2026-06-08', to: '2026-07-07' },
+    providers: [
+      {
+        provider: 'codex',
+        displayName: 'Codex',
+        coverageState: 'unsupported',
+        heatmap: [],
+        dailySkillUsage: [],
+        ranking: [],
+        diagnostics: [],
+      },
+      {
+        provider: 'claude',
+        displayName: 'Claude',
+        coverageState: 'unsupported',
+        heatmap: [],
+        dailySkillUsage: [],
+        ranking: [],
+        diagnostics: [],
+      },
+    ],
+  };
 
   return {
     getAllSkills: vi.fn(() => skills),
@@ -62,5 +90,8 @@ export function createMockManager(options: MockSkillManagerOptions = {}): MockSk
     checkUpdates: vi.fn(async () => updates),
     searchRemote: vi.fn(async () => remoteResults),
     installFromSource: vi.fn(async () => {}),
+    importSkillUsage: vi.fn(async () => []),
+    resetSkillUsage: vi.fn(async () => {}),
+    getSkillUsageOverview: vi.fn(async () => usageOverview),
   } as unknown as MockSkillManager;
 }

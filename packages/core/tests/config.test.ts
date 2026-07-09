@@ -63,5 +63,40 @@ describe('ConfigManager', () => {
     });
     expect(config.providers.claude.enabled).toBe(false);
     expect(config.projectSkillsDirs).toEqual(['.codex/skills', '.claude/skills', '.agents/skills']);
+    expect(config.usage.artifactRoots.codex).toEqual([
+      path.join(homeDir, '.codex', 'sessions'),
+      path.join(homeDir, '.codex', 'archived_sessions'),
+    ]);
+    expect(config.usage.artifactRoots.claude).toEqual([path.join(homeDir, '.claude', 'projects')]);
+  });
+
+  it('merges configured Usage Artifact Roots with defaults', async () => {
+    const customClaudeUsageRoot = path.join(root, 'claude-history');
+    await writeFile(path.join(configDir, 'config.json'), JSON.stringify({
+      usage: {
+        artifactRoots: {
+          claude: [customClaudeUsageRoot],
+        },
+      },
+    }), 'utf-8');
+
+    const config = await new ConfigManager({ configDir, homeDir: path.join(root, 'home') }).load();
+
+    expect(config.usage.artifactRoots.claude).toEqual([customClaudeUsageRoot]);
+    expect(config.usage.artifactRoots.codex[0]).toContain(path.join('.codex', 'sessions'));
+  });
+
+  it('persists Usage Import Consent', async () => {
+    const manager = new ConfigManager(configDir);
+    let config = await manager.load();
+
+    expect(config.usage.importConsent).toBe(false);
+
+    config = await manager.setUsageImportConsent(true);
+
+    expect(config.usage.importConsent).toBe(true);
+    await expect(new ConfigManager(configDir).load()).resolves.toMatchObject({
+      usage: { importConsent: true },
+    });
   });
 });

@@ -1,0 +1,5 @@
+# Derive Skill Usage from provider sessions
+
+Skillpack will derive Skill Usage by reading provider-owned session artifacts read-only, not by adding runtime hooks or instrumentation to agent platforms. This keeps Skillpack aligned with provider-native state: providers remain the source of truth for Skill Invocations, while Skillpack normalizes their session evidence into usage history and aggregates.
+
+The first supported adapter is Codex. It reads the real Codex session JSONL event streams under `~/.codex/sessions/**/*.jsonl` and `~/.codex/archived_sessions/*.jsonl`, using `session_meta` and `turn_context` for session/turn/cwd context and `response_item` `function_call` tool calls for evidence that the agent directly read a `.../skills/<skill>/SKILL.md` file. Codex usage is global across configured artifact roots and is not scoped to Skillpack's startup cwd. `~/.codex/logs_2.sqlite` is not a counting source because it includes rendered skill metadata and can confuse available skills with invoked skills. Claude remains unsupported for Skill Usage until its real session artifact format is implemented conservatively.

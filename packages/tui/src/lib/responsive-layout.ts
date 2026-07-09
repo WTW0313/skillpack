@@ -182,6 +182,7 @@ const DETAIL_SECTIONS: DetailSection[] = [
 ];
 const PROJECT_STATE_WIDTH = 15;
 const SETTINGS_STATUS_WIDTH = 8;
+const SHORTCUT_PREFIX_WIDTH = 3;
 
 export function getInventoryLayout(input: InventoryLayoutInput): InventoryLayout {
   const mode = getTerminalMode(input.size);
@@ -228,7 +229,7 @@ export function getVisibleShortcuts(
   size: TerminalSize,
 ): Array<ShortcutLayoutItem & { displayLabel: string }> {
   const mode = getTerminalMode(size);
-  const maxWidth = Math.max(0, size.columns - HORIZONTAL_PADDING);
+  const maxWidth = Math.max(0, size.columns - HORIZONTAL_PADDING - SHORTCUT_PREFIX_WIDTH);
   const result: Array<ShortcutLayoutItem & { displayLabel: string }> = [];
 
   for (const shortcut of shortcuts) {
@@ -236,7 +237,7 @@ export function getVisibleShortcuts(
       ? (shortcut.compactLabel ?? shortcut.label)
       : shortcut.label;
     const next = [...result, { ...shortcut, displayLabel }];
-    if (mode === 'compact' && measureShortcutLine(next) > maxWidth) break;
+    if (measureShortcutLine(next) > maxWidth) break;
     result.push({ ...shortcut, displayLabel });
   }
 

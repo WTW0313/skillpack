@@ -69,8 +69,11 @@ export function normalizeSkillName(name: string): string {
 function strongIdentityFor(skill: Skill): { key: string; reason: string; confirmsSingleInstance: boolean } | null {
   const realPath = skill.resolvedPath ?? skill.path;
   if (skill.source?.type === 'skillssh' && (skill.source.skillFolderHash || skill.source.repo)) {
+    const sourceKey = skill.source.skillFolderHash
+      ? `hash:${skill.source.skillFolderHash}`
+      : `repo:${skill.source.repo}:skill:${normalizeSkillName(skill.name)}`;
     return {
-      key: `skillssh:${skill.source.skillFolderHash ?? skill.source.repo}`,
+      key: `skillssh:${sourceKey}`,
       reason: 'skills.sh provenance',
       confirmsSingleInstance: true,
     };
