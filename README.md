@@ -8,6 +8,7 @@ Unified TUI manager for agent skills across Codex, Claude, and Global (`~/.agent
 - **Project Skills** — scans read-only project skill directories (`.codex/skills`, `.claude/skills`, `.agents/skills`) in a separate view
 - **Provider-native availability** — reads provider config when available and uses `.disabled-` renaming only as a fallback
 - **Skill Inventory** — groups provider instances by Skill Identity and surfaces deterministic Health Signals
+- **Skill Usage** — derives aggregate Codex skill usage from local session artifacts after explicit consent
 - **skills.sh installs** — installs, updates, and removes Global Skills through the skills.sh CLI
 - **Manual updates** — checks updates only when requested
 - **Fuzzy search** — filter skills by name or description
@@ -41,7 +42,9 @@ node packages/tui/dist/skillpack.js
 
 Launch `skillpack` to see discovered skills grouped into Skill Groups with provider status and Health Signals. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to filter by provider (All, Codex, Claude, Global), and `/` to search.
 
-Press `Enter` to inspect a Skill Group, then use left/right to choose a provider instance before taking instance-level actions. Press `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a skills.sh Global Skill, or `u` to open manual updates. Plugin-owned skills require confirmation because the action toggles the owning plugin and affects sibling skills from the same plugin.
+Press `Enter` to inspect a Skill Group, then use left/right to choose a provider instance before taking instance-level actions. Press `g` to open Skill Usage, `p` to inspect read-only Project Skills, `s` to inspect Settings and Scan Roots, `i` to install a skills.sh Global Skill, or `u` to open manual updates. Plugin-owned skills require confirmation because the action toggles the owning plugin and affects sibling skills from the same plugin.
+
+Skill Usage is opt-in. The first time you open it, press `y` to allow Skillpack to derive aggregate usage records from provider session artifacts. Skillpack stores only minimal invocation metadata: skill name, provider, source path, status, and timestamps. It does not store prompts, responses, tool arguments, file contents, or transcripts.
 
 ## Keyboard Shortcuts
 
@@ -58,6 +61,7 @@ Press `Enter` to inspect a Skill Group, then use left/right to choose a provider
 | `s` | Settings | Open read-only Settings and Scan Roots view |
 | `i` | Install | Install a Global Skill through skills.sh |
 | `u` | Updates | Open manual skills.sh updates |
+| `g` | Usage | Open opt-in Skill Usage analytics |
 | `q` | Quit | Exit skillpack |
 
 ### Detail View
@@ -70,6 +74,22 @@ Press `Enter` to inspect a Skill Group, then use left/right to choose a provider
 | `o` / `O` | Open folder | Open skill directory in system file manager |
 | `d` | Delete | Remove a skills.sh-managed Global Skill with confirmation |
 | `↑` / `↓` | Scroll | Scroll the description when it overflows |
+
+### Usage View
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `y` | Enable import | Grant consent for local Skill Usage import when prompted |
+| `Esc` | Back | Return to list view |
+| `Tab` / `Shift+Tab` | Provider | Switch between usage providers |
+| `1` / `2` / `3` | Range | Show 7 / 30 / 90 days |
+| `↑` / `↓` | Day | Move the selected day by one day |
+| `←` / `→` | Week | Move the selected day by one week |
+| `PageUp` / `PageDown` | Scroll | Scroll long usage reports |
+| `Home` / `End` | Jump | Jump to top / bottom of the report |
+| `r` | Rescan | Re-import usage from configured artifact roots |
+| `x` | Reset | Clear Skillpack's derived local usage records |
+| `q` | Quit | Exit skillpack |
 
 ## Configuration
 
@@ -91,9 +111,25 @@ Skillpack stores its configuration at `~/.config/skillpack/config.json`. On firs
   },
   "sources": {
     "skillssh": { "enabled": true }
+  },
+  "usage": {
+    "importConsent": false,
+    "artifactRoots": {
+      "codex": [
+        "~/.codex/sessions",
+        "~/.codex/archived_sessions"
+      ],
+      "claude": [
+        "~/.claude/projects"
+      ]
+    }
   }
 }
 ```
+
+`usage.importConsent` defaults to `false`. When enabled from the TUI, Skillpack imports supported provider artifacts into derived JSONL records under `~/.local/share/skillpack/usage/`. The current importer supports Codex session artifacts. Claude appears in the Usage view for coverage, but Claude usage import is not supported yet.
+
+The Settings view shows both Scan Roots and Usage Artifact Roots so you can verify which local directories Skillpack will inspect.
 
 ## Adding a Provider
 
@@ -140,7 +176,7 @@ skillpack/
 │   │   └── tests/
 │   └── tui/                   # @skillpack/tui — Ink-based terminal UI
 │       └── src/
-│           ├── views/         # ListView, DetailView, InstallView, ProjectSkillsView, SettingsView, UpdatesView
+│           ├── views/         # ListView, DetailView, InstallView, ProjectSkillsView, SettingsView, UpdatesView, UsageView
 │           ├── components/    # StatusBar, ConfirmDialog, SearchInput, SkillRow, TabBar
 │           ├── context/       # React context for app state
 │           ├── hooks/         # useSkillManager, useSkills, useSearch, useTerminalSize
