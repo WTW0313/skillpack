@@ -479,7 +479,7 @@ function renderSelectedDayDetail(
     key: 'detail:header',
     element: (
       <Text dimColor>
-        {fitCell('Skill', widths.skill)} {fitCell('Counted', widths.counted)} {fitCell('Failed', widths.failed)} {fitCell('Status', widths.status)}
+        {fitCell('Skill', widths.skill)} {fitCell('Counted', widths.counted)} {fitCell('Failed', widths.failed)} {fitCell('Source Path', widths.sourcePath)}
       </Text>
     ),
   });
@@ -488,7 +488,7 @@ function renderSelectedDayDetail(
       key: `detail:${row.skillName}`,
       element: (
         <Text>
-          {fitCell(row.skillName, widths.skill)} {fitCell(String(row.countedInvocations), widths.counted)} {fitCell(formatFailed(row.failedInvocations), widths.failed)} {fitCell(formatStatus(row), widths.status)}
+          {fitCell(row.skillName, widths.skill)} {fitCell(String(row.countedInvocations), widths.counted)} {fitCell(formatFailed(row.failedInvocations), widths.failed)} {fitCell(formatSourcePath(row.sourcePath), widths.sourcePath)}
         </Text>
       ),
     });
@@ -510,7 +510,7 @@ function renderRankingTable(provider: ProviderSkillUsageOverview, columns: numbe
     key: 'ranking:header',
     element: (
       <Text dimColor>
-        {fitCell('Skill', widths.skill)} {fitCell('Counted', widths.counted)} {fitCell('Failed', widths.failed)} {fitCell('Last Used', widths.lastUsed)} {fitCell('Status', widths.status)}
+        {fitCell('Skill', widths.skill)} {fitCell('Counted', widths.counted)} {fitCell('Failed', widths.failed)} {fitCell('Last Used', widths.lastUsed)} {fitCell('Source Path', widths.sourcePath)}
       </Text>
     ),
   });
@@ -519,7 +519,7 @@ function renderRankingTable(provider: ProviderSkillUsageOverview, columns: numbe
       key: `ranking:${row.skillName}`,
       element: (
         <Text>
-          {fitCell(row.skillName, widths.skill)} {fitCell(String(row.countedInvocations), widths.counted)} {fitCell(formatFailed(row.failedInvocations), widths.failed)} {fitCell(formatLastUsed(row.lastInvokedAt), widths.lastUsed)} {fitCell(formatStatus(row), widths.status)}
+          {fitCell(row.skillName, widths.skill)} {fitCell(String(row.countedInvocations), widths.counted)} {fitCell(formatFailed(row.failedInvocations), widths.failed)} {fitCell(formatLastUsed(row.lastInvokedAt), widths.lastUsed)} {fitCell(formatSourcePath(row.sourcePath), widths.sourcePath)}
         </Text>
       ),
     });
@@ -527,15 +527,16 @@ function renderRankingTable(provider: ProviderSkillUsageOverview, columns: numbe
   return result;
 }
 
-function usageTableWidths(columns: number, withLastUsed: boolean): { skill: number; counted: number; failed: number; lastUsed: number; status: number } {
+function usageTableWidths(columns: number, withLastUsed: boolean): { skill: number; counted: number; failed: number; lastUsed: number; sourcePath: number } {
   const contentWidth = Math.max(40, columns - 2);
   const counted = 7;
   const failed = 6;
-  const status = 10;
   const lastUsed = withLastUsed ? 10 : 0;
   const gaps = withLastUsed ? 4 : 3;
-  const skill = Math.max(16, contentWidth - counted - failed - status - lastUsed - gaps);
-  return { skill, counted, failed, lastUsed, status };
+  const fixed = counted + failed + lastUsed + gaps;
+  const skill = Math.max(16, Math.min(32, Math.floor((contentWidth - fixed) * 0.4)));
+  const sourcePath = Math.max(12, contentWidth - skill - fixed);
+  return { skill, counted, failed, lastUsed, sourcePath };
 }
 
 function appendErrors(rows: UsageContentRow[], input: { usageImportError: string | null; error: string | null }) {
@@ -616,6 +617,6 @@ function formatLastUsed(value: string | undefined): string {
   return value ? value.slice(0, 10) : '-';
 }
 
-function formatStatus(row: Pick<ProviderSkillUsageRow, 'historical'>): string {
-  return row.historical ? 'historical' : 'current';
+function formatSourcePath(value: string | undefined): string {
+  return value ?? '-';
 }

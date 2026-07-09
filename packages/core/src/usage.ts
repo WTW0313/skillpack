@@ -3,7 +3,7 @@ import { mkdir, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs
 import os from 'node:os';
 import path from 'node:path';
 
-const USAGE_IMPORTER_VERSION = 5;
+const USAGE_IMPORTER_VERSION = 6;
 
 export type UsageCoverageState = 'unsupported' | 'not-configured' | 'zero' | 'active';
 export type SkillInvocationStatus = 'loaded' | 'used' | 'failed' | 'unknown';
@@ -19,7 +19,6 @@ export interface SkillUsageProviderConfig {
 export interface SkillUsageOverviewInput {
   rangeDays: 7 | 30 | 90;
   now?: Date;
-  currentSkills?: CurrentSkillReference[];
 }
 
 export interface CurrentSkillReference {
@@ -44,10 +43,10 @@ export interface SkillUsageHeatmapCell {
 
 export interface ProviderSkillRankingRow {
   skillName: string;
+  sourcePath?: string;
   countedInvocations: number;
   failedInvocations: number;
   lastInvokedAt?: string;
-  historical: boolean;
 }
 
 export interface ProviderSkillDailyUsage {
@@ -57,10 +56,10 @@ export interface ProviderSkillDailyUsage {
 
 export interface ProviderSkillUsageRow {
   skillName: string;
+  sourcePath?: string;
   countedInvocations: number;
   failedInvocations: number;
   lastInvokedAt?: string;
-  historical: boolean;
 }
 
 export interface UsageImportDiagnostic {
@@ -247,8 +246,8 @@ export class SkillUsageManager {
         }
         const records = await this.readProviderRecords(provider.provider, range);
         const heatmap = buildHeatmap(records, range);
-        const dailySkillUsage = buildDailySkillUsage(records, range, input.currentSkills);
-        const ranking = buildRanking(records, input.currentSkills);
+        const dailySkillUsage = buildDailySkillUsage(records, range);
+        const ranking = buildRanking(records);
         return {
           provider: provider.provider,
           displayName: provider.displayName,
@@ -483,7 +482,11 @@ async function parseCodexInvocationLines(
       continue;
     }
     const evidence = statusFromToolOutput(outputs.get(candidate.callId), candidate.statusHint);
-    const recordKey = `${candidate.turnId}\0${skillName}`;
+    const sourcePath = sourcePathForRecord({
+      skillPath: candidate.skillPath,
+      resolvedPath: skillIdentity.resolvedPath,
+    });
+    const recordKey = `${candidate.turnId}\0${skillName}\0${sourcePath ?? ''}`;
     const existing = recordsByTurnAndSkill.get(recordKey);
     if (existing) {
       existing.status = mergeInvocationStatus(existing.status, evidence.status);
@@ -517,6 +520,7 @@ async function parseCodexInvocationLines(
         candidate.sessionId,
         candidate.turnId,
         skillName,
+        sourcePath,
       ),
       provider,
       sessionId: candidate.sessionId,
@@ -653,9 +657,10 @@ function invocationRecordId(
   sessionId: string,
   turnId: string,
   skillName: string,
+  sourcePath: string | undefined,
 ): string {
   return createHash('sha256')
-    .update(JSON.stringify({ provider, sessionId, turnId, skillName }))
+    .update(JSON.stringify({ provider, sessionId, turnId, skillName, sourcePath }))
     .digest('hex');
 }
 
@@ -688,15 +693,13 @@ function datesInRange(range: SkillUsageRange): string[] {
   return dates;
 }
 
-function buildRanking(
-  records: SkillInvocationRecord[],
-  currentSkills: CurrentSkillReference[] | undefined,
-): ProviderSkillRankingRow[] {
+function buildRanking(records: SkillInvocationRecord[]): ProviderSkillRankingRow[] {
   const rows = new Map<string, ProviderSkillUsageRow>();
   for (const record of records) {
-    const row = rows.get(record.skillName) ?? createUsageRow(record.skillName, currentSkills);
-    addRecordToUsageRow(row, record, currentSkills);
-    rows.set(record.skillName, row);
+    const rowKey = usageRowKey(record);
+    const row = rows.get(rowKey) ?? createUsageRow(record);
+    addRecordToUsageRow(row, record);
+    rows.set(rowKey, row);
   }
 
   return [...rows.values()].sort(compareUsageRows).slice(0, 10);
@@ -705,7 +708,6 @@ function buildRanking(
 function buildDailySkillUsage(
   records: SkillInvocationRecord[],
   range: SkillUsageRange,
-  currentSkills: CurrentSkillReference[] | undefined,
 ): ProviderSkillDailyUsage[] {
   const byDate = new Map<string, Map<string, ProviderSkillUsageRow>>();
   for (const date of datesInRange(range)) byDate.set(date, new Map());
@@ -713,9 +715,10 @@ function buildDailySkillUsage(
   for (const record of records) {
     const date = record.startedAt.slice(0, 10);
     const rows = byDate.get(date) ?? new Map<string, ProviderSkillUsageRow>();
-    const row = rows.get(record.skillName) ?? createUsageRow(record.skillName, currentSkills);
-    addRecordToUsageRow(row, record, currentSkills);
-    rows.set(record.skillName, row);
+    const rowKey = usageRowKey(record);
+    const row = rows.get(rowKey) ?? createUsageRow(record);
+    addRecordToUsageRow(row, record);
+    rows.set(rowKey, row);
     byDate.set(date, rows);
   }
 
@@ -725,19 +728,22 @@ function buildDailySkillUsage(
   })).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function createUsageRow(skillName: string, currentSkills: CurrentSkillReference[] | undefined): ProviderSkillUsageRow {
+function usageRowKey(record: SkillInvocationRecord): string {
+  return `${record.skillName}\0${sourcePathForRecord(record) ?? ''}`;
+}
+
+function createUsageRow(record: SkillInvocationRecord): ProviderSkillUsageRow {
   return {
-    skillName,
+    skillName: record.skillName,
+    sourcePath: sourcePathForRecord(record),
     countedInvocations: 0,
     failedInvocations: 0,
-    historical: currentSkills !== undefined,
   };
 }
 
 function addRecordToUsageRow(
   row: ProviderSkillUsageRow,
   record: SkillInvocationRecord,
-  currentSkills: CurrentSkillReference[] | undefined,
 ): void {
   if (record.status === 'failed') {
     row.failedInvocations += 1;
@@ -745,7 +751,6 @@ function addRecordToUsageRow(
     row.countedInvocations += 1;
   }
   if (!row.lastInvokedAt || record.startedAt > row.lastInvokedAt) row.lastInvokedAt = record.startedAt;
-  if (!isHistoricalSkill(record, currentSkills)) row.historical = false;
 }
 
 function compareUsageRows(a: ProviderSkillUsageRow, b: ProviderSkillUsageRow): number {
@@ -762,12 +767,8 @@ function compareOptionalTimestampDesc(left: string | undefined, right: string | 
   return right.localeCompare(left);
 }
 
-function isHistoricalSkill(
-  record: SkillInvocationRecord,
-  currentSkills: CurrentSkillReference[] | undefined,
-): boolean {
-  if (currentSkills === undefined) return false;
-  return !currentSkills.some((skill) => matchesCurrentSkill(record, skill));
+function sourcePathForRecord(record: Pick<SkillInvocationRecord, 'skillPath' | 'resolvedPath'>): string | undefined {
+  return record.skillPath ?? record.resolvedPath;
 }
 
 function findCurrentSkillSource(

@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-Users can see which skills exist and which Skill Providers can load them, but they cannot see which skills are actually invoked during agent sessions. This makes it hard to understand whether a skill is useful, whether a Skill Provider is actively using skills, or whether stale and historical skills still explain recent agent behavior.
+Users can see which skills exist and which Skill Providers can load them, but they cannot see which skills are actually invoked during agent sessions. This makes it hard to understand whether a skill is useful, whether a Skill Provider is actively using skills, or which source paths explain recent agent behavior.
 
 Users need a privacy-conscious Skill Usage view that derives aggregate usage from provider-owned session artifacts without turning Skillpack into a session transcript browser.
 
@@ -12,7 +12,7 @@ Add Skill Usage tracing to Skillpack.
 
 Skillpack will read supported provider session artifacts after explicit Usage Import Consent, derive minimal Skill Invocation Records, persist them in a local append-only Skill Usage Log, and show aggregate Skill Usage in a dedicated TUI view. The default output is a 7-day Provider Skill Ranking capped to the top 10 skills, with failed reads shown separately from counted invocations.
 
-Skill Usage is separate from Skill Inventory. Inventory answers what is currently discovered and manageable. Usage answers what was invoked over time, including Project Skills and Historical Skills when provider session evidence identifies them.
+Skill Usage is separate from Skill Inventory. Inventory answers what is currently discovered and manageable. Usage answers what was invoked over time, including Project Skills and their Skill Source Paths when provider session evidence identifies them.
 
 ## User Stories
 
@@ -30,8 +30,8 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 12. As a Skillpack user, I want the default usage window to be 7 days, so that the first view reflects recent runtime behavior.
 13. As a Skillpack user, I want the Provider Skill Ranking capped to the top 10 skills, so that the output stays focused and scannable.
 14. As a Skillpack user, I want Project Skills included when they are invoked, so that repository-owned skills are not omitted from usage analysis.
-15. As a Skillpack user, I want Historical Skills kept in usage aggregates, so that deleted or moved skills do not disappear from historical totals.
-16. As a Skillpack user, I want Historical Skills clearly labeled, so that I do not confuse them with current controllable Provider Instances.
+15. As a Skillpack user, I want usage rows to show the Skill Source Path, so that unscanned Project Skills and moved skills remain understandable without relying on Inventory status.
+16. As a Skillpack user, I want same-named skills from different source paths separated in usage aggregates, so that project-local skills are not collapsed into misleading totals.
 17. As a Skillpack user, I want unsupported providers shown differently from zero-usage providers, so that missing coverage is not mistaken for inactivity.
 18. As a Skillpack user, I want Usage Import Diagnostics when artifacts are skipped, so that I can understand why usage may be incomplete.
 19. As a Skillpack user, I want Skillpack to skip ambiguous provider evidence, so that false invocation records are not created.
@@ -59,7 +59,7 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 - Codex skill usage is derived only from `response_item` events with `payload.type === "function_call"` where an `exec_command` directly reads `.../skills/<skill>/SKILL.md`; `session_meta` and `turn_context` provide session, turn, and cwd context for session identity, turn identity, and relative path resolution.
 - Codex import excludes system/developer text, AGENTS.md text, available-skill lists, rendered skill metadata, ordinary text mentions, and search/script output such as `rg`, `grep`, or `python` commands that merely mention `SKILL.md`.
 - Codex usage is global across configured Codex artifact roots and is not scoped to Skillpack's startup cwd.
-- Codex records are deduplicated by `(turn_id, skill_name)` so segmented reads of the same `SKILL.md` in one turn count as one invocation.
+- Codex records are deduplicated by `(turn_id, skill_name, source_path)` so segmented reads of the same `SKILL.md` in one turn count as one invocation while same-named skills from different paths stay separate.
 - Codex skill names are normalized from the skill path directory, with plugin-owned Codex skills represented as `plugin-name:skill-name`.
 - Codex `function_call_output` exit-code evidence maps successful reads to `used` and failed reads to `failed`.
 - Claude Usage Import is intentionally unsupported in the first Codex-first slice and appears as unsupported coverage until a real Claude session adapter is added.
@@ -68,11 +68,11 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 - Prompts, responses, tool arguments, file contents, and full transcripts are never persisted by Skillpack.
 - Skill Invocation Status is evidence-based: loaded, used, failed, or unknown.
 - Failed invocation records are stored but excluded from default Counted Invocation totals.
-- Provider Skill Ranking ranks by exact Counted Invocation count within one Skill Provider.
+- Provider Skill Ranking ranks by exact Counted Invocation count within one Skill Provider and keeps same-named skills from different Skill Source Paths as separate rows.
 - Skill Usage Heatmap intensity uses exact Counted Invocation volume across the selected range with one scale across providers.
 - Skill Usage does not roll up same-name skills across providers in v1.
 - Skill Usage includes Project Skills when session evidence identifies them.
-- Skill Usage keeps Historical Skills in aggregates and labels them distinctly.
+- Skill Usage rows show Skill Source Path instead of current/historical status, because Usage should not depend on current scan-root coverage.
 - Usage Coverage State distinguishes supported zero usage from unsupported or not configured providers.
 - Usage Provider Adapters parse only stable, known provider artifact formats.
 - Ambiguous or unsupported provider evidence is skipped with Usage Import Diagnostics.
@@ -95,7 +95,7 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 - Usage view keyboard shortcuts are surfaced in the StatusBar rather than repeated inside the main content.
 - The bottom Provider Skill Ranking table is not row-selectable and does not support alternate sorting in v1.
 - The bottom Provider Skill Ranking table sorts by Counted Invocation count descending, failed invocation count descending, last-used timestamp descending, then skill name ascending.
-- The bottom Provider Skill Ranking table columns are Skill, Counted, Failed, Last Used, and Status.
+- The bottom Provider Skill Ranking table columns are Skill, Counted, Failed, Last Used, and Source Path.
 - The heatmap uses fixed-width colored block cells to show relative Counted Invocation volume across the selected provider and range; exact counts are shown in Selected-Day Usage Detail instead of permanent cell labels.
 - Heatmap color intensity is normalized within the selected provider and selected range, using that view's maximum single-day Counted Invocation count.
 - Failed invocations do not contribute to heatmap color intensity; they are shown in Selected-Day Usage Detail and Provider Skill Ranking context.
@@ -103,9 +103,9 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 - The heatmap uses a GitHub-style calendar layout with weeks as columns and days aligned by weekday rows.
 - The heatmap uses a high-contrast colored palette for activity levels; zero-count cells should be visually quiet but not rendered as a grayscale intensity ramp.
 - The selected heatmap cell shows exact date, provider, Counted Invocation count, failed invocation count, and per-skill aggregate usage for that day.
-- Selected-Day Usage Detail is grouped by skill and does not expose session-level or turn-level raw invocation history.
+- Selected-Day Usage Detail is grouped by skill source path and does not expose session-level or turn-level raw invocation history.
 - Selected-Day Usage Detail appears to the right of the heatmap on wide terminals and below the heatmap on narrower terminals.
-- Selected-Day Usage Detail columns are Skill, Counted, Failed, and Status, where Status distinguishes current and historical skills.
+- Selected-Day Usage Detail columns are Skill, Counted, Failed, and Source Path.
 - Selected-Day Usage Detail should show all skills used on the selected day whenever possible.
 - When Selected-Day Usage Detail or the bottom Provider Skill Ranking table cannot fit in the terminal, the Usage view becomes scrollable instead of truncating those aggregates.
 - The bottom Provider Skill Ranking table is scoped to the selected provider and selected range; Skill Usage does not show a cross-provider total table in v1.
@@ -140,7 +140,7 @@ interface SkillInvocationRecord {
 - Provider session artifacts are local-substitutable dependencies: tests should use fixture directories and files that represent supported provider formats.
 - Usage Provider Adapter tests should verify observable import results and diagnostics, not internal parser steps.
 - JSONL store tests should verify idempotent repeated imports, provider/month partitioning, retention until reset, and range-bounded reads.
-- Aggregate tests should use independent literal records to verify Counted Invocation totals, failed exclusion, Historical Skill inclusion, and provider-specific rankings.
+- Aggregate tests should use independent literal records to verify Counted Invocation totals, failed exclusion, source-path separation, and provider-specific rankings.
 - TUI tests can be added where the existing Ink test harness supports them; otherwise the first TUI slice should keep rendering logic factored so core aggregate behavior carries most coverage.
 - Do not mock Skillpack's own modules from each other in core tests.
 - Do not assert call counts between internal collaborators.

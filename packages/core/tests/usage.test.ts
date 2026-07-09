@@ -257,24 +257,23 @@ describe('SkillUsageManager', () => {
       const overview = await usage.getOverview({
         rangeDays: 7,
         now: new Date('2026-07-08T12:00:00Z'),
-        currentSkills,
       });
       const provider = overview.providers[0];
 
       expect(provider.ranking.map((row) => ({
         skillName: row.skillName,
+        sourcePath: row.sourcePath,
         countedInvocations: row.countedInvocations,
         failedInvocations: row.failedInvocations,
-        historical: row.historical,
       }))).toEqual([
-        { skillName: 'skill-beta', countedInvocations: 2, failedInvocations: 0, historical: false },
-        { skillName: 'skill-alpha', countedInvocations: 1, failedInvocations: 1, historical: true },
-        { skillName: 'skill-zeta', countedInvocations: 1, failedInvocations: 0, historical: true },
+        { skillName: 'skill-beta', sourcePath: '/Users/twwu/.agents/skills/skill-beta/SKILL.md', countedInvocations: 2, failedInvocations: 0 },
+        { skillName: 'skill-alpha', sourcePath: '/Users/twwu/.agents/skills/skill-alpha/SKILL.md', countedInvocations: 1, failedInvocations: 1 },
+        { skillName: 'skill-zeta', sourcePath: '/Users/twwu/.agents/skills/skill-zeta/SKILL.md', countedInvocations: 1, failedInvocations: 0 },
       ]);
       expect(provider.dailySkillUsage.find((day) => day.date === '2026-07-07')?.rows).toEqual([
-        { skillName: 'skill-beta', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-07T12:01:00Z', historical: false },
-        { skillName: 'skill-alpha', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-07T11:01:00Z', historical: true },
-        { skillName: 'skill-zeta', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:01:00Z', historical: true },
+        { skillName: 'skill-beta', sourcePath: '/Users/twwu/.agents/skills/skill-beta/SKILL.md', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-07T12:01:00Z' },
+        { skillName: 'skill-alpha', sourcePath: '/Users/twwu/.agents/skills/skill-alpha/SKILL.md', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-07T11:01:00Z' },
+        { skillName: 'skill-zeta', sourcePath: '/Users/twwu/.agents/skills/skill-zeta/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:01:00Z' },
       ]);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -325,12 +324,58 @@ describe('SkillUsageManager', () => {
       const overview = await usage.getOverview({
         rangeDays: 7,
         now: new Date('2026-07-08T12:00:00Z'),
-        currentSkills,
       });
       expect(overview.providers[0].ranking[0]).toMatchObject({
         skillName: 'frontend-testing',
-        historical: false,
+        sourcePath: skillMdPath,
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps same-named skills separate when their source paths differ', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectA = path.join(root, 'project-a');
+      const projectB = path.join(root, 'project-b');
+      const skillA = path.join(projectA, '.agents', 'skills', 'shared-name', 'SKILL.md');
+      const skillB = path.join(projectB, '.agents', 'skills', 'shared-name', 'SKILL.md');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+        turnContext('turn-a', projectA, '2026-07-07T08:00:02Z'),
+        functionCall('call-a1', `cat ${skillA}`, '2026-07-07T08:01:00Z'),
+        functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
+        taskStarted('turn-b', '2026-07-07T09:00:01Z'),
+        turnContext('turn-b', projectB, '2026-07-07T09:00:02Z'),
+        functionCall('call-b1', `cat ${skillB}`, '2026-07-07T09:01:00Z'),
+        functionOutput('call-b1', 0, '2026-07-07T09:01:01Z'),
+      ]));
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        now: new Date('2026-07-08T12:00:00Z'),
+        providers: [
+          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
+        ],
+      });
+
+      await usage.importProvider('codex');
+
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-08T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking.map((row) => ({
+        skillName: row.skillName,
+        sourcePath: row.sourcePath,
+        countedInvocations: row.countedInvocations,
+      }))).toEqual([
+        { skillName: 'shared-name', sourcePath: skillB, countedInvocations: 1 },
+        { skillName: 'shared-name', sourcePath: skillA, countedInvocations: 1 },
+      ]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -423,7 +468,7 @@ describe('SkillUsageManager', () => {
 
       const stored = await readFile(path.join(usageRoot, 'invocations', 'codex', '2026-07.jsonl'), 'utf-8');
       expect(stored.trim().split('\n')).toHaveLength(1);
-      await expect(readFile(path.join(usageRoot, 'cursors', 'codex.json'), 'utf-8')).resolves.toContain('"importerVersion": 5');
+      await expect(readFile(path.join(usageRoot, 'cursors', 'codex.json'), 'utf-8')).resolves.toContain('"importerVersion": 6');
     } finally {
       await rm(root, { recursive: true, force: true });
     }

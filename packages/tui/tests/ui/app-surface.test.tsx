@@ -295,20 +295,20 @@ describe.sequential('Terminal UI Tests', () => {
             {
               date: '2026-07-07',
               rows: [
-                { skillName: 'openai-docs', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z', historical: false },
+                { skillName: 'openai-docs', sourcePath: '/Users/twwu/.codex/skills/.system/openai-docs/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z' },
               ],
             },
             {
               date: '2026-07-08',
               rows: [
-                { skillName: 'frontend-testing', countedInvocations: 2, failedInvocations: 1, lastInvokedAt: '2026-07-08T11:00:00Z', historical: false },
-                { skillName: 'github:github', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-08T10:00:00Z', historical: false },
+                { skillName: 'frontend-testing', sourcePath: '/Users/twwu/project/.agents/skills/frontend-testing/SKILL.md', countedInvocations: 2, failedInvocations: 1, lastInvokedAt: '2026-07-08T11:00:00Z' },
+                { skillName: 'github:github', sourcePath: '/Users/twwu/.codex/plugins/cache/openai-curated/github/skills/github/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-08T10:00:00Z' },
               ],
             },
           ],
           ranking: [
-            { skillName: 'frontend-testing', countedInvocations: 5, failedInvocations: 1, lastInvokedAt: '2026-07-08T11:00:00Z', historical: false },
-            { skillName: 'github:github', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-08T10:00:00Z', historical: false },
+            { skillName: 'frontend-testing', sourcePath: '/Users/twwu/project/.agents/skills/frontend-testing/SKILL.md', countedInvocations: 5, failedInvocations: 1, lastInvokedAt: '2026-07-08T11:00:00Z' },
+            { skillName: 'github:github', sourcePath: '/Users/twwu/.codex/plugins/cache/openai-curated/github/skills/github/SKILL.md', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-08T10:00:00Z' },
           ],
           diagnostics: [],
         },
@@ -391,19 +391,19 @@ describe.sequential('Terminal UI Tests', () => {
             {
               date: '2026-07-06',
               rows: [
-                { skillName: 'tdd', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z', historical: false },
+                { skillName: 'tdd', sourcePath: '/Users/twwu/project/.agents/skills/tdd/SKILL.md', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z' },
               ],
             },
             {
               date: '2026-07-07',
               rows: [
-                { skillName: 'grilling', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z', historical: false },
+                { skillName: 'grilling', sourcePath: '/Users/twwu/project/.agents/skills/grilling/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z' },
               ],
             },
           ],
           ranking: [
-            { skillName: 'tdd', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z', historical: false },
-            { skillName: 'grilling', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z', historical: false },
+            { skillName: 'tdd', sourcePath: '/Users/twwu/project/.agents/skills/tdd/SKILL.md', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z' },
+            { skillName: 'grilling', sourcePath: '/Users/twwu/project/.agents/skills/grilling/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z' },
           ],
           diagnostics: [],
         }],
@@ -432,7 +432,7 @@ describe.sequential('Terminal UI Tests', () => {
     await waitForFrame(app, (output) => output.includes('2026-07-06 · Codex') && output.includes('Counted 2 · Failed 0'));
   });
 
-  it('shows failure context, Historical Skills, and Usage Import Diagnostics', async () => {
+  it('shows failure context, source paths, and Usage Import Diagnostics', async () => {
     const manager = createMockManager({
       usageOverview: {
         range: { days: 7, from: '2026-06-30', to: '2026-07-06' },
@@ -447,12 +447,12 @@ describe.sequential('Terminal UI Tests', () => {
             {
               date: '2026-07-06',
               rows: [
-                { skillName: 'deleted-skill', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z', historical: true },
+                { skillName: 'deleted-skill', sourcePath: '/Users/twwu/old-project/.agents/skills/deleted-skill/SKILL.md', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z' },
               ],
             },
           ],
           ranking: [
-            { skillName: 'deleted-skill', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z', historical: true },
+            { skillName: 'deleted-skill', sourcePath: '/Users/twwu/old-project/.agents/skills/deleted-skill/SKILL.md', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z' },
           ],
           diagnostics: [
             { provider: 'codex', message: 'Skipped ambiguous skill invocation evidence in session.jsonl:1' },
@@ -473,7 +473,8 @@ describe.sequential('Terminal UI Tests', () => {
       output.includes('2026-07-06 · Codex')
       && output.includes('Counted 1 · Failed 1')
       && output.includes('deleted-skill')
-      && output.includes('historical')
+      && output.includes('Source Path')
+      && output.includes('old-project')
       && output.includes('Skipped ambiguous skill invocation evidence')
     ));
   });
@@ -503,12 +504,12 @@ describe.sequential('Terminal UI Tests', () => {
               {
                 date: '2026-07-07',
                 rows: [
-                  { skillName: 'claude-skill', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z', historical: false },
+                  { skillName: 'claude-skill', sourcePath: '/Users/twwu/.claude/skills/claude-skill/SKILL.md', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z' },
                 ],
               },
             ],
             ranking: [
-              { skillName: 'claude-skill', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z', historical: false },
+              { skillName: 'claude-skill', sourcePath: '/Users/twwu/.claude/skills/claude-skill/SKILL.md', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z' },
             ],
             diagnostics: [],
           },

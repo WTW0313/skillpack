@@ -174,10 +174,7 @@ export class SkillManager {
   getDuplicates(): DuplicateInfo[] { return this.duplicates; }
   isDuplicate(skillName: string): boolean { return this.duplicates.some((d) => d.skillName === skillName); }
   getSkillUsageOverview(input: SkillUsageOverviewInput): Promise<SkillUsageOverview> {
-    return this.skillUsage.getOverview({
-      ...input,
-      currentSkills: input.currentSkills ?? this.getCurrentSkillReferences(),
-    });
+    return this.skillUsage.getOverview(input);
   }
   importSkillUsage(): Promise<SkillUsageImportResult[]> {
     return this.skillUsage.importAllProviders(this.getCurrentSkillReferences());

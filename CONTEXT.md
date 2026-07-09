@@ -76,24 +76,24 @@ _Avoid_: Skill Identity, duplicate confidence
 The evidence-based runtime state for a Skill Invocation, indicating whether provider session artifacts say the skill was loaded, used, failed, or unknown.
 _Avoid_: Skill Availability, Inventory Issue, inventory status
 
+**Skill Source Path**:
+The `SKILL.md` path recorded from provider session evidence for an invoked skill, falling back to a resolved path only when the evidence path is unavailable.
+_Avoid_: Historical status, Scan Root, inventory path
+
 **Counted Invocation**:
 A Skill Invocation Record included in default Skill Usage aggregates. Failed invocations are excluded from default intensity and ranking counts but can be shown as separate failure context.
 _Avoid_: Successful invocation, completed task
-
-**Historical Skill**:
-A skill referenced by a Skill Invocation Record that is not currently discovered in Skill Inventory or Project Skills.
-_Avoid_: Broken skill, Inventory Issue
 
 **Skill Usage**:
 User-facing aggregates derived from Skill Invocations, used to understand which skills are being used across Skill Providers, including Project Skills when provider session evidence identifies them.
 _Avoid_: Skill Inventory, Skill Availability, inventory status, session history, cross-provider skill rollup
 
 **Provider Skill Ranking**:
-A Skill Usage aggregate that ranks skills within a Skill Provider by exact Counted Invocation count, with failed invocation count and recency as supporting context.
+A Skill Usage aggregate that ranks invoked skill source paths within a Skill Provider by exact Counted Invocation count, with failed invocation count and recency as supporting context.
 _Avoid_: Global leaderboard, inventory order
 
 **Selected-Day Usage Detail**:
-The Skill Usage detail for one selected heatmap day, scoped to one Session-Producing Provider and grouped by skill with exact Counted Invocation and failure context for that day.
+The Skill Usage detail for one selected heatmap day, scoped to one Session-Producing Provider and grouped by skill source path with exact Counted Invocation and failure context for that day.
 _Avoid_: Session transcript, raw invocation history, provider-wide total
 
 **Skill Usage Heatmap**:
