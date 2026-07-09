@@ -200,6 +200,16 @@ describe.sequential('Terminal UI Tests', () => {
     ));
   });
 
+  it('does not show Settings scroll shortcut when all rows fit', async () => {
+    const app = renderApp();
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('s');
+
+    const frame = await waitForFrame(app, (output) => output.includes('Settings') && output.includes('read-only'));
+    expect(frame).not.toContain('↑↓ scroll');
+  });
+
   it('opens the Usage view from inventory', async () => {
     const app = renderApp();
     await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));

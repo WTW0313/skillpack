@@ -130,7 +130,7 @@ export function UsageView() {
     if (confirmingReset) return;
     if (input === 'q') { exit(); return; }
     if (key.escape) { setView('list'); return; }
-    if (key.shiftTab && hasConsent && overview && overview.providers.length > 1) {
+    if (key.tab && key.shift && hasConsent && overview && overview.providers.length > 1) {
       setSelectedProviderIndex((index) => (index + overview.providers.length - 1) % overview.providers.length);
       return;
     }

@@ -177,6 +177,35 @@ describe('Skill Inventory', () => {
     expect(inventory[0].instances[0].actions).toEqual(['update', 'remove']);
   });
 
+  it('does not group different skills from the same skills.sh repo when folder hashes are unavailable', () => {
+    const inventory = buildSkillInventory([
+      {
+        name: 'lark-doc',
+        description: '',
+        provider: 'global',
+        path: path.join(root, 'global', 'lark-doc'),
+        enabled: true,
+        scope: 'global',
+        metadata: {},
+        source: { type: 'skillssh', repo: 'owner/lark-skills' },
+      },
+      {
+        name: 'lark-task',
+        description: '',
+        provider: 'global',
+        path: path.join(root, 'global', 'lark-task'),
+        enabled: true,
+        scope: 'global',
+        metadata: {},
+        source: { type: 'skillssh', repo: 'owner/lark-skills' },
+      },
+    ]);
+
+    expect(inventory).toHaveLength(2);
+    expect(inventory.map((group) => group.name).sort()).toEqual(['lark-doc', 'lark-task']);
+    expect(inventory.flatMap((group) => group.notices)).toEqual([]);
+  });
+
   it('does not expose toggle actions when the provider has no Disable Strategy', () => {
     const inventory = buildSkillInventory([{
       name: 'plugin-skill',

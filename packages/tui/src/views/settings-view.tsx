@@ -1,10 +1,11 @@
 import { Box, Text, useApp, useInput } from 'ink';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAppContext } from '../context/app-context.js';
 import { StatusBar } from '../components/status-bar.js';
 import { formatDisplayPath } from '../lib/format-path.js';
 import { useTerminalSize } from '../hooks/use-terminal-size.js';
 import { fitCell, getBoundedContentLayout, getSettingsColumns } from '../lib/responsive-layout.js';
+import type { Shortcut } from '../lib/shortcuts.js';
 
 interface SettingsRow {
   key: string;
@@ -145,6 +146,16 @@ export function SettingsView() {
   const visibleRows = layout.visibleRows;
   const visibleContent = contentRows.slice(scrollOffset, scrollOffset + visibleRows);
   const showScroll = contentRows.length > visibleRows;
+  const settingsShortcuts: Shortcut[] = useMemo(() => [
+    { key: 'esc', label: 'back' },
+    { key: '?', label: 'help' },
+    ...(showScroll ? [{ key: '↑↓', label: 'scroll' }] : []),
+    { key: 'q', label: 'quit' },
+  ], [showScroll]);
+
+  useEffect(() => {
+    setScrollOffset((offset) => Math.min(offset, Math.max(0, contentRows.length - visibleRows)));
+  }, [contentRows.length, visibleRows]);
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -164,7 +175,7 @@ export function SettingsView() {
       </Box>
 
       <Box flexGrow={1} />
-      <StatusBar />
+      <StatusBar shortcuts={settingsShortcuts} />
     </Box>
   );
 }
