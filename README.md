@@ -1,5 +1,7 @@
 # Skillpack
 
+![NPM Downloads](https://img.shields.io/npm/dm/skillpack-tui?style=flat-square&color=%23085afc&link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Fskillpack-tui)
+
 Unified TUI manager for agent skills across Codex, Claude, and Global (`~/.agents/skills`).
 
 ## Features
