@@ -37,8 +37,9 @@ export function useSkillManager(): SkillManagerResult {
             {
               provider: 'claude',
               displayName: 'Claude',
-              supported: false,
+              supported: true,
               artifactRoots: cfg.usage.artifactRoots.claude ?? [],
+              skillRoots: cfg.providers.claude?.paths ?? [],
             },
           ],
         });

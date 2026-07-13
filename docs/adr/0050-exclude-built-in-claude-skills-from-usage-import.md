@@ -1,0 +1,3 @@
+# Exclude built-in Claude skills from usage import
+
+Claude Skill Usage Import will count real Claude `Skill` tool calls only when the invoked skill can be resolved to at least one current user-level or plugin-provided skill. Calls with no eligible match are skipped with a Usage Import Diagnostic because name-only transcript evidence cannot distinguish deleted user content from Built-In or deferred Project Skills. Built-In Skills are excluded because Skillpack usage is meant to explain user-controlled skill content and plugin-provided skill behavior, not provider-bundled capabilities with no user-managed source path.

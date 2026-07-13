@@ -29,6 +29,20 @@ describe('SkillManager', () => {
     expect(manager.getAllSkills()).toHaveLength(1);
   });
 
+  it('enables Claude in the default Skill Usage overview', async () => {
+    const usageManager = new SkillManager({ usageDataDir: path.join(dir, 'usage') });
+
+    const overview = await usageManager.getSkillUsageOverview({
+      rangeDays: 7,
+      now: new Date('2026-07-08T12:00:00Z'),
+    });
+
+    expect(overview.providers.find((provider) => provider.provider === 'claude')).toMatchObject({
+      displayName: 'Claude',
+      coverageState: 'zero',
+    });
+  });
+
   it('detects duplicates', async () => {
     const dir2 = await mkdtemp(path.join(tmpdir(), 'skillpack-mgr2-'));
     const provider2 = new CodexProvider([dir2]);

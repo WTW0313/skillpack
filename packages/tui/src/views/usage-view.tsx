@@ -123,8 +123,13 @@ export function UsageView() {
 
   const visibleRows = layout.visibleRows;
   const maxScrollOffset = Math.max(0, contentRows.length - visibleRows);
-  const visibleContent = contentRows.slice(scrollOffset, scrollOffset + visibleRows);
+  const boundedScrollOffset = Math.min(scrollOffset, maxScrollOffset);
+  const visibleContent = contentRows.slice(boundedScrollOffset, boundedScrollOffset + visibleRows);
   const showScroll = hasConsent && contentRows.length > visibleRows;
+
+  useEffect(() => {
+    if (scrollOffset > maxScrollOffset) setScrollOffset(maxScrollOffset);
+  }, [maxScrollOffset, scrollOffset]);
 
   useInput((input, key) => {
     if (confirmingReset) return;
@@ -151,18 +156,22 @@ export function UsageView() {
       return;
     }
     if (key.leftArrow && hasConsent) {
+      setScrollOffset(0);
       setSelectedDate((date) => moveDateWithinRange(date, overview, -WEEK_MS, selectedProvider?.heatmap, true));
       return;
     }
     if (key.rightArrow && hasConsent) {
+      setScrollOffset(0);
       setSelectedDate((date) => moveDateWithinRange(date, overview, WEEK_MS, selectedProvider?.heatmap, true));
       return;
     }
     if (key.upArrow && hasConsent) {
+      setScrollOffset(0);
       setSelectedDate((date) => moveDateWithinRange(date, overview, -DAY_MS, selectedProvider?.heatmap));
       return;
     }
     if (key.downArrow && hasConsent) {
+      setScrollOffset(0);
       setSelectedDate((date) => moveDateWithinRange(date, overview, DAY_MS, selectedProvider?.heatmap));
       return;
     }
@@ -225,7 +234,7 @@ export function UsageView() {
         <Text bold color="magenta">Skill Usage</Text>
         <Text dimColor>  {rangeDays} days</Text>
         {showScroll && (
-          <Text dimColor>  {scrollOffset + 1}-{Math.min(scrollOffset + visibleRows, contentRows.length)} of {contentRows.length}</Text>
+          <Text dimColor>  {boundedScrollOffset + 1}-{Math.min(boundedScrollOffset + visibleRows, contentRows.length)} of {contentRows.length}</Text>
         )}
       </Box>
 
@@ -351,7 +360,20 @@ function renderProviderTab(provider: ProviderSkillUsageOverview, selected: boole
 
 function emptyStateForProvider(provider: ProviderSkillUsageOverview): string {
   if (provider.coverageState === 'unsupported') return `Usage import is not supported for ${provider.displayName} yet.`;
-  if (provider.coverageState === 'not-configured') return `${provider.displayName} Usage Artifact Roots are not configured.`;
+  if (provider.coverageState === 'not-configured') {
+    const missingArtifactRoots = provider.coverageReasons.includes('missing-artifact-roots');
+    const missingAttributionRoots = provider.coverageReasons.includes('missing-attribution-roots');
+    if (missingArtifactRoots && missingAttributionRoots) {
+      return `${provider.displayName} Usage Artifact Roots and Skill Attribution Roots are not configured.`;
+    }
+    if (missingAttributionRoots) {
+      return `${provider.displayName} Skill Attribution Roots are not configured.`;
+    }
+    if (missingArtifactRoots) {
+      return `${provider.displayName} Usage Artifact Roots are not configured.`;
+    }
+    return `${provider.displayName} Usage Import is not configured.`;
+  }
   return `No usage records for ${provider.displayName}.`;
 }
 

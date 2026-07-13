@@ -358,6 +358,12 @@ function defaultUsageProviders(): SkillUsageProviderConfig[] {
       supported: true,
       artifactRoots: [path.join(os.homedir(), '.codex', 'sessions'), path.join(os.homedir(), '.codex', 'archived_sessions')],
     },
-    { provider: 'claude', displayName: 'Claude', supported: false, artifactRoots: [path.join(os.homedir(), '.claude', 'projects')] },
+    {
+      provider: 'claude',
+      displayName: 'Claude',
+      supported: true,
+      artifactRoots: [path.join(os.homedir(), '.claude', 'projects')],
+      skillRoots: [path.join(os.homedir(), '.claude', 'plugins', 'cache'), path.join(os.homedir(), '.claude', 'skills')],
+    },
   ];
 }

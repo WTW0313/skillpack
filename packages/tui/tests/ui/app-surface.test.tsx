@@ -252,6 +252,7 @@ describe.sequential('Terminal UI Tests', () => {
             provider: 'codex',
             displayName: 'Codex',
             coverageState: 'zero',
+            coverageReasons: [],
             heatmap: [],
             dailySkillUsage: [],
             ranking: [],
@@ -261,6 +262,7 @@ describe.sequential('Terminal UI Tests', () => {
             provider: 'claude',
             displayName: 'Claude',
             coverageState: 'unsupported',
+            coverageReasons: [],
             heatmap: [],
             dailySkillUsage: [],
             ranking: [],
@@ -283,6 +285,92 @@ describe.sequential('Terminal UI Tests', () => {
     expect(manager.getSkillUsageOverview).toHaveBeenCalledWith({ rangeDays: 7 });
   });
 
+  it('explains missing Skill Attribution Roots in Skill Usage', async () => {
+    const manager = createMockManager({
+      usageOverview: {
+        range: { days: 7, from: '2026-07-02', to: '2026-07-08' },
+        providers: [{
+          provider: 'claude',
+          displayName: 'Claude',
+          coverageState: 'not-configured',
+          coverageReasons: ['missing-attribution-roots'],
+          heatmap: [],
+          dailySkillUsage: [],
+          ranking: [],
+          diagnostics: [],
+        }],
+      },
+    });
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+      terminalSize: { columns: 120, rows: 30 },
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+
+    await waitForFrame(app, (output) => output.includes('Claude Skill Attribution Roots are not configured.'));
+  });
+
+  it('lists every missing Skill Usage configuration prerequisite', async () => {
+    const manager = createMockManager({
+      usageOverview: {
+        range: { days: 7, from: '2026-07-02', to: '2026-07-08' },
+        providers: [{
+          provider: 'claude',
+          displayName: 'Claude',
+          coverageState: 'not-configured',
+          coverageReasons: ['missing-artifact-roots', 'missing-attribution-roots'],
+          heatmap: [],
+          dailySkillUsage: [],
+          ranking: [],
+          diagnostics: [],
+        }],
+      },
+    });
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+      terminalSize: { columns: 120, rows: 30 },
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+
+    await waitForFrame(app, (output) => (
+      output.includes('Claude Usage Artifact Roots and Skill Attribution Roots are not configured.')
+    ));
+  });
+
+  it('shows generic Skill Usage configuration context without a missing root', async () => {
+    const manager = createMockManager({
+      usageOverview: {
+        range: { days: 7, from: '2026-07-02', to: '2026-07-08' },
+        providers: [{
+          provider: 'claude',
+          displayName: 'Claude',
+          coverageState: 'not-configured',
+          coverageReasons: ['provider-not-configured'],
+          heatmap: [],
+          dailySkillUsage: [],
+          ranking: [],
+          diagnostics: [],
+        }],
+      },
+    });
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+      terminalSize: { columns: 120, rows: 30 },
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+
+    await waitForFrame(app, (output) => output.includes('Claude Usage Import is not configured.'));
+  });
+
   it('renders the redesigned Skill Usage layout and keyboard model', async () => {
     const manager = createMockManager();
     manager.getSkillUsageOverview.mockImplementation(async ({ rangeDays }) => ({
@@ -292,6 +380,7 @@ describe.sequential('Terminal UI Tests', () => {
           provider: 'codex',
           displayName: 'Codex',
           coverageState: 'active',
+          coverageReasons: [],
           heatmap: [
             { date: '2026-07-02', countedInvocations: 0, failedInvocations: 0 },
             { date: '2026-07-03', countedInvocations: 1, failedInvocations: 0 },
@@ -326,6 +415,7 @@ describe.sequential('Terminal UI Tests', () => {
           provider: 'claude',
           displayName: 'Claude',
           coverageState: 'unsupported',
+          coverageReasons: [],
           heatmap: [],
           dailySkillUsage: [],
           ranking: [],
@@ -385,6 +475,56 @@ describe.sequential('Terminal UI Tests', () => {
     ));
   });
 
+  it('clamps Skill Usage scrolling when the selected day has fewer rows', async () => {
+    const longDayRows = Array.from({ length: 30 }, (_, index) => ({
+      skillName: `skill-${String(index).padStart(2, '0')}`,
+      sourcePath: `/Users/twwu/.agents/skills/skill-${String(index).padStart(2, '0')}/SKILL.md`,
+      countedInvocations: 1,
+      failedInvocations: 0,
+      lastInvokedAt: '2026-07-08T10:00:00Z',
+    }));
+    const manager = createMockManager({
+      usageOverview: {
+        range: { days: 7, from: '2026-07-02', to: '2026-07-08' },
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          coverageState: 'active',
+          coverageReasons: [],
+          heatmap: [
+            { date: '2026-07-07', countedInvocations: 0, failedInvocations: 0 },
+            { date: '2026-07-08', countedInvocations: 30, failedInvocations: 0 },
+          ],
+          dailySkillUsage: [
+            { date: '2026-07-07', rows: [] },
+            { date: '2026-07-08', rows: longDayRows },
+          ],
+          ranking: longDayRows.slice(0, 10),
+          diagnostics: [],
+        }],
+      },
+    });
+    const app = renderApp({
+      manager,
+      config: testConfig({ usage: { importConsent: true } }),
+      terminalSize: { columns: 120, rows: 18 },
+    });
+    await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
+
+    app.stdin.write('g');
+    await waitForFrame(app, (output) => output.includes('2026-07-08 · Codex'));
+
+    app.stdin.write(keypress.end);
+    await waitForFrame(app, (output) => output.includes('skill-09') && output.includes('36-50 of 50'));
+
+    app.stdin.write(keypress.up);
+    const frame = await waitForFrame(app, (output) => (
+      output.includes('No skill usage on this day.')
+      && output.includes('1-15 of 25')
+    ));
+    expect(frame).not.toContain('36-25 of 25');
+  });
+
   it('shows Skill Usage heatmap counts and Provider Skill Ranking', async () => {
     const manager = createMockManager({
       usageOverview: {
@@ -393,6 +533,7 @@ describe.sequential('Terminal UI Tests', () => {
           provider: 'codex',
           displayName: 'Codex',
           coverageState: 'active',
+          coverageReasons: [],
           heatmap: [
             { date: '2026-07-06', countedInvocations: 2, failedInvocations: 0 },
             { date: '2026-07-07', countedInvocations: 1, failedInvocations: 0 },
@@ -450,6 +591,7 @@ describe.sequential('Terminal UI Tests', () => {
           provider: 'codex',
           displayName: 'Codex',
           coverageState: 'active',
+          coverageReasons: [],
           heatmap: [
             { date: '2026-07-06', countedInvocations: 1, failedInvocations: 1 },
           ],
@@ -498,6 +640,7 @@ describe.sequential('Terminal UI Tests', () => {
             provider: 'codex',
             displayName: 'Codex',
             coverageState: 'zero',
+            coverageReasons: [],
             heatmap: [],
             dailySkillUsage: [],
             ranking: [],
@@ -507,6 +650,7 @@ describe.sequential('Terminal UI Tests', () => {
             provider: 'claude',
             displayName: 'Claude',
             coverageState: 'active',
+            coverageReasons: [],
             heatmap: [
               { date: '2026-07-07', countedInvocations: 3, failedInvocations: 0 },
             ],
@@ -552,6 +696,7 @@ describe.sequential('Terminal UI Tests', () => {
         provider: 'codex',
         displayName: 'Codex',
         coverageState: 'zero',
+        coverageReasons: [],
         heatmap: [],
         dailySkillUsage: [],
         ranking: [],
