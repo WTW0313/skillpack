@@ -230,6 +230,1596 @@ describe('SkillUsageManager', () => {
     }
   });
 
+  it('imports a Codex skill read from an orchestrated exec envelope', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const usageRoot = path.join(root, 'usage');
+      const projectRoot = path.join(root, 'project');
+      const skillPath = path.join(projectRoot, '.agents', 'skills', 'diagnosing-bugs', 'SKILL.md');
+      await mkdir(sessionsRoot, { recursive: true });
+      await mkdir(path.dirname(skillPath), { recursive: true });
+      await writeFile(skillPath, '---\nname: diagnosing-bugs\n---\n');
+
+      const command = "sed -n '1,240p' .agents/skills/diagnosing-bugs/SKILL.md";
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        {
+          timestamp: '2026-07-13T08:01:00Z',
+          type: 'response_item',
+          payload: {
+            type: 'custom_tool_call',
+            name: 'exec',
+            call_id: 'call-a',
+            status: 'completed',
+            input: `const result = await tools.exec_command(${JSON.stringify({
+              cmd: command,
+              workdir: projectRoot,
+            })}); text(result.output);`,
+          },
+        },
+        {
+          timestamp: '2026-07-13T08:01:01Z',
+          type: 'response_item',
+          payload: {
+            type: 'custom_tool_call_output',
+            call_id: 'call-a',
+            output: [
+              { type: 'input_text', text: 'Script completed\nWall time 0.1 seconds\nOutput:\n' },
+              { type: 'input_text', text: '---\nname: diagnosing-bugs\n---\n' },
+            ],
+          },
+        },
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: usageRoot,
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({
+        importedRecords: 1,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking).toEqual([{
+        skillName: 'diagnosing-bugs',
+        sourcePath: skillPath,
+        countedInvocations: 1,
+        failedInvocations: 0,
+        lastInvokedAt: '2026-07-13T08:01:00Z',
+      }]);
+
+      const stored = JSON.parse(await readFile(
+        path.join(usageRoot, 'invocations', 'codex', '2026-07.jsonl'),
+        'utf-8',
+      )) as { status: string; endedAt?: string | null };
+      expect(stored).toMatchObject({
+        status: 'unknown',
+        endedAt: '2026-07-13T08:01:01Z',
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('continues across a Codex output helper between direct skill reads', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      const program = [
+        'const first = await tools.exec_command({ cmd: "cat .agents/skills/diagnosing-bugs/SKILL.md" });',
+        'text(first.output);',
+        'await tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+      ].join('\n');
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 2 });
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking.map((row) => row.skillName).sort()).toEqual([
+        'diagnosing-bugs',
+        'tdd',
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stops after an unsupported logical expression can mutate static command evidence', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'runtimeCondition && (options.cmd = runtimeCommand);',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('evaluates object initializers after a static numeric property key', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      '({ 0: "safe", next: mutateAtRuntime(options) });',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('evaluates a computed member key after its static receiver', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'const values = [];',
+      'values[mutateAtRuntime(options)];',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops after a member read from an unresolved value', async () => {
+    const program = [
+      'const value = null;',
+      'value.output;',
+      'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops when a lexical binding is read inside its temporal dead zone', async () => {
+    const program = [
+      'const before = after;',
+      'const after = "initialized";',
+      'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it.each([
+    ['binary plus coercion', '"" + mutator;'],
+    ['template coercion', '`${mutator}`;'],
+  ])('stops before %s can mutate static evidence', async (_name, expression) => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'const mutator = {',
+      '  valueOf() { options.cmd = runtimeCommand; return 0; },',
+      '  toString() { options.cmd = runtimeCommand; return ""; },',
+      '};',
+      expression,
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops before awaiting a static thenable can mutate evidence', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'const thenable = { then(resolve) { options.cmd = runtimeCommand; resolve(); } };',
+      'await thenable;',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops before Promise.all assimilates a static thenable', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'const thenable = { then(resolve) { options.cmd = runtimeCommand; resolve(); } };',
+      'await Promise.all([thenable]);',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops after an array mutator with a runtime callback', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'const values = ["b", "a"];',
+      'values.sort(() => { options.cmd = runtimeCommand; return 0; });',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops after a computed assignment can mutate evidence', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'const target = {};',
+      'target[mutateAtRuntime(options)] = "value";',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('allows one tool-result property read but stops an unproven deeper chain', async () => {
+    const program = [
+      'const first = await tools.exec_command({ cmd: "echo ok" });',
+      'first.missing.deep;',
+      'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('does not treat a skill path in an unquoted shell comment as a read', async () => {
+    const program = [
+      'tools.exec_command({',
+      '  cmd: "cat /dev/null # ignored ; cat /tmp/skills/not-read/SKILL.md",',
+      '});',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops evaluating helper arguments after an unsupported call', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'text(mutateAtRuntime(options), tools.exec_command(options));',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('evaluates every direct Promise.all array element from left to right', async () => {
+    const program = [
+      'await Promise.all([',
+      '  tools.exec_command({ cmd: "cat .agents/skills/diagnosing-bugs/SKILL.md" }),',
+      '  tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" }),',
+      ']);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 2,
+      diagnostics: [],
+    });
+  });
+
+  it('recognizes a statically computed tools exec_command property', async () => {
+    const program = 'tools["exec_command"]({ cmd: "cat .agents/skills/tdd/SKILL.md" });';
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 1,
+      diagnostics: [],
+    });
+  });
+
+  it('fails closed when tools exec_command has an extra argument', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'tools.exec_command(options, mutateAtRuntime(options));',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+    });
+  });
+
+  it.each([
+    [
+      'Promise.all',
+      [
+        'const Promise = { all: () => { throw new Error("stop"); } };',
+        'Promise.all([]);',
+      ],
+    ],
+    [
+      'Object.assign',
+      [
+        'const Object = { assign: () => { throw new Error("stop"); } };',
+        'Object.assign({}, {});',
+      ],
+    ],
+  ])('does not treat shadowed %s as a known builtin', async (_name, prefix) => {
+    const program = [
+      ...prefix,
+      'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('hoists var bindings through unsupported callback control flow', async () => {
+    const program = [
+      'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
+      'commands.map((command) => {',
+      '  tools.exec_command(command);',
+      '  if (false) { var tools = fakeTools; }',
+      '});',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('propagates unsupported control flow from a static map callback', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      '[options].map((item) => {',
+      '  if (runtimeCondition) item.cmd = runtimeCommand;',
+      '});',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops when a static map callback uses an unsupported parameter pattern', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'const items = [{ value: "safe" }];',
+      'items.map(({ value }) => { options.cmd = runtimeCommand; });',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('stops when a map receiver is not a proven static array', async () => {
+    const program = [
+      'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+      'runtimeCollection.map((item) => mutateAtRuntime(item, options));',
+      'tools.exec_command(options);',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('binds a named function expression inside its static map callback', async () => {
+    const program = [
+      'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
+      'commands.map(function tools(command) {',
+      '  tools.exec_command(command);',
+      '});',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
+      importedRecords: 0,
+      diagnostics: [],
+    });
+  });
+
+  it('fails closed when one orchestrated program exceeds the command budget', async () => {
+    const program = Array.from(
+      { length: 257 },
+      () => 'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+    ).join('\n');
+
+    await expect(importOrchestratedProgram(program)).resolves.toEqual({
+      provider: 'codex',
+      importedRecords: 0,
+      skippedArtifacts: 0,
+      diagnostics: [{
+        provider: 'codex',
+        message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
+      }],
+    });
+  });
+
+  it('fails closed before static string composition can grow without bound', async () => {
+    const statements = [`const value0 = "${'x'.repeat(1024)}";`];
+    for (let index = 1; index <= 10; index += 1) {
+      statements.push(`const value${index} = value${index - 1} + value${index - 1};`);
+    }
+    statements.push('tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });');
+
+    await expect(importOrchestratedProgram(statements.join('\n'))).resolves.toEqual({
+      provider: 'codex',
+      importedRecords: 0,
+      skippedArtifacts: 0,
+      diagnostics: [{
+        provider: 'codex',
+        message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
+      }],
+    });
+  });
+
+  it('fails closed when one concrete command contains too many skill paths', async () => {
+    const paths = Array.from(
+      { length: 257 },
+      (_, index) => `.agents/skills/skill-${index}/SKILL.md`,
+    );
+    const program = `tools.exec_command({ cmd: ${JSON.stringify(`cat ${paths.join(' ')}`)} });`;
+
+    await expect(importOrchestratedProgram(program)).resolves.toEqual({
+      provider: 'codex',
+      importedRecords: 0,
+      skippedArtifacts: 0,
+      diagnostics: [{
+        provider: 'codex',
+        message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
+      }],
+    });
+  });
+
+  it('keeps absolute reads while diagnosing relative reads without a cwd', async () => {
+    const program = [
+      'tools.exec_command({',
+      '  cmd: "cat /tmp/skills/absolute/SKILL.md .agents/skills/relative/SKILL.md",',
+      '});',
+    ].join('\n');
+
+    await expect(importOrchestratedProgram(program, false)).resolves.toEqual({
+      provider: 'codex',
+      importedRecords: 1,
+      skippedArtifacts: 0,
+      diagnostics: [{
+        provider: 'codex',
+        message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
+      }],
+    });
+  });
+
+  it('imports an orchestrated Codex skill read assembled from static constants', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      const skillPath = path.join(projectRoot, '.agents', 'skills', 'tdd', 'SKILL.md');
+      await mkdir(sessionsRoot, { recursive: true });
+      await mkdir(path.dirname(skillPath), { recursive: true });
+      await writeFile(skillPath, '---\nname: tdd\n---\n');
+
+      const program = [
+        'const skillDir = ".agents/skills/tdd";',
+        'const filename = "SKILL" + ".md";',
+        `const workdir = ${JSON.stringify(projectRoot)};`,
+        'const cmd = `cat ${skillDir}/${filename}`;',
+        'const result = await tools.exec_command({ cmd, workdir });',
+        'text(result.output);',
+      ].join('\n');
+      expect(program).not.toContain('SKILL.md');
+
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        {
+          timestamp: '2026-07-13T08:01:00Z',
+          type: 'response_item',
+          payload: {
+            type: 'custom_tool_call',
+            name: 'exec',
+            call_id: 'call-a',
+            status: 'completed',
+            input: program,
+          },
+        },
+        {
+          timestamp: '2026-07-13T08:01:01Z',
+          type: 'response_item',
+          payload: {
+            type: 'custom_tool_call_output',
+            call_id: 'call-a',
+            output: [{ type: 'input_text', text: 'Script completed\n' }],
+          },
+        },
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({
+        importedRecords: 1,
+        diagnostics: [],
+      });
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking).toContainEqual(expect.objectContaining({
+        skillName: 'tdd',
+        sourcePath: skillPath,
+        countedInvocations: 1,
+      }));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('imports multiple orchestrated Codex skill reads from a static array map', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      const skillNames = ['diagnosing-bugs', 'tdd'];
+      await mkdir(sessionsRoot, { recursive: true });
+      await Promise.all(skillNames.map(async (skillName) => {
+        const skillPath = path.join(projectRoot, '.agents', 'skills', skillName, 'SKILL.md');
+        await mkdir(path.dirname(skillPath), { recursive: true });
+        await writeFile(skillPath, `---\nname: ${skillName}\n---\n`);
+      }));
+
+      const program = [
+        `const workdir = ${JSON.stringify(projectRoot)};`,
+        'const commands = [',
+        '  { cmd: "cat .agents/skills/diagnosing-bugs/SKILL.md", workdir },',
+        '  { cmd: "cat .agents/skills/tdd/SKILL.md", workdir },',
+        '];',
+        'const results = await Promise.all(',
+        '  commands.map((command) => tools.exec_command(command)),',
+        ');',
+        'results.forEach((result) => text(result.output));',
+      ].join('\n');
+
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        {
+          timestamp: '2026-07-13T08:01:00Z',
+          type: 'response_item',
+          payload: {
+            type: 'custom_tool_call',
+            name: 'exec',
+            call_id: 'call-a',
+            status: 'completed',
+            input: program,
+          },
+        },
+        {
+          timestamp: '2026-07-13T08:01:01Z',
+          type: 'response_item',
+          payload: {
+            type: 'custom_tool_call_output',
+            call_id: 'call-a',
+            output: 'Script completed\n',
+          },
+        },
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({
+        importedRecords: 2,
+        diagnostics: [],
+      });
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking.map((row) => row.skillName).sort()).toEqual(skillNames);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses a static map callback lexical environment instead of the call-site scope', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      const wrongRoot = path.join(root, 'wrong-project');
+      const skillPath = path.join(projectRoot, '.agents', 'skills', 'tdd', 'SKILL.md');
+      await mkdir(sessionsRoot, { recursive: true });
+      await mkdir(path.dirname(skillPath), { recursive: true });
+      await writeFile(skillPath, '---\nname: tdd\n---\n');
+      const program = [
+        `const workdir = ${JSON.stringify(projectRoot)};`,
+        'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
+        'const run = (command) => tools.exec_command({ cmd: command.cmd, workdir });',
+        '{',
+        `  const workdir = ${JSON.stringify(wrongRoot)};`,
+        '  await Promise.all(commands.map(run));',
+        '}',
+      ].join('\n');
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking).toContainEqual(expect.objectContaining({
+        skillName: 'tdd',
+        sourcePath: skillPath,
+      }));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('allows an unused index parameter in a static array map callback', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      const skillPath = path.join(projectRoot, '.agents', 'skills', 'tdd', 'SKILL.md');
+      await mkdir(sessionsRoot, { recursive: true });
+      await mkdir(path.dirname(skillPath), { recursive: true });
+      await writeFile(skillPath, '---\nname: tdd\n---\n');
+      const program = [
+        'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
+        'await Promise.all(commands.map((command, index) => tools.exec_command(command)));',
+      ].join('\n');
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking).toContainEqual(expect.objectContaining({
+        skillName: 'tdd',
+        sourcePath: skillPath,
+      }));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not execute a generator body used as an array map callback', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      const program = [
+        'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
+        'commands.map(function* (command) { tools.exec_command(command); });',
+      ].join('\n');
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('imports orchestrated Codex skill reads from a static for-of loop and property reads', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      const skillPath = path.join(projectRoot, '.agents', 'skills', 'grilling', 'SKILL.md');
+      await mkdir(sessionsRoot, { recursive: true });
+      await mkdir(path.dirname(skillPath), { recursive: true });
+      await writeFile(skillPath, '---\nname: grilling\n---\n');
+
+      const program = [
+        'const config = {',
+        `  workdir: ${JSON.stringify(projectRoot)},`,
+        '  commands: [{ cmd: "cat .agents/skills/grilling/SKILL.md" }],',
+        '};',
+        'for (const command of config.commands) {',
+        '  const options = { cmd: command.cmd, workdir: config.workdir };',
+        '  await tools.exec_command(options);',
+        '}',
+      ].join('\n');
+
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        orchestratedExecOutput('call-a', '2026-07-13T08:01:01Z'),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({
+        importedRecords: 1,
+        diagnostics: [],
+      });
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking).toContainEqual(expect.objectContaining({
+        skillName: 'grilling',
+        sourcePath: skillPath,
+        countedInvocations: 1,
+      }));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('respects break while interpreting a static for-of loop', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      const firstSkillPath = path.join(projectRoot, '.agents', 'skills', 'grilling', 'SKILL.md');
+      await mkdir(sessionsRoot, { recursive: true });
+      await mkdir(path.dirname(firstSkillPath), { recursive: true });
+      await writeFile(firstSkillPath, '---\nname: grilling\n---\n');
+      const program = [
+        'const commands = [',
+        '  { cmd: "cat .agents/skills/grilling/SKILL.md" },',
+        '  { cmd: "cat .agents/skills/tdd/SKILL.md" },',
+        '];',
+        'for (const command of commands) {',
+        '  await tools.exec_command(command);',
+        '  break;',
+        '}',
+      ].join('\n');
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers[0].ranking.map((row) => row.skillName)).toEqual(['grilling']);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('aggregates only high-signal orchestrated Codex parsing diagnostics without raw input', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-unresolved-command-a',
+          'tools.exec_command({ cmd: secretCommand /* /skills/tdd/SKILL.md */, workdir: "/tmp" });',
+          '2026-07-13T08:01:00Z',
+        ),
+        orchestratedExecCall(
+          'call-unresolved-command-b',
+          'tools.exec_command({ cmd: anotherSecretCommand /* /skills/tdd/SKILL.md */, workdir: "/tmp" });',
+          '2026-07-13T08:01:01Z',
+        ),
+        orchestratedExecCall(
+          'call-unresolved-workdir',
+          'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md", workdir: resolveSecretWorkdir() });',
+          '2026-07-13T08:01:02Z',
+        ),
+        orchestratedExecCall(
+          'call-unrelated-dynamic',
+          'tools.exec_command({ cmd: ordinaryRuntimeCommand, workdir: ordinaryRuntimeWorkdir });',
+          '2026-07-13T08:01:03Z',
+        ),
+        orchestratedExecCall(
+          'call-invalid-a',
+          'const brokenSkillSource = "/skills/tdd/SKILL.md"; tools.exec_command({',
+          '2026-07-13T08:01:04Z',
+        ),
+        orchestratedExecCall(
+          'call-invalid-b',
+          'const otherBrokenSkillSource = "/skills/tdd/SKILL.md"; tools.exec_command({',
+          '2026-07-13T08:01:05Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      const result = await usage.importProvider('codex');
+      expect(result).toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [
+          {
+            provider: 'codex',
+            message: 'Skipped 2 potential Codex Skill invocations in session.jsonl: unresolved-command',
+          },
+          {
+            provider: 'codex',
+            message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
+          },
+          {
+            provider: 'codex',
+            message: 'Skipped 2 potential Codex Skill invocations in session.jsonl: invalid-javascript',
+          },
+        ],
+      });
+      const diagnosticText = result.diagnostics.map((diagnostic) => diagnostic.message).join('\n');
+      expect(diagnosticText).not.toContain('secretCommand');
+      expect(diagnosticText).not.toContain('resolveSecretWorkdir');
+      expect(diagnosticText).not.toContain('/skills/tdd/SKILL.md');
+      expect(diagnosticText).not.toContain('ordinaryRuntimeCommand');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not attribute an orchestrated relative skill read without a reliable working directory', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        orchestratedExecCall(
+          'call-a',
+          'await tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [{
+          provider: 'codex',
+          message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
+        }],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not attribute a historical relative skill read without a reliable working directory', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        functionCall(
+          'call-a',
+          'cat .agents/skills/tdd/SKILL.md',
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [{
+          provider: 'codex',
+          message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
+        }],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not treat a shadowed tools object as Codex execution evidence', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const tools = { exec_command: (options) => options };',
+            'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('respects function-scoped var shadowing of the Codex tools binding', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            '{ var tools = fakeTools; }',
+            'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('respects destructured shadowing of the Codex tools binding', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const { tools } = { tools: fakeTools };',
+            'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores orchestrated strings, comments, uncalled functions, and runtime-derived commands', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      const program = [
+        'const example = `tools.exec_command({ cmd: "cat .agents/skills/string/SKILL.md" })`;',
+        '// tools.exec_command({ cmd: "cat .agents/skills/comment/SKILL.md" });',
+        'function neverCalled() {',
+        '  return tools.exec_command({ cmd: "cat .agents/skills/dead-code/SKILL.md" });',
+        '}',
+        'const runtimeCommand = makeCommand(".agents/skills/runtime/SKILL.md");',
+        'tools.exec_command({ cmd: runtimeCommand });',
+      ].join('\n');
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stops after a separately bound options object evaluates a runtime workdir', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const options = {',
+            '  cmd: "cat .agents/skills/tdd/SKILL.md",',
+            '  workdir: resolveRuntimeWorkdir(),',
+            '};',
+            'tools.exec_command(options);',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not diagnose a non-read command merely because it mentions SKILL.md', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          'tools.exec_command({ cmd: "rg SKILL.md .", workdir: resolveRuntimeWorkdir() });',
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not use stale static evidence after an options object is mutated', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+            'options.cmd = runtimeCommand;',
+            'tools.exec_command(options);',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not use static object evidence after it escapes to an unknown function', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+            'mutateAtRuntime(options);',
+            'tools.exec_command(options);',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not execute nested tool arguments of an unsupported call', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          'missingFunction(tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" }));',
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stops static interpretation after unsupported control flow can change evidence', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+            'if (runtimeCondition) options.cmd = runtimeCommand;',
+            'tools.exec_command(options);',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stops before a class declaration can run static side effects', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+            'class Mutator { static { options.cmd = runtimeCommand; } }',
+            'tools.exec_command(options);',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not retain an outer static binding after an unsupported block assignment', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const cmd = "cat .agents/skills/tdd/SKILL.md";',
+            '{ cmd = runtimeCommand; }',
+            'tools.exec_command({ cmd });',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not use stale static evidence after a command array is mutated', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const sessionsRoot = path.join(root, 'codex-sessions');
+      const projectRoot = path.join(root, 'project');
+      await mkdir(sessionsRoot, { recursive: true });
+      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
+        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          [
+            'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
+            'commands.splice(0, 1);',
+            'await Promise.all(commands.map((command) => tools.exec_command(command)));',
+          ].join('\n'),
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: path.join(root, 'usage'),
+        providers: [{
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        }],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toEqual({
+        provider: 'codex',
+        importedRecords: 0,
+        skippedArtifacts: 0,
+        diagnostics: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('reads only usage log months that overlap the requested range', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
     try {
@@ -826,7 +2416,100 @@ describe('SkillUsageManager', () => {
 
       const stored = await readFile(path.join(usageRoot, 'invocations', 'codex', '2026-07.jsonl'), 'utf-8');
       expect(stored.trim().split('\n')).toHaveLength(1);
-      await expect(readFile(path.join(usageRoot, 'cursors', 'codex.json'), 'utf-8')).resolves.toContain('"importerVersion": 8');
+      await expect(readFile(path.join(usageRoot, 'cursors', 'codex.json'), 'utf-8')).resolves.toContain('"importerVersion": 9');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rebuilds Codex v8 usage without rebuilding Claude v8 usage', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+    try {
+      const usageRoot = path.join(root, 'usage');
+      const codexRoot = path.join(root, 'codex-sessions');
+      const codexProject = path.join(root, 'project');
+      const codexSkillPath = path.join(codexProject, '.agents', 'skills', 'tdd', 'SKILL.md');
+      const codexArtifact = path.join(codexRoot, 'session.jsonl');
+      const claudeRoot = path.join(root, 'claude-projects');
+      const claudeProject = path.join(claudeRoot, '-tmp-project');
+      const claudeArtifact = path.join(claudeProject, 'session-a.jsonl');
+      const claudeSkillRoot = path.join(root, 'claude-skills');
+      const claudeSkillPath = path.join(claudeSkillRoot, 'preserved-claude', 'SKILL.md');
+      await mkdir(codexRoot, { recursive: true });
+      await mkdir(path.dirname(codexSkillPath), { recursive: true });
+      await mkdir(claudeProject, { recursive: true });
+      await mkdir(path.dirname(claudeSkillPath), { recursive: true });
+      await writeFile(codexSkillPath, '---\nname: tdd\n---\n');
+      await writeFile(claudeSkillPath, '---\nname: preserved-claude\n---\n');
+      await writeFile(codexArtifact, jsonl([
+        sessionMeta('session-a', codexProject, '2026-07-13T08:00:00Z'),
+        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+        turnContext('turn-a', codexProject, '2026-07-13T08:00:02Z'),
+        orchestratedExecCall(
+          'call-a',
+          'await tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+          '2026-07-13T08:01:00Z',
+        ),
+      ]));
+      await writeFile(claudeArtifact, jsonl([
+        claudeAssistant({
+          sessionId: 'session-claude',
+          messageId: 'message-claude',
+          toolUseId: 'toolu-claude',
+          skillName: 'preserved-claude',
+          timestamp: '2026-07-13T09:00:00Z',
+        }),
+      ]));
+
+      const usage = new SkillUsageManager({
+        dataDir: usageRoot,
+        providers: [
+          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [codexRoot] },
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [claudeRoot],
+            skillRoots: [claudeSkillRoot],
+          },
+        ],
+      });
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
+      await expect(usage.importProvider('claude')).resolves.toMatchObject({ importedRecords: 1 });
+
+      const codexMetadata = await stat(codexArtifact);
+      const claudeMetadata = await stat(claudeArtifact);
+      await writeFile(path.join(usageRoot, 'cursors', 'codex.json'), JSON.stringify({
+        provider: 'codex',
+        importerVersion: 8,
+        artifacts: {
+          [codexArtifact]: { size: codexMetadata.size, mtimeMs: codexMetadata.mtimeMs },
+        },
+      }) + '\n');
+      await writeFile(path.join(usageRoot, 'cursors', 'claude.json'), JSON.stringify({
+        provider: 'claude',
+        importerVersion: 8,
+        artifacts: {
+          [claudeArtifact]: { size: claudeMetadata.size, mtimeMs: claudeMetadata.mtimeMs },
+        },
+      }) + '\n');
+      await rm(claudeArtifact);
+
+      await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
+      await expect(usage.importProvider('claude')).resolves.toMatchObject({ importedRecords: 0 });
+      await expect(usage.importProvider('claude')).resolves.toMatchObject({ importedRecords: 0 });
+
+      const overview = await usage.getOverview({
+        rangeDays: 7,
+        now: new Date('2026-07-13T12:00:00Z'),
+      });
+      expect(overview.providers.find((provider) => provider.provider === 'codex')?.ranking).toContainEqual(
+        expect.objectContaining({ skillName: 'tdd', countedInvocations: 1 }),
+      );
+      expect(overview.providers.find((provider) => provider.provider === 'claude')?.ranking).toContainEqual(
+        expect.objectContaining({ skillName: 'preserved-claude', countedInvocations: 1 }),
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -1539,6 +3222,65 @@ function functionOutput(callId: string, exitCode: number, timestamp: string): Re
       output: `Chunk ID: abc\nProcess exited with code ${exitCode}\nOutput:\n`,
     },
   };
+}
+
+function orchestratedExecCall(callId: string, input: string, timestamp: string): Record<string, unknown> {
+  return {
+    timestamp,
+    type: 'response_item',
+    payload: {
+      type: 'custom_tool_call',
+      name: 'exec',
+      call_id: callId,
+      status: 'completed',
+      input,
+    },
+  };
+}
+
+function orchestratedExecOutput(callId: string, timestamp: string): Record<string, unknown> {
+  return {
+    timestamp,
+    type: 'response_item',
+    payload: {
+      type: 'custom_tool_call_output',
+      call_id: callId,
+      output: 'Script completed\n',
+    },
+  };
+}
+
+async function importOrchestratedProgram(program: string, includeCwd = true) {
+  const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
+  try {
+    const sessionsRoot = path.join(root, 'codex-sessions');
+    const projectRoot = path.join(root, 'project');
+    await mkdir(sessionsRoot, { recursive: true });
+    const events = includeCwd
+      ? [
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        ]
+      : [
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        ];
+    await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl(events));
+    const usage = new SkillUsageManager({
+      dataDir: path.join(root, 'usage'),
+      providers: [{
+        provider: 'codex',
+        displayName: 'Codex',
+        supported: true,
+        artifactRoots: [sessionsRoot],
+      }],
+    });
+    return await usage.importProvider('codex');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 }
 
 function customToolCall(callId: string, cmd: string, timestamp: string): Record<string, unknown> {
