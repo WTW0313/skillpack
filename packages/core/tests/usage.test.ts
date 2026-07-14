@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { appendFile, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -10,43 +10,49 @@ describe('SkillUsageManager', () => {
     try {
       const usageRoot = path.join(root, 'usage');
       await mkdir(path.join(usageRoot, 'invocations', 'codex'), { recursive: true });
-      await writeFile(path.join(usageRoot, 'invocations', 'codex', '2026-07.jsonl'), JSON.stringify({
-        schemaVersion: 1,
-        recordId: 'stale',
-        provider: 'codex',
-        sessionId: 'session-a',
-        turnId: 'turn-a',
-        skillName: 'frontend-testing',
-        identityConfidence: 'inferred',
-        status: 'used',
-        startedAt: '2026-07-07T08:00:00Z',
-      }) + '\n', 'utf-8');
+      await writeFile(
+        path.join(usageRoot, 'invocations', 'codex', '2026-07.jsonl'),
+        JSON.stringify({
+          schemaVersion: 1,
+          recordId: 'stale',
+          provider: 'codex',
+          sessionId: 'session-a',
+          turnId: 'turn-a',
+          skillName: 'frontend-testing',
+          identityConfidence: 'inferred',
+          status: 'used',
+          startedAt: '2026-07-07T08:00:00Z',
+        }) + '\n',
+        'utf-8',
+      );
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
-        providers: [
-          { provider: 'codex', displayName: 'Codex', supported: false },
-        ],
+        providers: [{ provider: 'codex', displayName: 'Codex', supported: false }],
       });
 
-      await expect(usage.getOverview({
-        rangeDays: 7,
-        now: new Date('2026-07-08T00:00:00Z'),
-      })).resolves.toEqual({
+      await expect(
+        usage.getOverview({
+          rangeDays: 7,
+          now: new Date('2026-07-08T00:00:00Z'),
+        }),
+      ).resolves.toEqual({
         range: {
           days: 7,
           from: '2026-07-02',
           to: '2026-07-08',
         },
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          coverageState: 'unsupported',
-          coverageReasons: [],
-          heatmap: [],
-          dailySkillUsage: [],
-          ranking: [],
-          diagnostics: [],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            coverageState: 'unsupported',
+            coverageReasons: [],
+            heatmap: [],
+            dailySkillUsage: [],
+            ranking: [],
+            diagnostics: [],
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -60,25 +66,31 @@ describe('SkillUsageManager', () => {
       await mkdir(artifactRoot, { recursive: true });
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [],
+          },
+        ],
       });
 
-      await expect(usage.getOverview({
-        rangeDays: 7,
-        now: new Date('2026-07-08T12:00:00Z'),
-      })).resolves.toMatchObject({
-        providers: [{
-          provider: 'claude',
-          coverageState: 'not-configured',
-          coverageReasons: ['missing-attribution-roots'],
-          diagnostics: [],
-        }],
+      await expect(
+        usage.getOverview({
+          rangeDays: 7,
+          now: new Date('2026-07-08T12:00:00Z'),
+        }),
+      ).resolves.toMatchObject({
+        providers: [
+          {
+            provider: 'claude',
+            coverageState: 'not-configured',
+            coverageReasons: ['missing-attribution-roots'],
+            diagnostics: [],
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -90,31 +102,33 @@ describe('SkillUsageManager', () => {
     try {
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          configured: false,
-          artifactRoots: [],
-          skillRoots: [],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            configured: false,
+            artifactRoots: [],
+            skillRoots: [],
+          },
+        ],
       });
 
       await expect(usage.importAllProviders()).resolves.toEqual([]);
-      await expect(usage.getOverview({
-        rangeDays: 7,
-        now: new Date('2026-07-08T12:00:00Z'),
-      })).resolves.toMatchObject({
-        providers: [{
-          provider: 'claude',
-          coverageState: 'not-configured',
-          coverageReasons: [
-            'missing-artifact-roots',
-            'missing-attribution-roots',
-            'provider-not-configured',
-          ],
-          diagnostics: [],
-        }],
+      await expect(
+        usage.getOverview({
+          rangeDays: 7,
+          now: new Date('2026-07-08T12:00:00Z'),
+        }),
+      ).resolves.toMatchObject({
+        providers: [
+          {
+            provider: 'claude',
+            coverageState: 'not-configured',
+            coverageReasons: ['missing-artifact-roots', 'missing-attribution-roots', 'provider-not-configured'],
+            diagnostics: [],
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -131,42 +145,75 @@ describe('SkillUsageManager', () => {
       await mkdir(path.join(sessionsRoot, '2026', '07', '07'), { recursive: true });
       await mkdir(archivedRoot, { recursive: true });
       await mkdir(path.join(difyRoot, '.agents', 'skills', 'frontend-testing'), { recursive: true });
-      await writeFile(path.join(difyRoot, '.agents', 'skills', 'frontend-testing', 'SKILL.md'), '---\nname: ignored-frontmatter-name\n---\n');
+      await writeFile(
+        path.join(difyRoot, '.agents', 'skills', 'frontend-testing', 'SKILL.md'),
+        '---\nname: ignored-frontmatter-name\n---\n',
+      );
 
-      await writeFile(path.join(sessionsRoot, '2026', '07', '07', 'rollout-session-a.jsonl'), jsonl([
-        sessionMeta('session-a', path.join(root, 'other-project'), '2026-07-07T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
-        turnContext('turn-a', difyRoot, '2026-07-07T08:00:02Z'),
-        functionCall('call-a1', "sed -n '1,220p' .agents/skills/frontend-testing/SKILL.md", '2026-07-07T08:01:00Z'),
-        functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
-        functionCall('call-a2', "sed -n '221,520p' .agents/skills/frontend-testing/SKILL.md", '2026-07-07T08:01:02Z'),
-        functionOutput('call-a2', 0, '2026-07-07T08:01:03Z'),
-        functionCall('call-a-rg', "rg 'SKILL.md' /Users/twwu/dify", '2026-07-07T08:02:00Z'),
-        functionCall('call-a-python', "python3 -c 'print(\"/Users/twwu/dify/.agents/skills/not-invoked/SKILL.md\")'", '2026-07-07T08:02:01Z'),
-        customToolCall('call-a-custom', "sed -n '1,240p' /Users/twwu/dify/.agents/skills/not-invoked/SKILL.md", '2026-07-07T08:02:02Z'),
-        taskStarted('turn-b', '2026-07-07T09:00:00Z'),
-        turnContext('turn-b', difyRoot, '2026-07-07T09:00:01Z'),
-        functionCall('call-b1', "cat /Users/twwu/.agents/skills/vercel-react-best-practices/SKILL.md", '2026-07-07T09:01:00Z'),
-        functionOutput('call-b1', 0, '2026-07-07T09:01:01Z'),
-        taskStarted('turn-c', '2026-07-07T10:00:00Z'),
-        turnContext('turn-c', path.join(root, 'other-project'), '2026-07-07T10:00:01Z'),
-        functionCall('call-c1', "cat /Users/twwu/.agents/skills/other-project-only/SKILL.md", '2026-07-07T10:01:00Z'),
-      ]));
-      await writeFile(path.join(archivedRoot, 'rollout-session-b.jsonl'), jsonl([
-        sessionMeta('session-b', path.join(root, 'other-project'), '2026-07-07T11:00:00Z'),
-        taskStarted('turn-d', '2026-07-07T11:00:01Z'),
-        turnContext('turn-d', difyRoot, '2026-07-07T11:00:02Z'),
-        functionCall('call-d1', "nl -ba /Users/twwu/.codex/skills/.system/openai-docs/SKILL.md", '2026-07-07T11:01:00Z'),
-        functionOutput('call-d1', 0, '2026-07-07T11:01:01Z'),
-        functionCall('call-d2', "head /Users/twwu/.codex/plugins/cache/openai-curated-remote/github/0.1.5/skills/github/SKILL.md", '2026-07-07T11:02:00Z'),
-        functionOutput('call-d2', 0, '2026-07-07T11:02:01Z'),
-        functionCall('call-d3', "tail /Users/twwu/.codex/plugins/cache/openai-bundled/browser/26.623.141536/skills/control-in-app-browser/SKILL.md", '2026-07-07T11:03:00Z'),
-        functionOutput('call-d3', 0, '2026-07-07T11:03:01Z'),
-        taskStarted('turn-e', '2026-06-30T11:00:01Z'),
-        turnContext('turn-e', difyRoot, '2026-06-30T11:00:02Z'),
-        functionCall('call-e1', "bat /Users/twwu/.agents/skills/too-old/SKILL.md", '2026-06-30T11:01:00Z'),
-        functionOutput('call-e1', 0, '2026-06-30T11:01:01Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, '2026', '07', '07', 'rollout-session-a.jsonl'),
+        jsonl([
+          sessionMeta('session-a', path.join(root, 'other-project'), '2026-07-07T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+          turnContext('turn-a', difyRoot, '2026-07-07T08:00:02Z'),
+          functionCall('call-a1', "sed -n '1,220p' .agents/skills/frontend-testing/SKILL.md", '2026-07-07T08:01:00Z'),
+          functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
+          functionCall('call-a2', "sed -n '221,520p' .agents/skills/frontend-testing/SKILL.md", '2026-07-07T08:01:02Z'),
+          functionOutput('call-a2', 0, '2026-07-07T08:01:03Z'),
+          functionCall('call-a-rg', "rg 'SKILL.md' /Users/twwu/dify", '2026-07-07T08:02:00Z'),
+          functionCall(
+            'call-a-python',
+            'python3 -c \'print("/Users/twwu/dify/.agents/skills/not-invoked/SKILL.md")\'',
+            '2026-07-07T08:02:01Z',
+          ),
+          customToolCall(
+            'call-a-custom',
+            "sed -n '1,240p' /Users/twwu/dify/.agents/skills/not-invoked/SKILL.md",
+            '2026-07-07T08:02:02Z',
+          ),
+          taskStarted('turn-b', '2026-07-07T09:00:00Z'),
+          turnContext('turn-b', difyRoot, '2026-07-07T09:00:01Z'),
+          functionCall(
+            'call-b1',
+            'cat /Users/twwu/.agents/skills/vercel-react-best-practices/SKILL.md',
+            '2026-07-07T09:01:00Z',
+          ),
+          functionOutput('call-b1', 0, '2026-07-07T09:01:01Z'),
+          taskStarted('turn-c', '2026-07-07T10:00:00Z'),
+          turnContext('turn-c', path.join(root, 'other-project'), '2026-07-07T10:00:01Z'),
+          functionCall('call-c1', 'cat /Users/twwu/.agents/skills/other-project-only/SKILL.md', '2026-07-07T10:01:00Z'),
+        ]),
+      );
+      await writeFile(
+        path.join(archivedRoot, 'rollout-session-b.jsonl'),
+        jsonl([
+          sessionMeta('session-b', path.join(root, 'other-project'), '2026-07-07T11:00:00Z'),
+          taskStarted('turn-d', '2026-07-07T11:00:01Z'),
+          turnContext('turn-d', difyRoot, '2026-07-07T11:00:02Z'),
+          functionCall(
+            'call-d1',
+            'nl -ba /Users/twwu/.codex/skills/.system/openai-docs/SKILL.md',
+            '2026-07-07T11:01:00Z',
+          ),
+          functionOutput('call-d1', 0, '2026-07-07T11:01:01Z'),
+          functionCall(
+            'call-d2',
+            'head /Users/twwu/.codex/plugins/cache/openai-curated-remote/github/0.1.5/skills/github/SKILL.md',
+            '2026-07-07T11:02:00Z',
+          ),
+          functionOutput('call-d2', 0, '2026-07-07T11:02:01Z'),
+          functionCall(
+            'call-d3',
+            'tail /Users/twwu/.codex/plugins/cache/openai-bundled/browser/26.623.141536/skills/control-in-app-browser/SKILL.md',
+            '2026-07-07T11:03:00Z',
+          ),
+          functionOutput('call-d3', 0, '2026-07-07T11:03:01Z'),
+          taskStarted('turn-e', '2026-06-30T11:00:01Z'),
+          turnContext('turn-e', difyRoot, '2026-06-30T11:00:02Z'),
+          functionCall('call-e1', 'bat /Users/twwu/.agents/skills/too-old/SKILL.md', '2026-06-30T11:01:00Z'),
+          functionOutput('call-e1', 0, '2026-06-30T11:01:01Z'),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
         now: new Date('2026-07-08T12:00:00Z'),
@@ -211,20 +258,24 @@ describe('SkillUsageManager', () => {
         rangeDays: 30,
         now: new Date('2026-07-08T12:00:00Z'),
       });
-      expect(thirtyDayOverview.providers[0].ranking).toContainEqual(expect.objectContaining({
-        skillName: 'too-old',
-        countedInvocations: 1,
-      }));
+      expect(thirtyDayOverview.providers[0].ranking).toContainEqual(
+        expect.objectContaining({
+          skillName: 'too-old',
+          countedInvocations: 1,
+        }),
+      );
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 0 });
       const retainedOverview = await usage.getOverview({
         rangeDays: 30,
         now: new Date('2026-07-08T12:00:00Z'),
       });
-      expect(retainedOverview.providers[0].ranking).toContainEqual(expect.objectContaining({
-        skillName: 'too-old',
-        countedInvocations: 1,
-      }));
+      expect(retainedOverview.providers[0].ranking).toContainEqual(
+        expect.objectContaining({
+          skillName: 'too-old',
+          countedInvocations: 1,
+        }),
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -242,46 +293,51 @@ describe('SkillUsageManager', () => {
       await writeFile(skillPath, '---\nname: diagnosing-bugs\n---\n');
 
       const command = "sed -n '1,240p' .agents/skills/diagnosing-bugs/SKILL.md";
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        {
-          timestamp: '2026-07-13T08:01:00Z',
-          type: 'response_item',
-          payload: {
-            type: 'custom_tool_call',
-            name: 'exec',
-            call_id: 'call-a',
-            status: 'completed',
-            input: `const result = await tools.exec_command(${JSON.stringify({
-              cmd: command,
-              workdir: projectRoot,
-            })}); text(result.output);`,
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          {
+            timestamp: '2026-07-13T08:01:00Z',
+            type: 'response_item',
+            payload: {
+              type: 'custom_tool_call',
+              name: 'exec',
+              call_id: 'call-a',
+              status: 'completed',
+              input: `const result = await tools.exec_command(${JSON.stringify({
+                cmd: command,
+                workdir: projectRoot,
+              })}); text(result.output);`,
+            },
           },
-        },
-        {
-          timestamp: '2026-07-13T08:01:01Z',
-          type: 'response_item',
-          payload: {
-            type: 'custom_tool_call_output',
-            call_id: 'call-a',
-            output: [
-              { type: 'input_text', text: 'Script completed\nWall time 0.1 seconds\nOutput:\n' },
-              { type: 'input_text', text: '---\nname: diagnosing-bugs\n---\n' },
-            ],
+          {
+            timestamp: '2026-07-13T08:01:01Z',
+            type: 'response_item',
+            payload: {
+              type: 'custom_tool_call_output',
+              call_id: 'call-a',
+              output: [
+                { type: 'input_text', text: 'Script completed\nWall time 0.1 seconds\nOutput:\n' },
+                { type: 'input_text', text: '---\nname: diagnosing-bugs\n---\n' },
+              ],
+            },
           },
-        },
-      ]));
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({
@@ -293,18 +349,19 @@ describe('SkillUsageManager', () => {
         rangeDays: 7,
         now: new Date('2026-07-13T12:00:00Z'),
       });
-      expect(overview.providers[0].ranking).toEqual([{
-        skillName: 'diagnosing-bugs',
-        sourcePath: skillPath,
-        countedInvocations: 1,
-        failedInvocations: 0,
-        lastInvokedAt: '2026-07-13T08:01:00Z',
-      }]);
+      expect(overview.providers[0].ranking).toEqual([
+        {
+          skillName: 'diagnosing-bugs',
+          sourcePath: skillPath,
+          countedInvocations: 1,
+          failedInvocations: 0,
+          lastInvokedAt: '2026-07-13T08:01:00Z',
+        },
+      ]);
 
-      const stored = JSON.parse(await readFile(
-        path.join(usageRoot, 'invocations', 'codex', '2026-07.jsonl'),
-        'utf-8',
-      )) as { status: string; endedAt?: string | null };
+      const stored = JSON.parse(
+        await readFile(path.join(usageRoot, 'invocations', 'codex', '2026-07.jsonl'), 'utf-8'),
+      ) as { status: string; endedAt?: string | null };
       expect(stored).toMatchObject({
         status: 'unknown',
         endedAt: '2026-07-13T08:01:01Z',
@@ -325,21 +382,26 @@ describe('SkillUsageManager', () => {
         'text(first.output);',
         'await tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
       ].join('\n');
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 2 });
@@ -347,10 +409,7 @@ describe('SkillUsageManager', () => {
         rangeDays: 7,
         now: new Date('2026-07-13T12:00:00Z'),
       });
-      expect(overview.providers[0].ranking.map((row) => row.skillName).sort()).toEqual([
-        'diagnosing-bugs',
-        'tdd',
-      ]);
+      expect(overview.providers[0].ranking.map((row) => row.skillName).sort()).toEqual(['diagnosing-bugs', 'tdd']);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -571,25 +630,10 @@ describe('SkillUsageManager', () => {
   });
 
   it.each([
-    [
-      'Promise.all',
-      [
-        'const Promise = { all: () => { throw new Error("stop"); } };',
-        'Promise.all([]);',
-      ],
-    ],
-    [
-      'Object.assign',
-      [
-        'const Object = { assign: () => { throw new Error("stop"); } };',
-        'Object.assign({}, {});',
-      ],
-    ],
+    ['Promise.all', ['const Promise = { all: () => { throw new Error("stop"); } };', 'Promise.all([]);']],
+    ['Object.assign', ['const Object = { assign: () => { throw new Error("stop"); } };', 'Object.assign({}, {});']],
   ])('does not treat shadowed %s as a known builtin', async (_name, prefix) => {
-    const program = [
-      ...prefix,
-      'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
-    ].join('\n');
+    const program = [...prefix, 'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });'].join('\n');
 
     await expect(importOrchestratedProgram(program)).resolves.toMatchObject({
       importedRecords: 0,
@@ -678,10 +722,12 @@ describe('SkillUsageManager', () => {
       provider: 'codex',
       importedRecords: 0,
       skippedArtifacts: 0,
-      diagnostics: [{
-        provider: 'codex',
-        message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
-      }],
+      diagnostics: [
+        {
+          provider: 'codex',
+          message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
+        },
+      ],
     });
   });
 
@@ -696,28 +742,29 @@ describe('SkillUsageManager', () => {
       provider: 'codex',
       importedRecords: 0,
       skippedArtifacts: 0,
-      diagnostics: [{
-        provider: 'codex',
-        message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
-      }],
+      diagnostics: [
+        {
+          provider: 'codex',
+          message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
+        },
+      ],
     });
   });
 
   it('fails closed when one concrete command contains too many skill paths', async () => {
-    const paths = Array.from(
-      { length: 257 },
-      (_, index) => `.agents/skills/skill-${index}/SKILL.md`,
-    );
+    const paths = Array.from({ length: 257 }, (_, index) => `.agents/skills/skill-${index}/SKILL.md`);
     const program = `tools.exec_command({ cmd: ${JSON.stringify(`cat ${paths.join(' ')}`)} });`;
 
     await expect(importOrchestratedProgram(program)).resolves.toEqual({
       provider: 'codex',
       importedRecords: 0,
       skippedArtifacts: 0,
-      diagnostics: [{
-        provider: 'codex',
-        message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
-      }],
+      diagnostics: [
+        {
+          provider: 'codex',
+          message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: analysis-budget-exceeded',
+        },
+      ],
     });
   });
 
@@ -732,10 +779,12 @@ describe('SkillUsageManager', () => {
       provider: 'codex',
       importedRecords: 1,
       skippedArtifacts: 0,
-      diagnostics: [{
-        provider: 'codex',
-        message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
-      }],
+      diagnostics: [
+        {
+          provider: 'codex',
+          message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
+        },
+      ],
     });
   });
 
@@ -759,40 +808,45 @@ describe('SkillUsageManager', () => {
       ].join('\n');
       expect(program).not.toContain('SKILL.md');
 
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        {
-          timestamp: '2026-07-13T08:01:00Z',
-          type: 'response_item',
-          payload: {
-            type: 'custom_tool_call',
-            name: 'exec',
-            call_id: 'call-a',
-            status: 'completed',
-            input: program,
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          {
+            timestamp: '2026-07-13T08:01:00Z',
+            type: 'response_item',
+            payload: {
+              type: 'custom_tool_call',
+              name: 'exec',
+              call_id: 'call-a',
+              status: 'completed',
+              input: program,
+            },
           },
-        },
-        {
-          timestamp: '2026-07-13T08:01:01Z',
-          type: 'response_item',
-          payload: {
-            type: 'custom_tool_call_output',
-            call_id: 'call-a',
-            output: [{ type: 'input_text', text: 'Script completed\n' }],
+          {
+            timestamp: '2026-07-13T08:01:01Z',
+            type: 'response_item',
+            payload: {
+              type: 'custom_tool_call_output',
+              call_id: 'call-a',
+              output: [{ type: 'input_text', text: 'Script completed\n' }],
+            },
           },
-        },
-      ]));
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({
@@ -803,11 +857,13 @@ describe('SkillUsageManager', () => {
         rangeDays: 7,
         now: new Date('2026-07-13T12:00:00Z'),
       });
-      expect(overview.providers[0].ranking).toContainEqual(expect.objectContaining({
-        skillName: 'tdd',
-        sourcePath: skillPath,
-        countedInvocations: 1,
-      }));
+      expect(overview.providers[0].ranking).toContainEqual(
+        expect.objectContaining({
+          skillName: 'tdd',
+          sourcePath: skillPath,
+          countedInvocations: 1,
+        }),
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -820,11 +876,13 @@ describe('SkillUsageManager', () => {
       const projectRoot = path.join(root, 'project');
       const skillNames = ['diagnosing-bugs', 'tdd'];
       await mkdir(sessionsRoot, { recursive: true });
-      await Promise.all(skillNames.map(async (skillName) => {
-        const skillPath = path.join(projectRoot, '.agents', 'skills', skillName, 'SKILL.md');
-        await mkdir(path.dirname(skillPath), { recursive: true });
-        await writeFile(skillPath, `---\nname: ${skillName}\n---\n`);
-      }));
+      await Promise.all(
+        skillNames.map(async (skillName) => {
+          const skillPath = path.join(projectRoot, '.agents', 'skills', skillName, 'SKILL.md');
+          await mkdir(path.dirname(skillPath), { recursive: true });
+          await writeFile(skillPath, `---\nname: ${skillName}\n---\n`);
+        }),
+      );
 
       const program = [
         `const workdir = ${JSON.stringify(projectRoot)};`,
@@ -838,40 +896,45 @@ describe('SkillUsageManager', () => {
         'results.forEach((result) => text(result.output));',
       ].join('\n');
 
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        {
-          timestamp: '2026-07-13T08:01:00Z',
-          type: 'response_item',
-          payload: {
-            type: 'custom_tool_call',
-            name: 'exec',
-            call_id: 'call-a',
-            status: 'completed',
-            input: program,
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          {
+            timestamp: '2026-07-13T08:01:00Z',
+            type: 'response_item',
+            payload: {
+              type: 'custom_tool_call',
+              name: 'exec',
+              call_id: 'call-a',
+              status: 'completed',
+              input: program,
+            },
           },
-        },
-        {
-          timestamp: '2026-07-13T08:01:01Z',
-          type: 'response_item',
-          payload: {
-            type: 'custom_tool_call_output',
-            call_id: 'call-a',
-            output: 'Script completed\n',
+          {
+            timestamp: '2026-07-13T08:01:01Z',
+            type: 'response_item',
+            payload: {
+              type: 'custom_tool_call_output',
+              call_id: 'call-a',
+              output: 'Script completed\n',
+            },
           },
-        },
-      ]));
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({
@@ -907,21 +970,26 @@ describe('SkillUsageManager', () => {
         '  await Promise.all(commands.map(run));',
         '}',
       ].join('\n');
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
@@ -929,10 +997,12 @@ describe('SkillUsageManager', () => {
         rangeDays: 7,
         now: new Date('2026-07-13T12:00:00Z'),
       });
-      expect(overview.providers[0].ranking).toContainEqual(expect.objectContaining({
-        skillName: 'tdd',
-        sourcePath: skillPath,
-      }));
+      expect(overview.providers[0].ranking).toContainEqual(
+        expect.objectContaining({
+          skillName: 'tdd',
+          sourcePath: skillPath,
+        }),
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -951,21 +1021,26 @@ describe('SkillUsageManager', () => {
         'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
         'await Promise.all(commands.map((command, index) => tools.exec_command(command)));',
       ].join('\n');
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
@@ -973,10 +1048,12 @@ describe('SkillUsageManager', () => {
         rangeDays: 7,
         now: new Date('2026-07-13T12:00:00Z'),
       });
-      expect(overview.providers[0].ranking).toContainEqual(expect.objectContaining({
-        skillName: 'tdd',
-        sourcePath: skillPath,
-      }));
+      expect(overview.providers[0].ranking).toContainEqual(
+        expect.objectContaining({
+          skillName: 'tdd',
+          sourcePath: skillPath,
+        }),
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -992,21 +1069,26 @@ describe('SkillUsageManager', () => {
         'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
         'commands.map(function* (command) { tools.exec_command(command); });',
       ].join('\n');
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1041,22 +1123,27 @@ describe('SkillUsageManager', () => {
         '}',
       ].join('\n');
 
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
-        orchestratedExecOutput('call-a', '2026-07-13T08:01:01Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+          orchestratedExecOutput('call-a', '2026-07-13T08:01:01Z'),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({
@@ -1067,11 +1154,13 @@ describe('SkillUsageManager', () => {
         rangeDays: 7,
         now: new Date('2026-07-13T12:00:00Z'),
       });
-      expect(overview.providers[0].ranking).toContainEqual(expect.objectContaining({
-        skillName: 'grilling',
-        sourcePath: skillPath,
-        countedInvocations: 1,
-      }));
+      expect(overview.providers[0].ranking).toContainEqual(
+        expect.objectContaining({
+          skillName: 'grilling',
+          sourcePath: skillPath,
+          countedInvocations: 1,
+        }),
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -1096,21 +1185,26 @@ describe('SkillUsageManager', () => {
         '  break;',
         '}',
       ].join('\n');
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
@@ -1130,50 +1224,55 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-unresolved-command-a',
-          'tools.exec_command({ cmd: secretCommand /* /skills/tdd/SKILL.md */, workdir: "/tmp" });',
-          '2026-07-13T08:01:00Z',
-        ),
-        orchestratedExecCall(
-          'call-unresolved-command-b',
-          'tools.exec_command({ cmd: anotherSecretCommand /* /skills/tdd/SKILL.md */, workdir: "/tmp" });',
-          '2026-07-13T08:01:01Z',
-        ),
-        orchestratedExecCall(
-          'call-unresolved-workdir',
-          'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md", workdir: resolveSecretWorkdir() });',
-          '2026-07-13T08:01:02Z',
-        ),
-        orchestratedExecCall(
-          'call-unrelated-dynamic',
-          'tools.exec_command({ cmd: ordinaryRuntimeCommand, workdir: ordinaryRuntimeWorkdir });',
-          '2026-07-13T08:01:03Z',
-        ),
-        orchestratedExecCall(
-          'call-invalid-a',
-          'const brokenSkillSource = "/skills/tdd/SKILL.md"; tools.exec_command({',
-          '2026-07-13T08:01:04Z',
-        ),
-        orchestratedExecCall(
-          'call-invalid-b',
-          'const otherBrokenSkillSource = "/skills/tdd/SKILL.md"; tools.exec_command({',
-          '2026-07-13T08:01:05Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-unresolved-command-a',
+            'tools.exec_command({ cmd: secretCommand /* /skills/tdd/SKILL.md */, workdir: "/tmp" });',
+            '2026-07-13T08:01:00Z',
+          ),
+          orchestratedExecCall(
+            'call-unresolved-command-b',
+            'tools.exec_command({ cmd: anotherSecretCommand /* /skills/tdd/SKILL.md */, workdir: "/tmp" });',
+            '2026-07-13T08:01:01Z',
+          ),
+          orchestratedExecCall(
+            'call-unresolved-workdir',
+            'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md", workdir: resolveSecretWorkdir() });',
+            '2026-07-13T08:01:02Z',
+          ),
+          orchestratedExecCall(
+            'call-unrelated-dynamic',
+            'tools.exec_command({ cmd: ordinaryRuntimeCommand, workdir: ordinaryRuntimeWorkdir });',
+            '2026-07-13T08:01:03Z',
+          ),
+          orchestratedExecCall(
+            'call-invalid-a',
+            'const brokenSkillSource = "/skills/tdd/SKILL.md"; tools.exec_command({',
+            '2026-07-13T08:01:04Z',
+          ),
+          orchestratedExecCall(
+            'call-invalid-b',
+            'const otherBrokenSkillSource = "/skills/tdd/SKILL.md"; tools.exec_command({',
+            '2026-07-13T08:01:05Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       const result = await usage.importProvider('codex');
@@ -1211,33 +1310,40 @@ describe('SkillUsageManager', () => {
     try {
       const sessionsRoot = path.join(root, 'codex-sessions');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        orchestratedExecCall(
-          'call-a',
-          'await tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          orchestratedExecCall(
+            'call-a',
+            'await tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
         provider: 'codex',
         importedRecords: 0,
         skippedArtifacts: 0,
-        diagnostics: [{
-          provider: 'codex',
-          message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
-        }],
+        diagnostics: [
+          {
+            provider: 'codex',
+            message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -1249,33 +1355,36 @@ describe('SkillUsageManager', () => {
     try {
       const sessionsRoot = path.join(root, 'codex-sessions');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        functionCall(
-          'call-a',
-          'cat .agents/skills/tdd/SKILL.md',
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          functionCall('call-a', 'cat .agents/skills/tdd/SKILL.md', '2026-07-13T08:01:00Z'),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
         provider: 'codex',
         importedRecords: 0,
         skippedArtifacts: 0,
-        diagnostics: [{
-          provider: 'codex',
-          message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
-        }],
+        diagnostics: [
+          {
+            provider: 'codex',
+            message: 'Skipped 1 potential Codex Skill invocation in session.jsonl: unresolved-workdir',
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -1288,28 +1397,33 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const tools = { exec_command: (options) => options };',
-            'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const tools = { exec_command: (options) => options };',
+              'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1329,28 +1443,32 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            '{ var tools = fakeTools; }',
-            'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            ['{ var tools = fakeTools; }', 'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });'].join(
+              '\n',
+            ),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1370,28 +1488,33 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const { tools } = { tools: fakeTools };',
-            'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const { tools } = { tools: fakeTools };',
+              'tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1420,21 +1543,26 @@ describe('SkillUsageManager', () => {
         'const runtimeCommand = makeCommand(".agents/skills/runtime/SKILL.md");',
         'tools.exec_command({ cmd: runtimeCommand });',
       ].join('\n');
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall('call-a', program, '2026-07-13T08:01:00Z'),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1454,31 +1582,36 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const options = {',
-            '  cmd: "cat .agents/skills/tdd/SKILL.md",',
-            '  workdir: resolveRuntimeWorkdir(),',
-            '};',
-            'tools.exec_command(options);',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const options = {',
+              '  cmd: "cat .agents/skills/tdd/SKILL.md",',
+              '  workdir: resolveRuntimeWorkdir(),',
+              '};',
+              'tools.exec_command(options);',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1498,25 +1631,30 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          'tools.exec_command({ cmd: "rg SKILL.md .", workdir: resolveRuntimeWorkdir() });',
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            'tools.exec_command({ cmd: "rg SKILL.md .", workdir: resolveRuntimeWorkdir() });',
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1536,29 +1674,34 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
-            'options.cmd = runtimeCommand;',
-            'tools.exec_command(options);',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+              'options.cmd = runtimeCommand;',
+              'tools.exec_command(options);',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1578,29 +1721,34 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
-            'mutateAtRuntime(options);',
-            'tools.exec_command(options);',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+              'mutateAtRuntime(options);',
+              'tools.exec_command(options);',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1620,25 +1768,30 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          'missingFunction(tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" }));',
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            'missingFunction(tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" }));',
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1658,29 +1811,34 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
-            'if (runtimeCondition) options.cmd = runtimeCommand;',
-            'tools.exec_command(options);',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+              'if (runtimeCondition) options.cmd = runtimeCommand;',
+              'tools.exec_command(options);',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1700,29 +1858,34 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
-            'class Mutator { static { options.cmd = runtimeCommand; } }',
-            'tools.exec_command(options);',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const options = { cmd: "cat .agents/skills/tdd/SKILL.md" };',
+              'class Mutator { static { options.cmd = runtimeCommand; } }',
+              'tools.exec_command(options);',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1742,29 +1905,34 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const cmd = "cat .agents/skills/tdd/SKILL.md";',
-            '{ cmd = runtimeCommand; }',
-            'tools.exec_command({ cmd });',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const cmd = "cat .agents/skills/tdd/SKILL.md";',
+              '{ cmd = runtimeCommand; }',
+              'tools.exec_command({ cmd });',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1784,29 +1952,34 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          [
-            'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
-            'commands.splice(0, 1);',
-            'await Promise.all(commands.map((command) => tools.exec_command(command)));',
-          ].join('\n'),
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', projectRoot, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            [
+              'const commands = [{ cmd: "cat .agents/skills/tdd/SKILL.md" }];',
+              'commands.splice(0, 1);',
+              'await Promise.all(commands.map((command) => tools.exec_command(command)));',
+            ].join('\n'),
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toEqual({
@@ -1828,40 +2001,48 @@ describe('SkillUsageManager', () => {
       const historicalPartition = path.join(partitionRoot, '2025-12.jsonl');
       const requestedPartition = path.join(partitionRoot, '2026-07.jsonl');
       await mkdir(partitionRoot, { recursive: true });
-      await writeFile(historicalPartition, JSON.stringify({
-        schemaVersion: 1,
-        recordId: 'historical',
-        provider: 'codex',
-        sessionId: 'session-old',
-        turnId: 'turn-old',
-        skillName: 'historical-skill',
-        identityConfidence: 'inferred',
-        status: 'used',
-        startedAt: '2025-12-15T08:00:00Z',
-      }) + '\n');
-      await writeFile(requestedPartition, JSON.stringify({
-        schemaVersion: 1,
-        recordId: 'requested',
-        provider: 'codex',
-        sessionId: 'session-current',
-        turnId: 'turn-current',
-        skillName: 'requested-skill',
-        identityConfidence: 'inferred',
-        status: 'used',
-        startedAt: '2026-07-07T08:00:00Z',
-      }) + '\n');
+      await writeFile(
+        historicalPartition,
+        JSON.stringify({
+          schemaVersion: 1,
+          recordId: 'historical',
+          provider: 'codex',
+          sessionId: 'session-old',
+          turnId: 'turn-old',
+          skillName: 'historical-skill',
+          identityConfidence: 'inferred',
+          status: 'used',
+          startedAt: '2025-12-15T08:00:00Z',
+        }) + '\n',
+      );
+      await writeFile(
+        requestedPartition,
+        JSON.stringify({
+          schemaVersion: 1,
+          recordId: 'requested',
+          provider: 'codex',
+          sessionId: 'session-current',
+          turnId: 'turn-current',
+          skillName: 'requested-skill',
+          identityConfidence: 'inferred',
+          status: 'used',
+          startedAt: '2026-07-07T08:00:00Z',
+        }) + '\n',
+      );
       const oldAccessTime = new Date('2000-01-01T00:00:00.000Z');
       const oldModifiedTime = new Date('2020-01-01T00:00:00.000Z');
       await utimes(historicalPartition, oldAccessTime, oldModifiedTime);
       await utimes(requestedPartition, oldAccessTime, oldModifiedTime);
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [path.join(root, 'sessions')],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [path.join(root, 'sessions')],
+          },
+        ],
       });
 
       const overview = await usage.getOverview({
@@ -1869,9 +2050,7 @@ describe('SkillUsageManager', () => {
         now: new Date('2026-07-08T12:00:00Z'),
       });
 
-      expect(overview.providers[0].ranking).toMatchObject([
-        { skillName: 'requested-skill', countedInvocations: 1 },
-      ]);
+      expect(overview.providers[0].ranking).toMatchObject([{ skillName: 'requested-skill', countedInvocations: 1 }]);
       expect((await stat(requestedPartition)).atimeMs).toBeGreaterThan(oldAccessTime.getTime());
       expect((await stat(historicalPartition)).atimeMs).toBe(oldAccessTime.getTime());
     } finally {
@@ -1885,36 +2064,44 @@ describe('SkillUsageManager', () => {
       const usageRoot = path.join(root, 'usage');
       const partitionRoot = path.join(usageRoot, 'invocations', 'codex');
       await mkdir(partitionRoot, { recursive: true });
-      await writeFile(path.join(partitionRoot, '2026-07.jsonl'), JSON.stringify({
-        schemaVersion: 1,
-        recordId: 'july',
-        provider: 'codex',
-        sessionId: 'session-july',
-        turnId: 'turn-july',
-        skillName: 'july-skill',
-        identityConfidence: 'inferred',
-        status: 'used',
-        startedAt: '2026-07-31T08:00:00Z',
-      }) + '\n');
-      await writeFile(path.join(partitionRoot, '2026-08.jsonl'), JSON.stringify({
-        schemaVersion: 1,
-        recordId: 'august',
-        provider: 'codex',
-        sessionId: 'session-august',
-        turnId: 'turn-august',
-        skillName: 'august-skill',
-        identityConfidence: 'inferred',
-        status: 'used',
-        startedAt: '2026-08-01T08:00:00Z',
-      }) + '\n');
+      await writeFile(
+        path.join(partitionRoot, '2026-07.jsonl'),
+        JSON.stringify({
+          schemaVersion: 1,
+          recordId: 'july',
+          provider: 'codex',
+          sessionId: 'session-july',
+          turnId: 'turn-july',
+          skillName: 'july-skill',
+          identityConfidence: 'inferred',
+          status: 'used',
+          startedAt: '2026-07-31T08:00:00Z',
+        }) + '\n',
+      );
+      await writeFile(
+        path.join(partitionRoot, '2026-08.jsonl'),
+        JSON.stringify({
+          schemaVersion: 1,
+          recordId: 'august',
+          provider: 'codex',
+          sessionId: 'session-august',
+          turnId: 'turn-august',
+          skillName: 'august-skill',
+          identityConfidence: 'inferred',
+          status: 'used',
+          startedAt: '2026-08-01T08:00:00Z',
+        }) + '\n',
+      );
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [path.join(root, 'sessions')],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [path.join(root, 'sessions')],
+          },
+        ],
       });
 
       const overview = await usage.getOverview({
@@ -1922,10 +2109,7 @@ describe('SkillUsageManager', () => {
         now: new Date('2026-08-03T12:00:00Z'),
       });
 
-      expect(overview.providers[0].ranking.map((row) => row.skillName)).toEqual([
-        'august-skill',
-        'july-skill',
-      ]);
+      expect(overview.providers[0].ranking.map((row) => row.skillName)).toEqual(['august-skill', 'july-skill']);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -1937,23 +2121,28 @@ describe('SkillUsageManager', () => {
       const sessionsRoot = path.join(root, 'codex-sessions');
       const difyRoot = path.join(root, 'dify');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', difyRoot, '2026-07-07T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
-        turnContext('turn-a', difyRoot, '2026-07-07T08:00:02Z'),
-        functionCall('call-a1', "sed -n '1,220p' /Users/twwu/.agents/skills/frontend-testing/SKILL.md", '2026-07-07T08:01:00Z'),
-        functionOutput('call-a1', 1, '2026-07-07T08:01:01Z'),
-        taskStarted('turn-b', '2026-07-07T09:00:01Z'),
-        turnContext('turn-b', difyRoot, '2026-07-07T09:00:02Z'),
-        functionCall('call-b1', "cat /Users/twwu/.agents/skills/frontend-testing/SKILL.md", '2026-07-07T09:01:00Z'),
-        functionOutput('call-b1', 0, '2026-07-07T09:01:01Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', difyRoot, '2026-07-07T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+          turnContext('turn-a', difyRoot, '2026-07-07T08:00:02Z'),
+          functionCall(
+            'call-a1',
+            "sed -n '1,220p' /Users/twwu/.agents/skills/frontend-testing/SKILL.md",
+            '2026-07-07T08:01:00Z',
+          ),
+          functionOutput('call-a1', 1, '2026-07-07T08:01:01Z'),
+          taskStarted('turn-b', '2026-07-07T09:00:01Z'),
+          turnContext('turn-b', difyRoot, '2026-07-07T09:00:02Z'),
+          functionCall('call-b1', 'cat /Users/twwu/.agents/skills/frontend-testing/SKILL.md', '2026-07-07T09:01:00Z'),
+          functionOutput('call-b1', 0, '2026-07-07T09:01:01Z'),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
         now: new Date('2026-07-08T12:00:00Z'),
-        providers: [
-          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
-        ],
+        providers: [{ provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] }],
       });
 
       await usage.importProvider('codex');
@@ -1967,11 +2156,11 @@ describe('SkillUsageManager', () => {
         failedInvocations: 1,
       });
       expect(overview).toMatchObject({
-        providers: [{
-          ranking: [
-            { skillName: 'frontend-testing', countedInvocations: 1, failedInvocations: 1 },
-          ],
-        }],
+        providers: [
+          {
+            ranking: [{ skillName: 'frontend-testing', countedInvocations: 1, failedInvocations: 1 }],
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -1985,41 +2174,52 @@ describe('SkillUsageManager', () => {
       const usageRoot = path.join(root, 'usage');
       const projectRoot = path.join(root, 'project');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', projectRoot, '2026-07-07T08:00:00Z'),
-        taskStarted('turn-beta-1', '2026-07-07T08:00:01Z'),
-        turnContext('turn-beta-1', projectRoot, '2026-07-07T08:00:02Z'),
-        functionCall('call-beta-1', 'cat /Users/twwu/.agents/skills/skill-beta/SKILL.md', '2026-07-07T08:01:00Z'),
-        functionOutput('call-beta-1', 0, '2026-07-07T08:01:01Z'),
-        taskStarted('turn-alpha-success', '2026-07-07T09:00:01Z'),
-        turnContext('turn-alpha-success', projectRoot, '2026-07-07T09:00:02Z'),
-        functionCall('call-alpha-success', 'cat /Users/twwu/.agents/skills/skill-alpha/SKILL.md', '2026-07-07T09:01:00Z'),
-        functionOutput('call-alpha-success', 0, '2026-07-07T09:01:01Z'),
-        taskStarted('turn-zeta', '2026-07-07T10:00:01Z'),
-        turnContext('turn-zeta', projectRoot, '2026-07-07T10:00:02Z'),
-        functionCall('call-zeta', 'cat /Users/twwu/.agents/skills/skill-zeta/SKILL.md', '2026-07-07T10:01:00Z'),
-        functionOutput('call-zeta', 0, '2026-07-07T10:01:01Z'),
-        taskStarted('turn-alpha-failed', '2026-07-07T11:00:01Z'),
-        turnContext('turn-alpha-failed', projectRoot, '2026-07-07T11:00:02Z'),
-        functionCall('call-alpha-failed', 'cat /Users/twwu/.agents/skills/skill-alpha/SKILL.md', '2026-07-07T11:01:00Z'),
-        functionOutput('call-alpha-failed', 1, '2026-07-07T11:01:01Z'),
-        taskStarted('turn-beta-2', '2026-07-07T12:00:01Z'),
-        turnContext('turn-beta-2', projectRoot, '2026-07-07T12:00:02Z'),
-        functionCall('call-beta-2', 'cat /Users/twwu/.agents/skills/skill-beta/SKILL.md', '2026-07-07T12:01:00Z'),
-        functionOutput('call-beta-2', 0, '2026-07-07T12:01:01Z'),
-      ]));
-      const currentSkills = [{
-        provider: 'global',
-        name: 'skill-beta',
-        path: '/Users/twwu/.agents/skills/skill-beta',
-        resolvedPath: '/Users/twwu/.agents/skills/skill-beta',
-      }];
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', projectRoot, '2026-07-07T08:00:00Z'),
+          taskStarted('turn-beta-1', '2026-07-07T08:00:01Z'),
+          turnContext('turn-beta-1', projectRoot, '2026-07-07T08:00:02Z'),
+          functionCall('call-beta-1', 'cat /Users/twwu/.agents/skills/skill-beta/SKILL.md', '2026-07-07T08:01:00Z'),
+          functionOutput('call-beta-1', 0, '2026-07-07T08:01:01Z'),
+          taskStarted('turn-alpha-success', '2026-07-07T09:00:01Z'),
+          turnContext('turn-alpha-success', projectRoot, '2026-07-07T09:00:02Z'),
+          functionCall(
+            'call-alpha-success',
+            'cat /Users/twwu/.agents/skills/skill-alpha/SKILL.md',
+            '2026-07-07T09:01:00Z',
+          ),
+          functionOutput('call-alpha-success', 0, '2026-07-07T09:01:01Z'),
+          taskStarted('turn-zeta', '2026-07-07T10:00:01Z'),
+          turnContext('turn-zeta', projectRoot, '2026-07-07T10:00:02Z'),
+          functionCall('call-zeta', 'cat /Users/twwu/.agents/skills/skill-zeta/SKILL.md', '2026-07-07T10:01:00Z'),
+          functionOutput('call-zeta', 0, '2026-07-07T10:01:01Z'),
+          taskStarted('turn-alpha-failed', '2026-07-07T11:00:01Z'),
+          turnContext('turn-alpha-failed', projectRoot, '2026-07-07T11:00:02Z'),
+          functionCall(
+            'call-alpha-failed',
+            'cat /Users/twwu/.agents/skills/skill-alpha/SKILL.md',
+            '2026-07-07T11:01:00Z',
+          ),
+          functionOutput('call-alpha-failed', 1, '2026-07-07T11:01:01Z'),
+          taskStarted('turn-beta-2', '2026-07-07T12:00:01Z'),
+          turnContext('turn-beta-2', projectRoot, '2026-07-07T12:00:02Z'),
+          functionCall('call-beta-2', 'cat /Users/twwu/.agents/skills/skill-beta/SKILL.md', '2026-07-07T12:01:00Z'),
+          functionOutput('call-beta-2', 0, '2026-07-07T12:01:01Z'),
+        ]),
+      );
+      const currentSkills = [
+        {
+          provider: 'global',
+          name: 'skill-beta',
+          path: '/Users/twwu/.agents/skills/skill-beta',
+          resolvedPath: '/Users/twwu/.agents/skills/skill-beta',
+        },
+      ];
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
         now: new Date('2026-07-08T12:00:00Z'),
-        providers: [
-          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
-        ],
+        providers: [{ provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] }],
       });
 
       await usage.importProvider('codex', currentSkills);
@@ -2030,20 +2230,55 @@ describe('SkillUsageManager', () => {
       });
       const provider = overview.providers[0];
 
-      expect(provider.ranking.map((row) => ({
-        skillName: row.skillName,
-        sourcePath: row.sourcePath,
-        countedInvocations: row.countedInvocations,
-        failedInvocations: row.failedInvocations,
-      }))).toEqual([
-        { skillName: 'skill-beta', sourcePath: '/Users/twwu/.agents/skills/skill-beta/SKILL.md', countedInvocations: 2, failedInvocations: 0 },
-        { skillName: 'skill-alpha', sourcePath: '/Users/twwu/.agents/skills/skill-alpha/SKILL.md', countedInvocations: 1, failedInvocations: 1 },
-        { skillName: 'skill-zeta', sourcePath: '/Users/twwu/.agents/skills/skill-zeta/SKILL.md', countedInvocations: 1, failedInvocations: 0 },
+      expect(
+        provider.ranking.map((row) => ({
+          skillName: row.skillName,
+          sourcePath: row.sourcePath,
+          countedInvocations: row.countedInvocations,
+          failedInvocations: row.failedInvocations,
+        })),
+      ).toEqual([
+        {
+          skillName: 'skill-beta',
+          sourcePath: '/Users/twwu/.agents/skills/skill-beta/SKILL.md',
+          countedInvocations: 2,
+          failedInvocations: 0,
+        },
+        {
+          skillName: 'skill-alpha',
+          sourcePath: '/Users/twwu/.agents/skills/skill-alpha/SKILL.md',
+          countedInvocations: 1,
+          failedInvocations: 1,
+        },
+        {
+          skillName: 'skill-zeta',
+          sourcePath: '/Users/twwu/.agents/skills/skill-zeta/SKILL.md',
+          countedInvocations: 1,
+          failedInvocations: 0,
+        },
       ]);
       expect(provider.dailySkillUsage.find((day) => day.date === '2026-07-07')?.rows).toEqual([
-        { skillName: 'skill-beta', sourcePath: '/Users/twwu/.agents/skills/skill-beta/SKILL.md', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-07T12:01:00Z' },
-        { skillName: 'skill-alpha', sourcePath: '/Users/twwu/.agents/skills/skill-alpha/SKILL.md', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-07T11:01:00Z' },
-        { skillName: 'skill-zeta', sourcePath: '/Users/twwu/.agents/skills/skill-zeta/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:01:00Z' },
+        {
+          skillName: 'skill-beta',
+          sourcePath: '/Users/twwu/.agents/skills/skill-beta/SKILL.md',
+          countedInvocations: 2,
+          failedInvocations: 0,
+          lastInvokedAt: '2026-07-07T12:01:00Z',
+        },
+        {
+          skillName: 'skill-alpha',
+          sourcePath: '/Users/twwu/.agents/skills/skill-alpha/SKILL.md',
+          countedInvocations: 1,
+          failedInvocations: 1,
+          lastInvokedAt: '2026-07-07T11:01:00Z',
+        },
+        {
+          skillName: 'skill-zeta',
+          sourcePath: '/Users/twwu/.agents/skills/skill-zeta/SKILL.md',
+          countedInvocations: 1,
+          failedInvocations: 0,
+          lastInvokedAt: '2026-07-07T10:01:00Z',
+        },
       ]);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -2060,26 +2295,29 @@ describe('SkillUsageManager', () => {
       await mkdir(sessionsRoot, { recursive: true });
       await mkdir(skillDir, { recursive: true });
       await writeFile(skillMdPath, '---\nname: frontend-testing\n---\n');
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
-        turnContext('turn-a', root, '2026-07-07T08:00:02Z'),
-        functionCall('call-a1', `cat ${skillMdPath}`, '2026-07-07T08:01:00Z'),
-        functionOutput('call-a1', 0, '2026-07-07T08:01:15Z'),
-      ]));
-      const currentSkills = [{
-        provider: 'global',
-        name: 'frontend-testing',
-        path: skillDir,
-        resolvedPath: skillDir,
-        source: { type: 'skillssh' as const, repo: 'owner/repo', skillFolderHash: 'abc123' },
-      }];
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+          turnContext('turn-a', root, '2026-07-07T08:00:02Z'),
+          functionCall('call-a1', `cat ${skillMdPath}`, '2026-07-07T08:01:00Z'),
+          functionOutput('call-a1', 0, '2026-07-07T08:01:15Z'),
+        ]),
+      );
+      const currentSkills = [
+        {
+          provider: 'global',
+          name: 'frontend-testing',
+          path: skillDir,
+          resolvedPath: skillDir,
+          source: { type: 'skillssh' as const, repo: 'owner/repo', skillFolderHash: 'abc123' },
+        },
+      ];
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
         now: new Date('2026-07-08T12:00:00Z'),
-        providers: [
-          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
-        ],
+        providers: [{ provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] }],
       });
 
       await expect(usage.importProvider('codex', currentSkills)).resolves.toMatchObject({ importedRecords: 1 });
@@ -2113,23 +2351,24 @@ describe('SkillUsageManager', () => {
       const skillA = path.join(projectA, '.agents', 'skills', 'shared-name', 'SKILL.md');
       const skillB = path.join(projectB, '.agents', 'skills', 'shared-name', 'SKILL.md');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
-        turnContext('turn-a', projectA, '2026-07-07T08:00:02Z'),
-        functionCall('call-a1', `cat ${skillA}`, '2026-07-07T08:01:00Z'),
-        functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
-        taskStarted('turn-b', '2026-07-07T09:00:01Z'),
-        turnContext('turn-b', projectB, '2026-07-07T09:00:02Z'),
-        functionCall('call-b1', `cat ${skillB}`, '2026-07-07T09:01:00Z'),
-        functionOutput('call-b1', 0, '2026-07-07T09:01:01Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+          turnContext('turn-a', projectA, '2026-07-07T08:00:02Z'),
+          functionCall('call-a1', `cat ${skillA}`, '2026-07-07T08:01:00Z'),
+          functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
+          taskStarted('turn-b', '2026-07-07T09:00:01Z'),
+          turnContext('turn-b', projectB, '2026-07-07T09:00:02Z'),
+          functionCall('call-b1', `cat ${skillB}`, '2026-07-07T09:01:00Z'),
+          functionOutput('call-b1', 0, '2026-07-07T09:01:01Z'),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
         now: new Date('2026-07-08T12:00:00Z'),
-        providers: [
-          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
-        ],
+        providers: [{ provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] }],
       });
 
       await usage.importProvider('codex');
@@ -2138,11 +2377,13 @@ describe('SkillUsageManager', () => {
         rangeDays: 7,
         now: new Date('2026-07-08T12:00:00Z'),
       });
-      expect(overview.providers[0].ranking.map((row) => ({
-        skillName: row.skillName,
-        sourcePath: row.sourcePath,
-        countedInvocations: row.countedInvocations,
-      }))).toEqual([
+      expect(
+        overview.providers[0].ranking.map((row) => ({
+          skillName: row.skillName,
+          sourcePath: row.sourcePath,
+          countedInvocations: row.countedInvocations,
+        })),
+      ).toEqual([
         { skillName: 'shared-name', sourcePath: skillB, countedInvocations: 1 },
         { skillName: 'shared-name', sourcePath: skillA, countedInvocations: 1 },
       ]);
@@ -2165,33 +2406,43 @@ describe('SkillUsageManager', () => {
       await mkdir(sharedSkillDir, { recursive: true });
       await writeFile(resolvedSkillPath, '---\nname: frontend-testing\n---\n');
       await symlink(sharedSkillDir, aliasSkillDir);
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
-        turnContext('turn-a', root, '2026-07-07T08:00:02Z'),
-        functionCall('call-alias', `cat ${aliasSkillPath}`, '2026-07-07T08:01:00Z'),
-        functionOutput('call-alias', 0, '2026-07-07T08:01:01Z'),
-        functionCall('call-resolved', `cat ${resolvedSkillPath}`, '2026-07-07T08:01:02Z'),
-        functionOutput('call-resolved', 0, '2026-07-07T08:01:03Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+          turnContext('turn-a', root, '2026-07-07T08:00:02Z'),
+          functionCall('call-alias', `cat ${aliasSkillPath}`, '2026-07-07T08:01:00Z'),
+          functionOutput('call-alias', 0, '2026-07-07T08:01:01Z'),
+          functionCall('call-resolved', `cat ${resolvedSkillPath}`, '2026-07-07T08:01:02Z'),
+          functionOutput('call-resolved', 0, '2026-07-07T08:01:03Z'),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          supported: true,
-          artifactRoots: [sessionsRoot],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: [sessionsRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
-      const [storedRecord] = (await readFile(
-        path.join(root, 'usage', 'invocations', 'codex', '2026-07.jsonl'),
-        'utf-8',
-      )).trim().split('\n').map((line) => JSON.parse(line) as {
-        skillPath?: string;
-        resolvedPath?: string;
-      });
+      const [storedRecord] = (
+        await readFile(path.join(root, 'usage', 'invocations', 'codex', '2026-07.jsonl'), 'utf-8')
+      )
+        .trim()
+        .split('\n')
+        .map(
+          (line) =>
+            JSON.parse(line) as {
+              skillPath?: string;
+              resolvedPath?: string;
+            },
+        );
       expect(storedRecord.skillPath).toBeUndefined();
       expect(storedRecord.resolvedPath).toBe(await realpath(resolvedSkillPath));
       const overview = await usage.getOverview({
@@ -2217,42 +2468,47 @@ describe('SkillUsageManager', () => {
       const partitionRoot = path.join(usageRoot, 'invocations', 'claude');
       const resolvedPath = path.join(root, 'shared-skills', 'frontend-testing', 'SKILL.md');
       await mkdir(partitionRoot, { recursive: true });
-      await writeFile(path.join(partitionRoot, '2026-07.jsonl'), jsonl([
-        {
-          schemaVersion: 1,
-          recordId: 'alias-invocation',
-          provider: 'claude',
-          sessionId: 'session-a',
-          turnId: 'message-a',
-          skillName: 'frontend-testing',
-          skillPath: path.join(root, 'claude-skills', 'frontend-testing', 'SKILL.md'),
-          resolvedPath,
-          identityConfidence: 'confirmed',
-          status: 'used',
-          startedAt: '2026-07-07T09:00:00Z',
-        },
-        {
-          schemaVersion: 1,
-          recordId: 'resolved-invocation',
-          provider: 'claude',
-          sessionId: 'session-b',
-          turnId: 'message-b',
-          skillName: 'frontend-testing',
-          resolvedPath,
-          identityConfidence: 'confirmed',
-          status: 'used',
-          startedAt: '2026-07-07T10:00:00Z',
-        },
-      ]));
+      await writeFile(
+        path.join(partitionRoot, '2026-07.jsonl'),
+        jsonl([
+          {
+            schemaVersion: 1,
+            recordId: 'alias-invocation',
+            provider: 'claude',
+            sessionId: 'session-a',
+            turnId: 'message-a',
+            skillName: 'frontend-testing',
+            skillPath: path.join(root, 'claude-skills', 'frontend-testing', 'SKILL.md'),
+            resolvedPath,
+            identityConfidence: 'confirmed',
+            status: 'used',
+            startedAt: '2026-07-07T09:00:00Z',
+          },
+          {
+            schemaVersion: 1,
+            recordId: 'resolved-invocation',
+            provider: 'claude',
+            sessionId: 'session-b',
+            turnId: 'message-b',
+            skillName: 'frontend-testing',
+            resolvedPath,
+            identityConfidence: 'confirmed',
+            status: 'used',
+            startedAt: '2026-07-07T10:00:00Z',
+          },
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [path.join(root, 'claude-projects')],
-          skillRoots: [path.join(root, 'claude-skills')],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [path.join(root, 'claude-projects')],
+            skillRoots: [path.join(root, 'claude-skills')],
+          },
+        ],
       });
 
       const overview = await usage.getOverview({
@@ -2260,13 +2516,15 @@ describe('SkillUsageManager', () => {
         now: new Date('2026-07-08T12:00:00Z'),
       });
 
-      expect(overview.providers[0].ranking).toEqual([{
-        skillName: 'frontend-testing',
-        sourcePath: resolvedPath,
-        countedInvocations: 2,
-        failedInvocations: 0,
-        lastInvokedAt: '2026-07-07T10:00:00Z',
-      }]);
+      expect(overview.providers[0].ranking).toEqual([
+        {
+          skillName: 'frontend-testing',
+          sourcePath: resolvedPath,
+          countedInvocations: 2,
+          failedInvocations: 0,
+          lastInvokedAt: '2026-07-07T10:00:00Z',
+        },
+      ]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -2276,30 +2534,53 @@ describe('SkillUsageManager', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'skillpack-usage-'));
     try {
       const sessionsRoot = path.join(root, 'codex-sessions');
-      const firstVersion = path.join(root, '.codex', 'plugins', 'cache', 'openai-curated', 'github', 'version-a', 'skills', 'github', 'SKILL.md');
-      const secondVersion = path.join(root, '.codex', 'plugins', 'cache', 'openai-curated', 'github', 'version-b', 'skills', 'github', 'SKILL.md');
+      const firstVersion = path.join(
+        root,
+        '.codex',
+        'plugins',
+        'cache',
+        'openai-curated',
+        'github',
+        'version-a',
+        'skills',
+        'github',
+        'SKILL.md',
+      );
+      const secondVersion = path.join(
+        root,
+        '.codex',
+        'plugins',
+        'cache',
+        'openai-curated',
+        'github',
+        'version-b',
+        'skills',
+        'github',
+        'SKILL.md',
+      );
       await mkdir(sessionsRoot, { recursive: true });
       await mkdir(path.dirname(firstVersion), { recursive: true });
       await mkdir(path.dirname(secondVersion), { recursive: true });
       await writeFile(firstVersion, '---\nname: github\n---\n');
       await writeFile(secondVersion, '---\nname: github\n---\n');
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
-        turnContext('turn-a', root, '2026-07-07T08:00:02Z'),
-        functionCall('call-a', `cat ${firstVersion}`, '2026-07-07T08:01:00Z'),
-        functionOutput('call-a', 0, '2026-07-07T08:01:01Z'),
-        taskStarted('turn-b', '2026-07-07T09:00:01Z'),
-        turnContext('turn-b', root, '2026-07-07T09:00:02Z'),
-        functionCall('call-b', `cat ${secondVersion}`, '2026-07-07T09:01:00Z'),
-        functionOutput('call-b', 0, '2026-07-07T09:01:01Z'),
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', root, '2026-07-07T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+          turnContext('turn-a', root, '2026-07-07T08:00:02Z'),
+          functionCall('call-a', `cat ${firstVersion}`, '2026-07-07T08:01:00Z'),
+          functionOutput('call-a', 0, '2026-07-07T08:01:01Z'),
+          taskStarted('turn-b', '2026-07-07T09:00:01Z'),
+          turnContext('turn-b', root, '2026-07-07T09:00:02Z'),
+          functionCall('call-b', `cat ${secondVersion}`, '2026-07-07T09:01:00Z'),
+          functionOutput('call-b', 0, '2026-07-07T09:01:01Z'),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
         now: new Date('2026-07-08T12:00:00Z'),
-        providers: [
-          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
-        ],
+        providers: [{ provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] }],
       });
 
       await usage.importProvider('codex');
@@ -2308,13 +2589,15 @@ describe('SkillUsageManager', () => {
         rangeDays: 7,
         now: new Date('2026-07-08T12:00:00Z'),
       });
-      expect(overview.providers[0].ranking).toEqual([{
-        skillName: 'github:github',
-        sourcePath: undefined,
-        countedInvocations: 2,
-        failedInvocations: 0,
-        lastInvokedAt: '2026-07-07T09:01:00Z',
-      }]);
+      expect(overview.providers[0].ranking).toEqual([
+        {
+          skillName: 'github:github',
+          sourcePath: undefined,
+          countedInvocations: 2,
+          failedInvocations: 0,
+          lastInvokedAt: '2026-07-07T09:01:00Z',
+        },
+      ]);
       expect(overview.providers[0].dailySkillUsage.find((day) => day.date === '2026-07-07')?.rows).toEqual([
         {
           skillName: 'github:github',
@@ -2341,7 +2624,11 @@ describe('SkillUsageManager', () => {
         events.push(
           taskStarted(`turn-${index}`, `2026-07-07T08:${String(index).padStart(2, '0')}:00Z`),
           turnContext(`turn-${index}`, difyRoot, `2026-07-07T08:${String(index).padStart(2, '0')}:01Z`),
-          functionCall(`call-${index}`, `cat /Users/twwu/.agents/skills/${skillName}/SKILL.md`, `2026-07-07T08:${String(index).padStart(2, '0')}:02Z`),
+          functionCall(
+            `call-${index}`,
+            `cat /Users/twwu/.agents/skills/${skillName}/SKILL.md`,
+            `2026-07-07T08:${String(index).padStart(2, '0')}:02Z`,
+          ),
           functionOutput(`call-${index}`, 0, `2026-07-07T08:${String(index).padStart(2, '0')}:03Z`),
         );
       }
@@ -2349,9 +2636,7 @@ describe('SkillUsageManager', () => {
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
         now: new Date('2026-07-08T12:00:00Z'),
-        providers: [
-          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
-        ],
+        providers: [{ provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] }],
       });
 
       await usage.importProvider('codex');
@@ -2385,19 +2670,24 @@ describe('SkillUsageManager', () => {
       const difyRoot = path.join(root, 'dify');
       const artifact = path.join(sessionsRoot, 'session.jsonl');
       await mkdir(sessionsRoot, { recursive: true });
-      await writeFile(artifact, jsonl([
-        sessionMeta('session-a', difyRoot, '2026-07-07T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
-        turnContext('turn-a', difyRoot, '2026-07-07T08:00:02Z'),
-        functionCall('call-a1', "sed -n '1,220p' /Users/twwu/.agents/skills/frontend-testing/SKILL.md", '2026-07-07T08:01:00Z'),
-        functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
-      ]));
+      await writeFile(
+        artifact,
+        jsonl([
+          sessionMeta('session-a', difyRoot, '2026-07-07T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+          turnContext('turn-a', difyRoot, '2026-07-07T08:00:02Z'),
+          functionCall(
+            'call-a1',
+            "sed -n '1,220p' /Users/twwu/.agents/skills/frontend-testing/SKILL.md",
+            '2026-07-07T08:01:00Z',
+          ),
+          functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
         now: new Date('2026-07-08T12:00:00Z'),
-        providers: [
-          { provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] },
-        ],
+        providers: [{ provider: 'codex', displayName: 'Codex', supported: true, artifactRoots: [sessionsRoot] }],
       });
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
@@ -2405,18 +2695,24 @@ describe('SkillUsageManager', () => {
 
       const metadata = await stat(artifact);
       await mkdir(path.join(usageRoot, 'cursors'), { recursive: true });
-      await writeFile(path.join(usageRoot, 'cursors', 'codex.json'), JSON.stringify({
-        provider: 'codex',
-        importerVersion: 2,
-        artifacts: {
-          [artifact]: { size: metadata.size, mtimeMs: metadata.mtimeMs },
-        },
-      }) + '\n', 'utf-8');
+      await writeFile(
+        path.join(usageRoot, 'cursors', 'codex.json'),
+        JSON.stringify({
+          provider: 'codex',
+          importerVersion: 2,
+          artifacts: {
+            [artifact]: { size: metadata.size, mtimeMs: metadata.mtimeMs },
+          },
+        }) + '\n',
+        'utf-8',
+      );
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
 
       const stored = await readFile(path.join(usageRoot, 'invocations', 'codex', '2026-07.jsonl'), 'utf-8');
       expect(stored.trim().split('\n')).toHaveLength(1);
-      await expect(readFile(path.join(usageRoot, 'cursors', 'codex.json'), 'utf-8')).resolves.toContain('"importerVersion": 9');
+      await expect(readFile(path.join(usageRoot, 'cursors', 'codex.json'), 'utf-8')).resolves.toContain(
+        '"importerVersion": 9',
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -2441,25 +2737,31 @@ describe('SkillUsageManager', () => {
       await mkdir(path.dirname(claudeSkillPath), { recursive: true });
       await writeFile(codexSkillPath, '---\nname: tdd\n---\n');
       await writeFile(claudeSkillPath, '---\nname: preserved-claude\n---\n');
-      await writeFile(codexArtifact, jsonl([
-        sessionMeta('session-a', codexProject, '2026-07-13T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-13T08:00:01Z'),
-        turnContext('turn-a', codexProject, '2026-07-13T08:00:02Z'),
-        orchestratedExecCall(
-          'call-a',
-          'await tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
-          '2026-07-13T08:01:00Z',
-        ),
-      ]));
-      await writeFile(claudeArtifact, jsonl([
-        claudeAssistant({
-          sessionId: 'session-claude',
-          messageId: 'message-claude',
-          toolUseId: 'toolu-claude',
-          skillName: 'preserved-claude',
-          timestamp: '2026-07-13T09:00:00Z',
-        }),
-      ]));
+      await writeFile(
+        codexArtifact,
+        jsonl([
+          sessionMeta('session-a', codexProject, '2026-07-13T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-13T08:00:01Z'),
+          turnContext('turn-a', codexProject, '2026-07-13T08:00:02Z'),
+          orchestratedExecCall(
+            'call-a',
+            'await tools.exec_command({ cmd: "cat .agents/skills/tdd/SKILL.md" });',
+            '2026-07-13T08:01:00Z',
+          ),
+        ]),
+      );
+      await writeFile(
+        claudeArtifact,
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-claude',
+            messageId: 'message-claude',
+            toolUseId: 'toolu-claude',
+            skillName: 'preserved-claude',
+            timestamp: '2026-07-13T09:00:00Z',
+          }),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: usageRoot,
@@ -2480,20 +2782,26 @@ describe('SkillUsageManager', () => {
 
       const codexMetadata = await stat(codexArtifact);
       const claudeMetadata = await stat(claudeArtifact);
-      await writeFile(path.join(usageRoot, 'cursors', 'codex.json'), JSON.stringify({
-        provider: 'codex',
-        importerVersion: 8,
-        artifacts: {
-          [codexArtifact]: { size: codexMetadata.size, mtimeMs: codexMetadata.mtimeMs },
-        },
-      }) + '\n');
-      await writeFile(path.join(usageRoot, 'cursors', 'claude.json'), JSON.stringify({
-        provider: 'claude',
-        importerVersion: 8,
-        artifacts: {
-          [claudeArtifact]: { size: claudeMetadata.size, mtimeMs: claudeMetadata.mtimeMs },
-        },
-      }) + '\n');
+      await writeFile(
+        path.join(usageRoot, 'cursors', 'codex.json'),
+        JSON.stringify({
+          provider: 'codex',
+          importerVersion: 8,
+          artifacts: {
+            [codexArtifact]: { size: codexMetadata.size, mtimeMs: codexMetadata.mtimeMs },
+          },
+        }) + '\n',
+      );
+      await writeFile(
+        path.join(usageRoot, 'cursors', 'claude.json'),
+        JSON.stringify({
+          provider: 'claude',
+          importerVersion: 8,
+          artifacts: {
+            [claudeArtifact]: { size: claudeMetadata.size, mtimeMs: claudeMetadata.mtimeMs },
+          },
+        }) + '\n',
+      );
       await rm(claudeArtifact);
 
       await expect(usage.importProvider('codex')).resolves.toMatchObject({ importedRecords: 1 });
@@ -2526,26 +2834,31 @@ describe('SkillUsageManager', () => {
       await mkdir(projectArtifacts, { recursive: true });
       await mkdir(skillDir, { recursive: true });
       await writeFile(skillMdPath, '---\nname: frontend-testing\ndescription: Test frontend behavior\n---\n');
-      await writeFile(path.join(projectArtifacts, 'session-a.jsonl'), jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:00:00Z',
-        }),
-      ]));
+      await writeFile(
+        path.join(projectArtifacts, 'session-a.jsonl'),
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+        ]),
+      );
 
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
         now: new Date('2026-07-08T12:00:00Z'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toEqual({
@@ -2555,20 +2868,26 @@ describe('SkillUsageManager', () => {
         diagnostics: [],
       });
 
-      await expect(usage.getOverview({
-        rangeDays: 7,
-        now: new Date('2026-07-08T12:00:00Z'),
-      })).resolves.toMatchObject({
-        providers: [{
-          provider: 'claude',
-          coverageState: 'active',
-          ranking: [{
-            skillName: 'frontend-testing',
-            sourcePath: skillMdPath,
-            countedInvocations: 1,
-            failedInvocations: 0,
-          }],
-        }],
+      await expect(
+        usage.getOverview({
+          rangeDays: 7,
+          now: new Date('2026-07-08T12:00:00Z'),
+        }),
+      ).resolves.toMatchObject({
+        providers: [
+          {
+            provider: 'claude',
+            coverageState: 'active',
+            ranking: [
+              {
+                skillName: 'frontend-testing',
+                sourcePath: skillMdPath,
+                countedInvocations: 1,
+                failedInvocations: 0,
+              },
+            ],
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -2602,13 +2921,15 @@ describe('SkillUsageManager', () => {
       await writeFile(path.join(projectArtifacts, 'session-a.jsonl'), jsonl([assistant]));
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toMatchObject({ importedRecords: 2 });
@@ -2633,41 +2954,49 @@ describe('SkillUsageManager', () => {
       const skillRoot = path.join(root, 'claude-skills');
       await mkdir(projectArtifacts, { recursive: true });
       await mkdir(skillRoot, { recursive: true });
-      await writeFile(path.join(projectArtifacts, 'session-a.jsonl'), jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'statusline-setup',
-          timestamp: '2026-07-07T09:00:00Z',
-        }),
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-b',
-          toolUseId: 'toolu-b',
-          skillName: 'statusline-setup',
-          timestamp: '2026-07-07T09:01:00Z',
-        }),
-      ]));
+      await writeFile(
+        path.join(projectArtifacts, 'session-a.jsonl'),
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'statusline-setup',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-b',
+            toolUseId: 'toolu-b',
+            skillName: 'statusline-setup',
+            timestamp: '2026-07-07T09:01:00Z',
+          }),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toEqual({
         provider: 'claude',
         importedRecords: 0,
         skippedArtifacts: 0,
-        diagnostics: [{
-          provider: 'claude',
-          message: 'Skipped 2 Claude Skill invocations for "statusline-setup" in session-a.jsonl: no eligible user-level or plugin source',
-        }],
+        diagnostics: [
+          {
+            provider: 'claude',
+            message:
+              'Skipped 2 Claude Skill invocations for "statusline-setup" in session-a.jsonl: no eligible user-level or plugin source',
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -2684,51 +3013,64 @@ describe('SkillUsageManager', () => {
       await mkdir(projectArtifacts, { recursive: true });
       await mkdir(skillDir, { recursive: true });
       await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: frontend-testing\n---\n');
-      await writeFile(path.join(projectArtifacts, 'session-a.jsonl'), jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:00:00Z',
-        }),
-        claudeToolResult({
-          sessionId: 'session-a',
-          messageId: 'message-b',
-          toolUseId: 'toolu-a',
-          isError: true,
-          timestamp: '2026-07-07T09:00:05Z',
-        }),
-      ]));
+      await writeFile(
+        path.join(projectArtifacts, 'session-a.jsonl'),
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+          claudeToolResult({
+            sessionId: 'session-a',
+            messageId: 'message-b',
+            toolUseId: 'toolu-a',
+            isError: true,
+            timestamp: '2026-07-07T09:00:05Z',
+          }),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await usage.importProvider('claude');
 
-      await expect(usage.getOverview({
-        rangeDays: 7,
-        now: new Date('2026-07-08T12:00:00Z'),
-      })).resolves.toMatchObject({
-        providers: [{
-          heatmap: expect.arrayContaining([{
-            date: '2026-07-07',
-            countedInvocations: 0,
-            failedInvocations: 1,
-          }]),
-          ranking: [{
-            skillName: 'frontend-testing',
-            countedInvocations: 0,
-            failedInvocations: 1,
-          }],
-        }],
+      await expect(
+        usage.getOverview({
+          rangeDays: 7,
+          now: new Date('2026-07-08T12:00:00Z'),
+        }),
+      ).resolves.toMatchObject({
+        providers: [
+          {
+            heatmap: expect.arrayContaining([
+              {
+                date: '2026-07-07',
+                countedInvocations: 0,
+                failedInvocations: 1,
+              },
+            ]),
+            ranking: [
+              {
+                skillName: 'frontend-testing',
+                countedInvocations: 0,
+                failedInvocations: 1,
+              },
+            ],
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -2746,43 +3088,53 @@ describe('SkillUsageManager', () => {
       await mkdir(unsupportedDir, { recursive: true });
       await mkdir(skillDir, { recursive: true });
       await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: frontend-testing\n---\n');
-      await writeFile(path.join(projectArtifacts, 'session-a.jsonl'), jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:00:00Z',
-        }),
-      ]));
-      await writeFile(path.join(unsupportedDir, 'trace.jsonl'), jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-b',
-          toolUseId: 'toolu-b',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:01:00Z',
-        }),
-      ]));
+      await writeFile(
+        path.join(projectArtifacts, 'session-a.jsonl'),
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+        ]),
+      );
+      await writeFile(
+        path.join(unsupportedDir, 'trace.jsonl'),
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-b',
+            toolUseId: 'toolu-b',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:01:00Z',
+          }),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toEqual({
         provider: 'claude',
         importedRecords: 1,
         skippedArtifacts: 1,
-        diagnostics: [{
-          provider: 'claude',
-          message: `Skipped unsupported Claude artifact path: ${path.join('-tmp-project', 'logs', 'trace.jsonl')}`,
-        }],
+        diagnostics: [
+          {
+            provider: 'claude',
+            message: `Skipped unsupported Claude artifact path: ${path.join('-tmp-project', 'logs', 'trace.jsonl')}`,
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -2801,33 +3153,39 @@ describe('SkillUsageManager', () => {
       await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: frontend-testing\n---\n');
       await writeFile(
         path.join(projectArtifacts, 'session-a.jsonl'),
-        `${JSON.stringify(claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:00:00Z',
-        }))}\n{not-json\n[also-not-json\n`,
+        `${JSON.stringify(
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+        )}\n{not-json\n[also-not-json\n`,
       );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toEqual({
         provider: 'claude',
         importedRecords: 1,
         skippedArtifacts: 0,
-        diagnostics: [{
-          provider: 'claude',
-          message: 'Skipped 2 malformed JSONL lines in session-a.jsonl',
-        }],
+        diagnostics: [
+          {
+            provider: 'claude',
+            message: 'Skipped 2 malformed JSONL lines in session-a.jsonl',
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -2847,26 +3205,31 @@ describe('SkillUsageManager', () => {
       await mkdir(secondSubagents, { recursive: true });
       await mkdir(skillDir, { recursive: true });
       await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: frontend-testing\n---\n');
-      await writeFile(sharedArtifact, jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:00:00Z',
-        }),
-      ]));
+      await writeFile(
+        sharedArtifact,
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+        ]),
+      );
       await symlink(sharedArtifact, path.join(firstSubagents, 'agent-shared.jsonl'));
       await symlink(sharedArtifact, path.join(secondSubagents, 'agent-shared.jsonl'));
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toMatchObject({
@@ -2902,24 +3265,29 @@ describe('SkillUsageManager', () => {
       await symlink(sharedSkillDir, path.join(skillRoot, 'frontend-testing-a'));
       await symlink(sharedSkillDir, path.join(skillRoot, 'frontend-testing-b'));
       const expectedResolvedSkillMdPath = await realpath(resolvedSkillMdPath);
-      await writeFile(path.join(projectArtifacts, 'session-a.jsonl'), jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:00:00Z',
-        }),
-      ]));
+      await writeFile(
+        path.join(projectArtifacts, 'session-a.jsonl'),
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toMatchObject({ importedRecords: 1 });
@@ -2950,24 +3318,29 @@ describe('SkillUsageManager', () => {
         await mkdir(skillDir, { recursive: true });
         await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: frontend-testing\n---\n');
       }
-      await writeFile(path.join(projectArtifacts, 'session-a.jsonl'), jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:00:00Z',
-        }),
-      ]));
+      await writeFile(
+        path.join(projectArtifacts, 'session-a.jsonl'),
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [firstSkillRoot, secondSkillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [firstSkillRoot, secondSkillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toMatchObject({ importedRecords: 1 });
@@ -2996,46 +3369,57 @@ describe('SkillUsageManager', () => {
       await mkdir(projectArtifacts, { recursive: true });
       await mkdir(skillDir, { recursive: true });
       await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: frontend-testing\n---\n');
-      await writeFile(artifact, jsonl([
-        claudeAssistant({
-          sessionId: 'session-a',
-          messageId: 'message-a',
-          toolUseId: 'toolu-a',
-          skillName: 'frontend-testing',
-          timestamp: '2026-07-07T09:00:00Z',
-        }),
-      ]));
+      await writeFile(
+        artifact,
+        jsonl([
+          claudeAssistant({
+            sessionId: 'session-a',
+            messageId: 'message-a',
+            toolUseId: 'toolu-a',
+            skillName: 'frontend-testing',
+            timestamp: '2026-07-07T09:00:00Z',
+          }),
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toMatchObject({ importedRecords: 1 });
-      await appendFile(artifact, jsonl([
-        claudeToolResult({
-          sessionId: 'session-a',
-          messageId: 'message-b',
-          toolUseId: 'toolu-a',
-          isError: true,
-          timestamp: '2026-07-07T09:00:05Z',
-        }),
-      ]));
+      await appendFile(
+        artifact,
+        jsonl([
+          claudeToolResult({
+            sessionId: 'session-a',
+            messageId: 'message-b',
+            toolUseId: 'toolu-a',
+            isError: true,
+            timestamp: '2026-07-07T09:00:05Z',
+          }),
+        ]),
+      );
 
       await expect(usage.importProvider('claude')).resolves.toMatchObject({ importedRecords: 1 });
-      const revisions = (await readFile(
-        path.join(root, 'usage', 'invocations', 'claude', '2026-07.jsonl'),
-        'utf-8',
-      )).trim().split('\n').map((line) => JSON.parse(line) as {
-        recordId: string;
-        provider: string;
-        startedAt: string;
-      });
+      const revisions = (await readFile(path.join(root, 'usage', 'invocations', 'claude', '2026-07.jsonl'), 'utf-8'))
+        .trim()
+        .split('\n')
+        .map(
+          (line) =>
+            JSON.parse(line) as {
+              recordId: string;
+              provider: string;
+              startedAt: string;
+            },
+        );
       expect(revisions).toHaveLength(2);
       expect(new Set(revisions.map((record) => record.recordId))).toHaveLength(1);
       expect(new Set(revisions.map((record) => record.provider))).toEqual(new Set(['claude']));
@@ -3088,29 +3472,33 @@ describe('SkillUsageManager', () => {
         skillName: 'frontend-testing',
         timestamp: 'not-a-timestamp',
       });
-      await writeFile(path.join(projectArtifacts, 'session-a.jsonl'), jsonl([
-        untimedAssistant,
-        invalidTimestampAssistant,
-      ]));
+      await writeFile(
+        path.join(projectArtifacts, 'session-a.jsonl'),
+        jsonl([untimedAssistant, invalidTimestampAssistant]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          supported: true,
-          artifactRoots: [artifactRoot],
-          skillRoots: [skillRoot],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: [artifactRoot],
+            skillRoots: [skillRoot],
+          },
+        ],
       });
 
       await expect(usage.importProvider('claude')).resolves.toEqual({
         provider: 'claude',
         importedRecords: 0,
         skippedArtifacts: 0,
-        diagnostics: [{
-          provider: 'claude',
-          message: 'Skipped 2 Claude Skill invocations in session-a.jsonl: missing or invalid assistant timestamp',
-        }],
+        diagnostics: [
+          {
+            provider: 'claude',
+            message: 'Skipped 2 Claude Skill invocations in session-a.jsonl: missing or invalid assistant timestamp',
+          },
+        ],
       });
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -3125,22 +3513,32 @@ describe('SkillUsageManager', () => {
       const difyRoot = path.join(root, 'dify');
       await mkdir(sessionsRoot, { recursive: true });
       await mkdir(claudeRoot, { recursive: true });
-      await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl([
-        sessionMeta('session-a', difyRoot, '2026-07-07T08:00:00Z'),
-        taskStarted('turn-a', '2026-07-07T08:00:01Z'),
-        turnContext('turn-a', difyRoot, '2026-07-07T08:00:02Z'),
-        functionCall('call-a1', "sed -n '1,220p' /Users/twwu/.agents/skills/frontend-testing/SKILL.md", '2026-07-07T08:01:00Z'),
-        functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
-      ]));
-      await writeFile(path.join(claudeRoot, 'session.jsonl'), jsonl([
-        {
-          type: 'skill_invocation',
-          session_id: 'claude-session',
-          timestamp: '2026-07-07T09:00:00Z',
-          status: 'used',
-          skill: { name: 'frontend-testing' },
-        },
-      ]));
+      await writeFile(
+        path.join(sessionsRoot, 'session.jsonl'),
+        jsonl([
+          sessionMeta('session-a', difyRoot, '2026-07-07T08:00:00Z'),
+          taskStarted('turn-a', '2026-07-07T08:00:01Z'),
+          turnContext('turn-a', difyRoot, '2026-07-07T08:00:02Z'),
+          functionCall(
+            'call-a1',
+            "sed -n '1,220p' /Users/twwu/.agents/skills/frontend-testing/SKILL.md",
+            '2026-07-07T08:01:00Z',
+          ),
+          functionOutput('call-a1', 0, '2026-07-07T08:01:01Z'),
+        ]),
+      );
+      await writeFile(
+        path.join(claudeRoot, 'session.jsonl'),
+        jsonl([
+          {
+            type: 'skill_invocation',
+            session_id: 'claude-session',
+            timestamp: '2026-07-07T09:00:00Z',
+            status: 'used',
+            skill: { name: 'frontend-testing' },
+          },
+        ]),
+      );
       const usage = new SkillUsageManager({
         dataDir: path.join(root, 'usage'),
         now: new Date('2026-07-08T12:00:00Z'),
@@ -3150,16 +3548,20 @@ describe('SkillUsageManager', () => {
         ],
       });
 
-      await expect(usage.importAllProviders()).resolves.toEqual([{
-        provider: 'codex',
-        importedRecords: 1,
-        skippedArtifacts: 0,
-        diagnostics: [],
-      }]);
-      await expect(usage.getOverview({
-        rangeDays: 7,
-        now: new Date('2026-07-08T12:00:00Z'),
-      })).resolves.toMatchObject({
+      await expect(usage.importAllProviders()).resolves.toEqual([
+        {
+          provider: 'codex',
+          importedRecords: 1,
+          skippedArtifacts: 0,
+          diagnostics: [],
+        },
+      ]);
+      await expect(
+        usage.getOverview({
+          rangeDays: 7,
+          now: new Date('2026-07-08T12:00:00Z'),
+        }),
+      ).resolves.toMatchObject({
         providers: [
           { provider: 'codex', ranking: [{ skillName: 'frontend-testing', countedInvocations: 1 }] },
           { provider: 'claude', coverageState: 'unsupported', ranking: [] },
@@ -3270,12 +3672,14 @@ async function importOrchestratedProgram(program: string, includeCwd = true) {
     await writeFile(path.join(sessionsRoot, 'session.jsonl'), jsonl(events));
     const usage = new SkillUsageManager({
       dataDir: path.join(root, 'usage'),
-      providers: [{
-        provider: 'codex',
-        displayName: 'Codex',
-        supported: true,
-        artifactRoots: [sessionsRoot],
-      }],
+      providers: [
+        {
+          provider: 'codex',
+          displayName: 'Codex',
+          supported: true,
+          artifactRoots: [sessionsRoot],
+        },
+      ],
     });
     return await usage.importProvider('codex');
   } finally {
@@ -3310,12 +3714,14 @@ function claudeAssistant(input: {
     timestamp: input.timestamp,
     message: {
       role: 'assistant',
-      content: [{
-        type: 'tool_use',
-        id: input.toolUseId,
-        name: 'Skill',
-        input: { skill: input.skillName },
-      }],
+      content: [
+        {
+          type: 'tool_use',
+          id: input.toolUseId,
+          name: 'Skill',
+          input: { skill: input.skillName },
+        },
+      ],
     },
   };
 }
@@ -3334,12 +3740,14 @@ function claudeToolResult(input: {
     timestamp: input.timestamp,
     message: {
       role: 'user',
-      content: [{
-        type: 'tool_result',
-        tool_use_id: input.toolUseId,
-        is_error: input.isError,
-        content: 'Launching skill: frontend-testing',
-      }],
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: input.toolUseId,
+          is_error: input.isError,
+          content: 'Launching skill: frontend-testing',
+        },
+      ],
     },
   };
 }

@@ -1,9 +1,4 @@
-import type {
-  Skill,
-  SkillGroup,
-  SkillInventoryInstance,
-  SkillpackConfig,
-} from '@skillpack/core';
+import type { Skill, SkillGroup, SkillInventoryInstance, SkillpackConfig } from '@skillpack/core';
 
 type TestConfigOverrides = Partial<Omit<SkillpackConfig, 'usage'>> & {
   usage?: Partial<SkillpackConfig['usage']>;
@@ -129,25 +124,29 @@ export function basicInventory(): SkillGroup[] {
         },
       }),
     ]),
-    inventoryGroup('charlie', [
-      inventoryInstance({
-        name: 'charlie',
-        provider: 'global',
-        description: 'Charlie is managed by skills.sh.',
-        version: '1.0.0',
-        source: {
-          type: 'skillssh',
-          repo: 'owner/charlie',
-          skillFolderHash: 'abc1234',
+    inventoryGroup(
+      'charlie',
+      [
+        inventoryInstance({
+          name: 'charlie',
+          provider: 'global',
+          description: 'Charlie is managed by skills.sh.',
+          version: '1.0.0',
+          source: {
+            type: 'skillssh',
+            repo: 'owner/charlie',
+            skillFolderHash: 'abc1234',
+          },
+          actions: ['update', 'remove'],
+        }),
+      ],
+      {
+        identity: {
+          confidence: 'confirmed',
+          reasons: ['skills.sh provenance'],
         },
-        actions: ['update', 'remove'],
-      }),
-    ], {
-      identity: {
-        confidence: 'confirmed',
-        reasons: ['skills.sh provenance'],
       },
-    }),
+    ),
   ];
 }
 

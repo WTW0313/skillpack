@@ -5,14 +5,16 @@ Skillpack is published to npm as a single package `skillpack-tui`. Users install
 ## Build Architecture
 
 ```
-packages/core (source)  ──┐
-                          ├─ tsup bundle ──▶ dist/skillpack.js (single-file ESM)
-packages/tui  (source)  ──┘
+packages/core (source) ── Vite+ Pack ──▶ packages/core/dist/index.js + index.d.ts
+          │
+          └────────────── inlined by Vite+ Pack ──▶ packages/tui/dist/skillpack.js
+packages/tui (source) ────────────────────────────▶ (single-file ESM CLI)
 ```
 
 - `@skillpack/core` source is inlined into the bundle — it is not published separately
-- npm dependencies (`yaml`) remain external as runtime dependencies
-- No sourcemaps in production; no minification (add `minify: true` in `tsup.config.ts` if needed)
+- Package runtime dependencies remain external; Core's `acorn` implementation is bundled into the CLI
+- Production artifacts are unminified and contain no sourcemaps
+- `pnpm build:ci` verifies the exact Core and CLI artifact shape, executable CLI shebang, ESM syntax, and package dry-run contents
 
 ## Prerequisites
 
@@ -35,14 +37,15 @@ npm view skillpack-tui
 
 ```bash
 git status              # ensure clean working tree
-pnpm install            # ensure dependencies are up to date
-pnpm test               # run all tests
+pnpm install --frozen-lockfile
+pnpm check:ci
+pnpm test:ci
 ```
 
 ### 2. Build and verify output
 
 ```bash
-pnpm build              # triggers tsup bundling
+pnpm build:ci           # builds and verifies both packages
 
 # verify output
 ls -lh packages/tui/dist/skillpack.js   # confirm single-file output
@@ -52,11 +55,10 @@ node packages/tui/dist/skillpack.js     # local smoke test (requires TTY)
 ### 3. Preview package contents
 
 ```bash
-cd packages/tui
-npm pack --dry-run      # preview files that will be published
+pnpm --dir packages/tui pack --dry-run --json
 ```
 
-Expected output should contain `dist/skillpack.js`, `package.json`, and `README.md`.
+Expected output contains only `dist/skillpack.js`, `LICENSE`, `package.json`, and `README.md`.
 
 ### 4. Bump version
 
@@ -78,7 +80,7 @@ cd packages/tui
 npm publish
 ```
 
-The `prepublishOnly` script automatically runs `tsup` before publishing.
+The `prepublishOnly` script automatically runs the same check, test, build, and artifact-verification flow used by CI before publishing.
 
 ### 6. Push tag to GitHub
 
@@ -118,7 +120,9 @@ npm deprecate skillpack-tui@<version> "reason"  # mark as deprecated (preferred)
 Full release from the project root:
 
 ```bash
-pnpm test && pnpm build
+pnpm check:ci
+pnpm test:ci
+pnpm build:ci
 cd packages/tui
 npm version patch
 npm publish

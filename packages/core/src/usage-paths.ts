@@ -12,7 +12,5 @@ export function isSupportedClaudeArtifactPath(
   if (!relative || relative.startsWith(`..${pathOperations.sep}`) || pathOperations.isAbsolute(relative)) return false;
   const parts = relative.split(pathOperations.sep);
   if (parts.length === 2) return parts[1].endsWith('.jsonl');
-  return parts.length === 4
-    && parts[2] === 'subagents'
-    && /^agent-.*\.jsonl$/.test(parts[3]);
+  return parts.length === 4 && parts[2] === 'subagents' && /^agent-.*\.jsonl$/.test(parts[3]);
 }

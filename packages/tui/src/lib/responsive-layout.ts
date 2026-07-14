@@ -233,9 +233,7 @@ export function getVisibleShortcuts(
   const result: Array<ShortcutLayoutItem & { displayLabel: string }> = [];
 
   for (const shortcut of shortcuts) {
-    const displayLabel = mode === 'compact'
-      ? (shortcut.compactLabel ?? shortcut.label)
-      : shortcut.label;
+    const displayLabel = mode === 'compact' ? (shortcut.compactLabel ?? shortcut.label) : shortcut.label;
     const next = [...result, { ...shortcut, displayLabel }];
     if (measureShortcutLine(next) > maxWidth) break;
     result.push({ ...shortcut, displayLabel });
@@ -280,9 +278,8 @@ export function getProjectSkillsColumns(size: TerminalSize): ProjectSkillsColumn
   const state = mode === 'compact' ? 14 : PROJECT_STATE_WIDTH;
   const fixedWidth = 5 + state;
   const name = Math.max(12, Math.min(24, Math.floor((contentWidth - fixedWidth) * 0.3)));
-  const description = mode === 'compact'
-    ? 0
-    : Math.max(12, Math.min(24, Math.floor((contentWidth - fixedWidth - name) * 0.45)));
+  const description =
+    mode === 'compact' ? 0 : Math.max(12, Math.min(24, Math.floor((contentWidth - fixedWidth - name) * 0.45)));
   const path = Math.max(12, contentWidth - fixedWidth - name - description);
   return {
     name,

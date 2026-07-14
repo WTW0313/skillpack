@@ -42,8 +42,14 @@ export function createDefaultConfig(homeDir = os.homedir()): SkillpackConfig {
     autoCheckUpdates: false,
     projectSkillsDirs: ['.codex/skills', '.claude/skills', '.agents/skills'],
     providers: {
-      codex: { enabled: true, paths: [path.join(homeDir, '.codex', 'skills'), path.join(homeDir, '.codex', 'plugins', 'cache')] },
-      claude: { enabled: true, paths: [path.join(homeDir, '.claude', 'plugins', 'cache'), path.join(homeDir, '.claude', 'skills')] },
+      codex: {
+        enabled: true,
+        paths: [path.join(homeDir, '.codex', 'skills'), path.join(homeDir, '.codex', 'plugins', 'cache')],
+      },
+      claude: {
+        enabled: true,
+        paths: [path.join(homeDir, '.claude', 'plugins', 'cache'), path.join(homeDir, '.claude', 'skills')],
+      },
       global: { enabled: true, paths: [path.join(homeDir, '.agents', 'skills')] },
     },
     sources: {
@@ -65,9 +71,8 @@ export class ConfigManager {
   private config: SkillpackConfig;
 
   constructor(configDirOrOptions?: string | ConfigManagerOptions) {
-    const options = typeof configDirOrOptions === 'string'
-      ? { configDir: configDirOrOptions }
-      : (configDirOrOptions ?? {});
+    const options =
+      typeof configDirOrOptions === 'string' ? { configDir: configDirOrOptions } : (configDirOrOptions ?? {});
     const homeDir = options.homeDir ?? os.homedir();
     this.defaultConfig = createDefaultConfig(homeDir);
     this.config = cloneConfig(this.defaultConfig);
@@ -109,7 +114,9 @@ export class ConfigManager {
           await access(p);
           found = true;
           break;
-        } catch { /* not found */ }
+        } catch {
+          /* not found */
+        }
       }
       this.config.providers[id].enabled = found;
     }
@@ -128,10 +135,7 @@ function cloneConfig(config: SkillpackConfig): SkillpackConfig {
       ]),
     ),
     sources: Object.fromEntries(
-      Object.entries(config.sources).map(([id, source]) => [
-        id,
-        { enabled: source.enabled },
-      ]),
+      Object.entries(config.sources).map(([id, source]) => [id, { enabled: source.enabled }]),
     ),
     usage: {
       importConsent: config.usage.importConsent,

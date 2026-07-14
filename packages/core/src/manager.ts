@@ -45,11 +45,21 @@ export class SkillManager {
     });
   }
 
-  registerProvider(provider: ISkillProvider): void { this.providers.set(provider.id, provider); }
-  registerSource(source: IInstallSource): void { this.sources.set(source.id, source); }
-  getProvider(id: string): ISkillProvider | undefined { return this.providers.get(id); }
-  getProviders(): ISkillProvider[] { return [...this.providers.values()]; }
-  getSources(): IInstallSource[] { return [...this.sources.values()]; }
+  registerProvider(provider: ISkillProvider): void {
+    this.providers.set(provider.id, provider);
+  }
+  registerSource(source: IInstallSource): void {
+    this.sources.set(source.id, source);
+  }
+  getProvider(id: string): ISkillProvider | undefined {
+    return this.providers.get(id);
+  }
+  getProviders(): ISkillProvider[] {
+    return [...this.providers.values()];
+  }
+  getSources(): IInstallSource[] {
+    return [...this.sources.values()];
+  }
 
   async init(_configDir?: string): Promise<void> {
     await this.skillsLock.load();
@@ -94,7 +104,11 @@ export class SkillManager {
     const seen = new Set<string>();
     for (const dir of projectSkillsDirs) {
       const projectPath = resolveProjectSkillsPath(cwd, dir);
-      try { await access(projectPath); } catch { continue; }
+      try {
+        await access(projectPath);
+      } catch {
+        continue;
+      }
       const entries = await readdir(projectPath, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
@@ -116,7 +130,11 @@ export class SkillManager {
               version: parsed.raw.version as string | undefined,
               enabled: true,
               scope: 'project',
-              metadata: { license: parsed.metadata.license, author: parsed.metadata.author, tags: parsed.metadata.tags },
+              metadata: {
+                license: parsed.metadata.license,
+                author: parsed.metadata.author,
+                tags: parsed.metadata.tags,
+              },
               source: { type: 'local' },
             });
           } catch (err) {
@@ -131,20 +149,28 @@ export class SkillManager {
               scope: 'project',
               metadata: {},
               source: { type: 'local' },
-              scanIssues: [{
-                code: 'invalid-skill-md',
-                message: err instanceof Error ? err.message : 'Invalid SKILL.md',
-              }],
+              scanIssues: [
+                {
+                  code: 'invalid-skill-md',
+                  message: err instanceof Error ? err.message : 'Invalid SKILL.md',
+                },
+              ],
             });
           }
-        } catch { /* skip missing SKILL.md */ }
+        } catch {
+          /* skip missing SKILL.md */
+        }
       }
     }
     return skills;
   }
 
-  getAllSkills(): Skill[] { return this.skills; }
-  getScanPathDiagnostics(): ScanPathDiagnostic[] { return this.scanPathDiagnostics; }
+  getAllSkills(): Skill[] {
+    return this.skills;
+  }
+  getScanPathDiagnostics(): ScanPathDiagnostic[] {
+    return this.scanPathDiagnostics;
+  }
   getInventory(): SkillGroup[] {
     return buildSkillInventory(this.skills, {
       getDisableStrategy: (skill) => this.providers.get(skill.provider)?.getDisableStrategy(skill),
@@ -170,9 +196,15 @@ export class SkillManager {
       notices: [],
     }));
   }
-  getSkillsByProvider(providerId: string): Skill[] { return this.skills.filter((s) => s.provider === providerId); }
-  getDuplicates(): DuplicateInfo[] { return this.duplicates; }
-  isDuplicate(skillName: string): boolean { return this.duplicates.some((d) => d.skillName === skillName); }
+  getSkillsByProvider(providerId: string): Skill[] {
+    return this.skills.filter((s) => s.provider === providerId);
+  }
+  getDuplicates(): DuplicateInfo[] {
+    return this.duplicates;
+  }
+  isDuplicate(skillName: string): boolean {
+    return this.duplicates.some((d) => d.skillName === skillName);
+  }
   getSkillUsageOverview(input: SkillUsageOverviewInput): Promise<SkillUsageOverview> {
     return this.skillUsage.getOverview(input);
   }
@@ -239,7 +271,7 @@ export class SkillManager {
     const skillshSource = this.sources.get('skillssh');
 
     if (skillshSource?.checkUpdates) {
-      updates.push(...await skillshSource.checkUpdates(skillshSkills));
+      updates.push(...(await skillshSource.checkUpdates(skillshSkills)));
       this.rememberUpdateResults(skillshSkills, updates);
       return updates;
     }
@@ -252,7 +284,9 @@ export class SkillManager {
     return updates;
   }
 
-  async checkSkillUpdate(skill: Pick<Skill, 'name' | 'provider' | 'path' | 'source' | 'version'>): Promise<UpdateInfo | null> {
+  async checkSkillUpdate(
+    skill: Pick<Skill, 'name' | 'provider' | 'path' | 'source' | 'version'>,
+  ): Promise<UpdateInfo | null> {
     if (!isSkillShManagedGlobalSkill(skill)) return null;
     for (const source of this.sources.values()) {
       const update = await source.checkUpdate(skill);
@@ -292,28 +326,33 @@ export class SkillManager {
 
   private async collectScanPathDiagnostics(cwd?: string, projectSkillsDirs?: string[]): Promise<ScanPathDiagnostic[]> {
     const providerDiagnostics = await Promise.all(
-      [...this.providers.values()].flatMap((provider) => provider.getScanPaths().map(async (scanPath) => ({
-        scope: 'provider' as const,
-        provider: provider.id,
-        path: scanPath.path,
-        exists: await pathExists(scanPath.path),
-        kind: scanPath.kind,
-        label: scanPath.label,
-      }))),
+      [...this.providers.values()].flatMap((provider) =>
+        provider.getScanPaths().map(async (scanPath) => ({
+          scope: 'provider' as const,
+          provider: provider.id,
+          path: scanPath.path,
+          exists: await pathExists(scanPath.path),
+          kind: scanPath.kind,
+          label: scanPath.label,
+        })),
+      ),
     );
 
-    const projectDiagnostics = cwd && projectSkillsDirs?.length
-      ? await Promise.all(projectSkillsDirs.map(async (dir) => {
-        const projectPath = resolveProjectSkillsPath(cwd, dir);
-        return {
-          scope: 'project' as const,
-          path: projectPath,
-          exists: await pathExists(projectPath),
-          kind: 'project-root' as const,
-          label: 'Project Skills root',
-        };
-      }))
-      : [];
+    const projectDiagnostics =
+      cwd && projectSkillsDirs?.length
+        ? await Promise.all(
+            projectSkillsDirs.map(async (dir) => {
+              const projectPath = resolveProjectSkillsPath(cwd, dir);
+              return {
+                scope: 'project' as const,
+                path: projectPath,
+                exists: await pathExists(projectPath),
+                kind: 'project-root' as const,
+                label: 'Project Skills root',
+              };
+            }),
+          )
+        : [];
 
     return [...providerDiagnostics, ...projectDiagnostics];
   }
@@ -356,14 +395,20 @@ function defaultUsageProviders(): SkillUsageProviderConfig[] {
       provider: 'codex',
       displayName: 'Codex',
       supported: true,
-      artifactRoots: [path.join(os.homedir(), '.codex', 'sessions'), path.join(os.homedir(), '.codex', 'archived_sessions')],
+      artifactRoots: [
+        path.join(os.homedir(), '.codex', 'sessions'),
+        path.join(os.homedir(), '.codex', 'archived_sessions'),
+      ],
     },
     {
       provider: 'claude',
       displayName: 'Claude',
       supported: true,
       artifactRoots: [path.join(os.homedir(), '.claude', 'projects')],
-      skillRoots: [path.join(os.homedir(), '.claude', 'plugins', 'cache'), path.join(os.homedir(), '.claude', 'skills')],
+      skillRoots: [
+        path.join(os.homedir(), '.claude', 'plugins', 'cache'),
+        path.join(os.homedir(), '.claude', 'skills'),
+      ],
     },
   ];
 }

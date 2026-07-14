@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vite-plus/test';
 import { inventoryGroup, inventoryInstance, testConfig } from '../fixtures/inventory.js';
 import { createMockManager } from '../helpers/mock-manager.js';
 import { keypress, renderTui, waitForFrame, type RenderTuiResult } from '../helpers/render-tui.js';
@@ -23,9 +23,10 @@ describe.sequential('Terminal UI Tests', () => {
   it('renders a stable inventory frame', async () => {
     const app = renderApp();
 
-    const frame = await waitForFrame(app, (output) => (
-      output.includes('* Skillpack') && !output.includes('Scanning skills')
-    ));
+    const frame = await waitForFrame(
+      app,
+      (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'),
+    );
 
     expect(frame).toMatchSnapshot();
   });
@@ -67,9 +68,7 @@ describe.sequential('Terminal UI Tests', () => {
     await waitForFrame(app, (output) => output.includes('charlie'));
     app.stdin.write(keypress.enter);
 
-    const frame = await waitForFrame(app, (output) => (
-      output.includes('filtered by') && output.includes('charlie')
-    ));
+    const frame = await waitForFrame(app, (output) => output.includes('filtered by') && output.includes('charlie'));
     expect(frame).toContain('1 instance');
     expect(frame).toContain('charlie');
     expect(frame).not.toContain('alpha');
@@ -162,7 +161,10 @@ describe.sequential('Terminal UI Tests', () => {
     await waitForFrame(app, (output) => output.includes('* Skillpack') && !output.includes('Scanning skills'));
 
     app.stdin.write(keypress.enter);
-    await waitForFrame(app, (output) => output.includes('charlie') && output.includes('press') && output.includes('to check'));
+    await waitForFrame(
+      app,
+      (output) => output.includes('charlie') && output.includes('press') && output.includes('to check'),
+    );
 
     app.stdin.write('u');
     await waitForFrame(app, (output) => output.includes('1.0.0') && output.includes('1.1.0'));
@@ -193,11 +195,11 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('s');
 
-    await waitForFrame(app, (output) => (
-      output.includes('Usage Artifact Roots')
-      && output.includes('codex')
-      && output.includes('/tmp/codex-usage')
-    ));
+    await waitForFrame(
+      app,
+      (output) =>
+        output.includes('Usage Artifact Roots') && output.includes('codex') && output.includes('/tmp/codex-usage'),
+    );
   });
 
   it('does not show Settings scroll shortcut when all rows fit', async () => {
@@ -216,9 +218,7 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('g');
 
-    await waitForFrame(app, (output) => (
-      output.includes('Skill Usage') && output.includes('Enable usage import?')
-    ));
+    await waitForFrame(app, (output) => output.includes('Skill Usage') && output.includes('Enable usage import?'));
 
     app.stdin.write(keypress.escape);
     await waitForFrame(app, (output) => output.includes('* Skillpack') && output.includes('alpha'));
@@ -289,16 +289,18 @@ describe.sequential('Terminal UI Tests', () => {
     const manager = createMockManager({
       usageOverview: {
         range: { days: 7, from: '2026-07-02', to: '2026-07-08' },
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          coverageState: 'not-configured',
-          coverageReasons: ['missing-attribution-roots'],
-          heatmap: [],
-          dailySkillUsage: [],
-          ranking: [],
-          diagnostics: [],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            coverageState: 'not-configured',
+            coverageReasons: ['missing-attribution-roots'],
+            heatmap: [],
+            dailySkillUsage: [],
+            ranking: [],
+            diagnostics: [],
+          },
+        ],
       },
     });
     const app = renderApp({
@@ -317,16 +319,18 @@ describe.sequential('Terminal UI Tests', () => {
     const manager = createMockManager({
       usageOverview: {
         range: { days: 7, from: '2026-07-02', to: '2026-07-08' },
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          coverageState: 'not-configured',
-          coverageReasons: ['missing-artifact-roots', 'missing-attribution-roots'],
-          heatmap: [],
-          dailySkillUsage: [],
-          ranking: [],
-          diagnostics: [],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            coverageState: 'not-configured',
+            coverageReasons: ['missing-artifact-roots', 'missing-attribution-roots'],
+            heatmap: [],
+            dailySkillUsage: [],
+            ranking: [],
+            diagnostics: [],
+          },
+        ],
       },
     });
     const app = renderApp({
@@ -338,25 +342,27 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('g');
 
-    await waitForFrame(app, (output) => (
-      output.includes('Claude Usage Artifact Roots and Skill Attribution Roots are not configured.')
-    ));
+    await waitForFrame(app, (output) =>
+      output.includes('Claude Usage Artifact Roots and Skill Attribution Roots are not configured.'),
+    );
   });
 
   it('shows generic Skill Usage configuration context without a missing root', async () => {
     const manager = createMockManager({
       usageOverview: {
         range: { days: 7, from: '2026-07-02', to: '2026-07-08' },
-        providers: [{
-          provider: 'claude',
-          displayName: 'Claude',
-          coverageState: 'not-configured',
-          coverageReasons: ['provider-not-configured'],
-          heatmap: [],
-          dailySkillUsage: [],
-          ranking: [],
-          diagnostics: [],
-        }],
+        providers: [
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            coverageState: 'not-configured',
+            coverageReasons: ['provider-not-configured'],
+            heatmap: [],
+            dailySkillUsage: [],
+            ranking: [],
+            diagnostics: [],
+          },
+        ],
       },
     });
     const app = renderApp({
@@ -394,20 +400,50 @@ describe.sequential('Terminal UI Tests', () => {
             {
               date: '2026-07-07',
               rows: [
-                { skillName: 'openai-docs', sourcePath: '/Users/twwu/.codex/skills/.system/openai-docs/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z' },
+                {
+                  skillName: 'openai-docs',
+                  sourcePath: '/Users/twwu/.codex/skills/.system/openai-docs/SKILL.md',
+                  countedInvocations: 1,
+                  failedInvocations: 0,
+                  lastInvokedAt: '2026-07-07T08:00:00Z',
+                },
               ],
             },
             {
               date: '2026-07-08',
               rows: [
-                { skillName: 'frontend-testing', sourcePath: '/Users/twwu/project/.agents/skills/frontend-testing/SKILL.md', countedInvocations: 2, failedInvocations: 1, lastInvokedAt: '2026-07-08T11:00:00Z' },
-                { skillName: 'github:github', sourcePath: '/Users/twwu/.codex/plugins/cache/openai-curated/github/skills/github/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-08T10:00:00Z' },
+                {
+                  skillName: 'frontend-testing',
+                  sourcePath: '/Users/twwu/project/.agents/skills/frontend-testing/SKILL.md',
+                  countedInvocations: 2,
+                  failedInvocations: 1,
+                  lastInvokedAt: '2026-07-08T11:00:00Z',
+                },
+                {
+                  skillName: 'github:github',
+                  sourcePath: '/Users/twwu/.codex/plugins/cache/openai-curated/github/skills/github/SKILL.md',
+                  countedInvocations: 1,
+                  failedInvocations: 0,
+                  lastInvokedAt: '2026-07-08T10:00:00Z',
+                },
               ],
             },
           ],
           ranking: [
-            { skillName: 'frontend-testing', sourcePath: '/Users/twwu/project/.agents/skills/frontend-testing/SKILL.md', countedInvocations: 5, failedInvocations: 1, lastInvokedAt: '2026-07-08T11:00:00Z' },
-            { skillName: 'github:github', sourcePath: '/Users/twwu/.codex/plugins/cache/openai-curated/github/skills/github/SKILL.md', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-08T10:00:00Z' },
+            {
+              skillName: 'frontend-testing',
+              sourcePath: '/Users/twwu/project/.agents/skills/frontend-testing/SKILL.md',
+              countedInvocations: 5,
+              failedInvocations: 1,
+              lastInvokedAt: '2026-07-08T11:00:00Z',
+            },
+            {
+              skillName: 'github:github',
+              sourcePath: '/Users/twwu/.codex/plugins/cache/openai-curated/github/skills/github/SKILL.md',
+              countedInvocations: 2,
+              failedInvocations: 0,
+              lastInvokedAt: '2026-07-08T10:00:00Z',
+            },
           ],
           diagnostics: [],
         },
@@ -432,24 +468,26 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('g');
 
-    await waitForFrame(app, (output) => (
-      output.includes('Providers')
-      && output.includes('[Codex]')
-      && output.includes('Claude unsupported')
-      && output.includes('Range')
-      && output.includes('[7d]')
-      && output.includes('Usage heatmap')
-      && output.includes('Jul')
-      && output.includes('[■]')
-      && !output.includes('[3]')
-      && output.includes('2026-07-08 · Codex')
-      && output.includes('Counted 3 · Failed 1')
-      && output.includes('Selected day')
-      && output.includes('frontend-testing')
-      && output.includes('github:github')
-      && output.includes('Provider Skill Ranking')
-      && output.includes('Last Used')
-    ));
+    await waitForFrame(
+      app,
+      (output) =>
+        output.includes('Providers') &&
+        output.includes('[Codex]') &&
+        output.includes('Claude unsupported') &&
+        output.includes('Range') &&
+        output.includes('[7d]') &&
+        output.includes('Usage heatmap') &&
+        output.includes('Jul') &&
+        output.includes('[■]') &&
+        !output.includes('[3]') &&
+        output.includes('2026-07-08 · Codex') &&
+        output.includes('Counted 3 · Failed 1') &&
+        output.includes('Selected day') &&
+        output.includes('frontend-testing') &&
+        output.includes('github:github') &&
+        output.includes('Provider Skill Ranking') &&
+        output.includes('Last Used'),
+    );
 
     app.stdin.write(keypress.up);
     await waitForFrame(app, (output) => output.includes('2026-07-07 · Codex') && output.includes('openai-docs'));
@@ -458,7 +496,10 @@ describe.sequential('Terminal UI Tests', () => {
     await waitForFrame(app, (output) => output.includes('2026-07-08 · Codex') && output.includes('frontend-testing'));
 
     app.stdin.write(keypress.left);
-    await waitForFrame(app, (output) => output.includes('2026-07-02 · Codex') && output.includes('No skill usage on this day.'));
+    await waitForFrame(
+      app,
+      (output) => output.includes('2026-07-02 · Codex') && output.includes('No skill usage on this day.'),
+    );
 
     app.stdin.write(keypress.right);
     await waitForFrame(app, (output) => output.includes('2026-07-08 · Codex') && output.includes('frontend-testing'));
@@ -468,11 +509,13 @@ describe.sequential('Terminal UI Tests', () => {
     expect(manager.getSkillUsageOverview).toHaveBeenLastCalledWith({ rangeDays: 30 });
 
     app.stdin.write(keypress.tab);
-    await waitForFrame(app, (output) => (
-      output.includes('[Claude unsupported]')
-      && output.includes('Usage import is not supported for Claude yet.')
-      && output.includes('No usage records for this provider and range.')
-    ));
+    await waitForFrame(
+      app,
+      (output) =>
+        output.includes('[Claude unsupported]') &&
+        output.includes('Usage import is not supported for Claude yet.') &&
+        output.includes('No usage records for this provider and range.'),
+    );
   });
 
   it('clamps Skill Usage scrolling when the selected day has fewer rows', async () => {
@@ -486,22 +529,24 @@ describe.sequential('Terminal UI Tests', () => {
     const manager = createMockManager({
       usageOverview: {
         range: { days: 7, from: '2026-07-02', to: '2026-07-08' },
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          coverageState: 'active',
-          coverageReasons: [],
-          heatmap: [
-            { date: '2026-07-07', countedInvocations: 0, failedInvocations: 0 },
-            { date: '2026-07-08', countedInvocations: 30, failedInvocations: 0 },
-          ],
-          dailySkillUsage: [
-            { date: '2026-07-07', rows: [] },
-            { date: '2026-07-08', rows: longDayRows },
-          ],
-          ranking: longDayRows.slice(0, 10),
-          diagnostics: [],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            coverageState: 'active',
+            coverageReasons: [],
+            heatmap: [
+              { date: '2026-07-07', countedInvocations: 0, failedInvocations: 0 },
+              { date: '2026-07-08', countedInvocations: 30, failedInvocations: 0 },
+            ],
+            dailySkillUsage: [
+              { date: '2026-07-07', rows: [] },
+              { date: '2026-07-08', rows: longDayRows },
+            ],
+            ranking: longDayRows.slice(0, 10),
+            diagnostics: [],
+          },
+        ],
       },
     });
     const app = renderApp({
@@ -518,10 +563,10 @@ describe.sequential('Terminal UI Tests', () => {
     await waitForFrame(app, (output) => output.includes('skill-09') && output.includes('36-50 of 50'));
 
     app.stdin.write(keypress.up);
-    const frame = await waitForFrame(app, (output) => (
-      output.includes('No skill usage on this day.')
-      && output.includes('1-15 of 25')
-    ));
+    const frame = await waitForFrame(
+      app,
+      (output) => output.includes('No skill usage on this day.') && output.includes('1-15 of 25'),
+    );
     expect(frame).not.toContain('36-25 of 25');
   });
 
@@ -529,35 +574,61 @@ describe.sequential('Terminal UI Tests', () => {
     const manager = createMockManager({
       usageOverview: {
         range: { days: 30, from: '2026-06-08', to: '2026-07-07' },
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          coverageState: 'active',
-          coverageReasons: [],
-          heatmap: [
-            { date: '2026-07-06', countedInvocations: 2, failedInvocations: 0 },
-            { date: '2026-07-07', countedInvocations: 1, failedInvocations: 0 },
-          ],
-          dailySkillUsage: [
-            {
-              date: '2026-07-06',
-              rows: [
-                { skillName: 'tdd', sourcePath: '/Users/twwu/project/.agents/skills/tdd/SKILL.md', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z' },
-              ],
-            },
-            {
-              date: '2026-07-07',
-              rows: [
-                { skillName: 'grilling', sourcePath: '/Users/twwu/project/.agents/skills/grilling/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z' },
-              ],
-            },
-          ],
-          ranking: [
-            { skillName: 'tdd', sourcePath: '/Users/twwu/project/.agents/skills/tdd/SKILL.md', countedInvocations: 2, failedInvocations: 0, lastInvokedAt: '2026-07-06T10:02:00Z' },
-            { skillName: 'grilling', sourcePath: '/Users/twwu/project/.agents/skills/grilling/SKILL.md', countedInvocations: 1, failedInvocations: 0, lastInvokedAt: '2026-07-07T08:00:00Z' },
-          ],
-          diagnostics: [],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            coverageState: 'active',
+            coverageReasons: [],
+            heatmap: [
+              { date: '2026-07-06', countedInvocations: 2, failedInvocations: 0 },
+              { date: '2026-07-07', countedInvocations: 1, failedInvocations: 0 },
+            ],
+            dailySkillUsage: [
+              {
+                date: '2026-07-06',
+                rows: [
+                  {
+                    skillName: 'tdd',
+                    sourcePath: '/Users/twwu/project/.agents/skills/tdd/SKILL.md',
+                    countedInvocations: 2,
+                    failedInvocations: 0,
+                    lastInvokedAt: '2026-07-06T10:02:00Z',
+                  },
+                ],
+              },
+              {
+                date: '2026-07-07',
+                rows: [
+                  {
+                    skillName: 'grilling',
+                    sourcePath: '/Users/twwu/project/.agents/skills/grilling/SKILL.md',
+                    countedInvocations: 1,
+                    failedInvocations: 0,
+                    lastInvokedAt: '2026-07-07T08:00:00Z',
+                  },
+                ],
+              },
+            ],
+            ranking: [
+              {
+                skillName: 'tdd',
+                sourcePath: '/Users/twwu/project/.agents/skills/tdd/SKILL.md',
+                countedInvocations: 2,
+                failedInvocations: 0,
+                lastInvokedAt: '2026-07-06T10:02:00Z',
+              },
+              {
+                skillName: 'grilling',
+                sourcePath: '/Users/twwu/project/.agents/skills/grilling/SKILL.md',
+                countedInvocations: 1,
+                failedInvocations: 0,
+                lastInvokedAt: '2026-07-07T08:00:00Z',
+              },
+            ],
+            diagnostics: [],
+          },
+        ],
       },
     });
     const app = renderApp({
@@ -569,47 +640,64 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('g');
 
-    await waitForFrame(app, (output) => (
-      output.includes('Usage heatmap')
-      && output.includes('2026-07-07 · Codex')
-      && output.includes('Counted 1 · Failed 0')
-      && output.includes('Provider Skill Ranking')
-      && output.includes('Last Used')
-      && output.includes('tdd')
-      && output.includes('grilling')
-    ));
+    await waitForFrame(
+      app,
+      (output) =>
+        output.includes('Usage heatmap') &&
+        output.includes('2026-07-07 · Codex') &&
+        output.includes('Counted 1 · Failed 0') &&
+        output.includes('Provider Skill Ranking') &&
+        output.includes('Last Used') &&
+        output.includes('tdd') &&
+        output.includes('grilling'),
+    );
 
     app.stdin.write(keypress.up);
-    await waitForFrame(app, (output) => output.includes('2026-07-06 · Codex') && output.includes('Counted 2 · Failed 0'));
+    await waitForFrame(
+      app,
+      (output) => output.includes('2026-07-06 · Codex') && output.includes('Counted 2 · Failed 0'),
+    );
   });
 
   it('shows failure context, source paths, and Usage Import Diagnostics', async () => {
     const manager = createMockManager({
       usageOverview: {
         range: { days: 7, from: '2026-06-30', to: '2026-07-06' },
-        providers: [{
-          provider: 'codex',
-          displayName: 'Codex',
-          coverageState: 'active',
-          coverageReasons: [],
-          heatmap: [
-            { date: '2026-07-06', countedInvocations: 1, failedInvocations: 1 },
-          ],
-          dailySkillUsage: [
-            {
-              date: '2026-07-06',
-              rows: [
-                { skillName: 'deleted-skill', sourcePath: '/Users/twwu/old-project/.agents/skills/deleted-skill/SKILL.md', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z' },
-              ],
-            },
-          ],
-          ranking: [
-            { skillName: 'deleted-skill', sourcePath: '/Users/twwu/old-project/.agents/skills/deleted-skill/SKILL.md', countedInvocations: 1, failedInvocations: 1, lastInvokedAt: '2026-07-06T10:02:00Z' },
-          ],
-          diagnostics: [
-            { provider: 'codex', message: 'Skipped ambiguous skill invocation evidence in session.jsonl:1' },
-          ],
-        }],
+        providers: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            coverageState: 'active',
+            coverageReasons: [],
+            heatmap: [{ date: '2026-07-06', countedInvocations: 1, failedInvocations: 1 }],
+            dailySkillUsage: [
+              {
+                date: '2026-07-06',
+                rows: [
+                  {
+                    skillName: 'deleted-skill',
+                    sourcePath: '/Users/twwu/old-project/.agents/skills/deleted-skill/SKILL.md',
+                    countedInvocations: 1,
+                    failedInvocations: 1,
+                    lastInvokedAt: '2026-07-06T10:02:00Z',
+                  },
+                ],
+              },
+            ],
+            ranking: [
+              {
+                skillName: 'deleted-skill',
+                sourcePath: '/Users/twwu/old-project/.agents/skills/deleted-skill/SKILL.md',
+                countedInvocations: 1,
+                failedInvocations: 1,
+                lastInvokedAt: '2026-07-06T10:02:00Z',
+              },
+            ],
+            diagnostics: [
+              { provider: 'codex', message: 'Skipped ambiguous skill invocation evidence in session.jsonl:1' },
+            ],
+          },
+        ],
       },
     });
     const app = renderApp({
@@ -621,14 +709,16 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('g');
 
-    await waitForFrame(app, (output) => (
-      output.includes('2026-07-06 · Codex')
-      && output.includes('Counted 1 · Failed 1')
-      && output.includes('deleted-skill')
-      && output.includes('Source Path')
-      && output.includes('old-project')
-      && output.includes('Skipped ambiguous skill invocation evidence')
-    ));
+    await waitForFrame(
+      app,
+      (output) =>
+        output.includes('2026-07-06 · Codex') &&
+        output.includes('Counted 1 · Failed 1') &&
+        output.includes('deleted-skill') &&
+        output.includes('Source Path') &&
+        output.includes('old-project') &&
+        output.includes('Skipped ambiguous skill invocation evidence'),
+    );
   });
 
   it('switches the selected Skill Usage provider', async () => {
@@ -651,19 +741,29 @@ describe.sequential('Terminal UI Tests', () => {
             displayName: 'Claude',
             coverageState: 'active',
             coverageReasons: [],
-            heatmap: [
-              { date: '2026-07-07', countedInvocations: 3, failedInvocations: 0 },
-            ],
+            heatmap: [{ date: '2026-07-07', countedInvocations: 3, failedInvocations: 0 }],
             dailySkillUsage: [
               {
                 date: '2026-07-07',
                 rows: [
-                  { skillName: 'claude-skill', sourcePath: '/Users/twwu/.claude/skills/claude-skill/SKILL.md', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z' },
+                  {
+                    skillName: 'claude-skill',
+                    sourcePath: '/Users/twwu/.claude/skills/claude-skill/SKILL.md',
+                    countedInvocations: 3,
+                    failedInvocations: 0,
+                    lastInvokedAt: '2026-07-07T10:00:00Z',
+                  },
                 ],
               },
             ],
             ranking: [
-              { skillName: 'claude-skill', sourcePath: '/Users/twwu/.claude/skills/claude-skill/SKILL.md', countedInvocations: 3, failedInvocations: 0, lastInvokedAt: '2026-07-07T10:00:00Z' },
+              {
+                skillName: 'claude-skill',
+                sourcePath: '/Users/twwu/.claude/skills/claude-skill/SKILL.md',
+                countedInvocations: 3,
+                failedInvocations: 0,
+                lastInvokedAt: '2026-07-07T10:00:00Z',
+              },
             ],
             diagnostics: [],
           },
@@ -681,27 +781,28 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write(keypress.tab);
 
-    await waitForFrame(app, (output) => (
-      output.includes('Codex zero')
-      && output.includes('[Claude]')
-      && output.includes('claude-skill')
-    ));
+    await waitForFrame(
+      app,
+      (output) => output.includes('Codex zero') && output.includes('[Claude]') && output.includes('claude-skill'),
+    );
   });
 
   it('cycles Skill Usage ranges from 7 to 30 days', async () => {
     const manager = createMockManager();
     manager.getSkillUsageOverview.mockImplementation(async ({ rangeDays }) => ({
       range: { days: rangeDays, from: '2026-01-01', to: '2026-01-30' },
-      providers: [{
-        provider: 'codex',
-        displayName: 'Codex',
-        coverageState: 'zero',
-        coverageReasons: [],
-        heatmap: [],
-        dailySkillUsage: [],
-        ranking: [],
-        diagnostics: [],
-      }],
+      providers: [
+        {
+          provider: 'codex',
+          displayName: 'Codex',
+          coverageState: 'zero',
+          coverageReasons: [],
+          heatmap: [],
+          dailySkillUsage: [],
+          ranking: [],
+          diagnostics: [],
+        },
+      ],
     }));
     const app = renderApp({
       manager,
@@ -714,7 +815,10 @@ describe.sequential('Terminal UI Tests', () => {
 
     app.stdin.write('2');
 
-    await waitForFrame(app, (output) => output.includes('Skill Usage') && output.includes('30 days') && output.includes('[30d]'));
+    await waitForFrame(
+      app,
+      (output) => output.includes('Skill Usage') && output.includes('30 days') && output.includes('[30d]'),
+    );
     expect(manager.getSkillUsageOverview).toHaveBeenCalledWith({ rangeDays: 30 });
   });
 

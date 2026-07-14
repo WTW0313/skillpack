@@ -40,6 +40,21 @@ pnpm build
 node packages/tui/dist/skillpack.js
 ```
 
+## Development
+
+Contributing requires a Vite+-supported Node.js release (20.19+, 22.18+, or 24.11+) and pnpm 11. The published CLI still supports Node.js 18 and newer.
+
+```bash
+pnpm check          # format check, type-aware lint, and type check
+pnpm format         # format supported source and config files
+pnpm lint           # type-aware lint and type check
+pnpm test           # run all package tests once
+pnpm build          # package Core and the TUI
+pnpm dev            # build Core, then watch the TUI package
+```
+
+CI uses the explicit `pnpm check:ci`, `pnpm test:ci`, and `pnpm build:ci` entry points. The final command also verifies the Core exports, CLI shebang and executable bit, ESM syntax, source-map policy, and npm package contents.
+
 ## Quick Start
 
 Launch `skillpack` to see discovered skills grouped into Skill Groups with provider status and Health Signals. Use `↑↓` arrow keys to navigate, `Tab` / `Shift+Tab` to filter by provider (All, Codex, Claude, Global), and `/` to search.

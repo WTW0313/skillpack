@@ -269,9 +269,8 @@ export function deriveCodexUsageEvidence(input: {
       });
     }
     const output = outputs.get(candidate.callId);
-    const status = candidate.format === 'orchestrated'
-      ? 'unknown'
-      : statusFromLegacyOutput(output?.output, candidate.statusHint);
+    const status =
+      candidate.format === 'orchestrated' ? 'unknown' : statusFromLegacyOutput(output?.output, candidate.statusHint);
     for (const rawSkillPath of rawSkillPaths) {
       if (relativePathsAreUnresolved && skillPathNeedsCwd(rawSkillPath)) continue;
       const skillPath = resolveSkillPath(rawSkillPath, commandCwd);
@@ -302,16 +301,17 @@ function parseLegacyExecCommand(payload: Record<string, unknown>): ExecCommand |
   return { cmd, workdir: stringValue(value.workdir) };
 }
 
-function parseOrchestratedExecCommands(source: string, lineIndex: number): {
+function parseOrchestratedExecCommands(
+  source: string,
+  lineIndex: number,
+): {
   commands: ExecCommand[];
   findings: CodexEvidenceFinding[];
 } {
   if (source.length > MAX_PROGRAM_SOURCE_LENGTH) {
     return {
       commands: [],
-      findings: hasPotentialSkillEvidence(source)
-        ? [{ lineIndex, reason: 'analysis-budget-exceeded', count: 1 }]
-        : [],
+      findings: hasPotentialSkillEvidence(source) ? [{ lineIndex, reason: 'analysis-budget-exceeded', count: 1 }] : [],
     };
   }
   let program: Program;
@@ -320,9 +320,7 @@ function parseOrchestratedExecCommands(source: string, lineIndex: number): {
   } catch {
     return {
       commands: [],
-      findings: hasPotentialSkillEvidence(source)
-        ? [{ lineIndex, reason: 'invalid-javascript', count: 1 }]
-        : [],
+      findings: hasPotentialSkillEvidence(source) ? [{ lineIndex, reason: 'invalid-javascript', count: 1 }] : [],
     };
   }
 
@@ -346,8 +344,7 @@ function parseOrchestratedExecCommands(source: string, lineIndex: number): {
 function enterStaticEvaluation(context: EvaluationContext): boolean {
   if (context.budgetExceeded) return false;
   context.evaluationSteps += 1;
-  if (context.evaluationSteps > MAX_STATIC_EVALUATION_STEPS
-    || context.evaluationDepth >= MAX_STATIC_EVALUATION_DEPTH) {
+  if (context.evaluationSteps > MAX_STATIC_EVALUATION_STEPS || context.evaluationDepth >= MAX_STATIC_EVALUATION_DEPTH) {
     exceedAnalysisBudget(context);
     return false;
   }
@@ -390,8 +387,10 @@ function recordResolvedCommand(command: ExecCommand, context: EvaluationContext)
 }
 
 function retainStaticString(value: string, context: EvaluationContext): StaticEvaluation {
-  if (value.length > MAX_STATIC_STRING_LENGTH
-    || context.staticStringCodeUnits > MAX_STATIC_STRING_CODE_UNITS - value.length) {
+  if (
+    value.length > MAX_STATIC_STRING_LENGTH ||
+    context.staticStringCodeUnits > MAX_STATIC_STRING_CODE_UNITS - value.length
+  ) {
     exceedAnalysisBudget(context);
     return UNRESOLVED;
   }
@@ -453,10 +452,13 @@ function resolveExecCommand(
       potentialSkillEvidence,
     };
   }
-  return { command: {
-    cmd,
-    workdir: typeof workdir === 'string' ? workdir : undefined,
-  }, potentialSkillEvidence };
+  return {
+    command: {
+      cmd,
+      workdir: typeof workdir === 'string' ? workdir : undefined,
+    },
+    potentialSkillEvidence,
+  };
 }
 
 function recordUnresolvedExecFinding(
@@ -525,24 +527,24 @@ function aggregateFindings(findings: CodexEvidenceFinding[]): CodexEvidenceFindi
       aggregated.set(finding.reason, { ...finding });
     }
   }
-  return [...aggregated.values()].sort((left, right) => (
-    left.lineIndex - right.lineIndex || left.reason.localeCompare(right.reason)
-  ));
+  return [...aggregated.values()].sort(
+    (left, right) => left.lineIndex - right.lineIndex || left.reason.localeCompare(right.reason),
+  );
 }
 
 function isToolsExecCommand(call: CallExpression, environment: StaticEnvironment): boolean {
   if (environment.has('tools')) return false;
-  if (call.callee.type !== 'MemberExpression'
-    || call.callee.object.type !== 'Identifier'
-    || call.callee.object.name !== 'tools') {
+  if (
+    call.callee.type !== 'MemberExpression' ||
+    call.callee.object.type !== 'Identifier' ||
+    call.callee.object.name !== 'tools'
+  ) {
     return false;
   }
   if (!call.callee.computed) {
-    return call.callee.property.type === 'Identifier'
-      && call.callee.property.name === 'exec_command';
+    return call.callee.property.type === 'Identifier' && call.callee.property.name === 'exec_command';
   }
-  return call.callee.property.type === 'Literal'
-    && call.callee.property.value === 'exec_command';
+  return call.callee.property.type === 'Literal' && call.callee.property.value === 'exec_command';
 }
 
 function propertyName(key: Expression): string | undefined {
@@ -571,9 +573,7 @@ function evaluateStaticExpression(
   context: EvaluationContext,
 ): StaticEvaluation {
   if (expression.type === 'Literal') {
-    return typeof expression.value === 'string'
-      ? retainStaticString(expression.value, context)
-      : UNRESOLVED;
+    return typeof expression.value === 'string' ? retainStaticString(expression.value, context) : UNRESOLVED;
   }
   if (expression.type === 'Identifier') {
     if (environment.has(expression.name)) {
@@ -696,9 +696,11 @@ function evaluateStaticExpression(
   if (expression.type === 'AwaitExpression') {
     const awaited = evaluateStatic(expression.argument, environment, context);
     if (context.pathUnsupported) return UNRESOLVED;
-    if (awaited === UNRESOLVED
-      || isStaticOpaqueLeaf(awaited)
-      || (isStaticObject(awaited) && awaited.properties.has('then'))) {
+    if (
+      awaited === UNRESOLVED ||
+      isStaticOpaqueLeaf(awaited) ||
+      (isStaticObject(awaited) && awaited.properties.has('then'))
+    ) {
       context.pathUnsupported = true;
       return UNRESOLVED;
     }
@@ -708,12 +710,7 @@ function evaluateStaticExpression(
     if (isToolsExecCommand(expression, environment)) {
       if (expression.arguments.length !== 1 || expression.arguments[0].type === 'SpreadElement') {
         context.pathUnsupported = true;
-        recordUnresolvedExecFinding(
-          expression,
-          'unresolved-command',
-          false,
-          context,
-        );
+        recordUnresolvedExecFinding(expression, 'unresolved-command', false, context);
         return UNRESOLVED;
       }
       const resolution = resolveExecCommand(expression, environment, context);
@@ -725,21 +722,14 @@ function evaluateStaticExpression(
         recordResolvedCommand(resolution.command, context);
         return context.pathUnsupported ? UNRESOLVED : STATIC_OPAQUE_OBJECT;
       }
-      recordUnresolvedExecFinding(
-        expression,
-        resolution.reason,
-        resolution.potentialSkillEvidence,
-        context,
-      );
+      recordUnresolvedExecFinding(expression, resolution.reason, resolution.potentialSkillEvidence, context);
       context.pathUnsupported = true;
       return UNRESOLVED;
     }
     if (invalidateKnownMutationCall(expression, environment, context)) return UNRESOLVED;
     if (isPromiseAllCall(expression, environment)) {
       const argument = expression.arguments[0];
-      if (expression.arguments.length !== 1
-        || !argument
-        || argument.type === 'SpreadElement') {
+      if (expression.arguments.length !== 1 || !argument || argument.type === 'SpreadElement') {
         context.pathUnsupported = true;
         return UNRESOLVED;
       }
@@ -755,10 +745,12 @@ function evaluateStaticExpression(
       const receiver = evaluateStatic(expression.callee.object as Expression, environment, context);
       const callbackArgument = expression.arguments[0];
       if (context.pathUnsupported) return UNRESOLVED;
-      if (!isStaticArray(receiver)
-        || expression.arguments.length !== 1
-        || !callbackArgument
-        || callbackArgument.type === 'SpreadElement') {
+      if (
+        !isStaticArray(receiver) ||
+        expression.arguments.length !== 1 ||
+        !callbackArgument ||
+        callbackArgument.type === 'SpreadElement'
+      ) {
         context.pathUnsupported = true;
         return UNRESOLVED;
       }
@@ -811,9 +803,7 @@ function executeStatements(
     if (!consumeStatementStep(context)) return { kind: 'unsupported' };
     if (statement.type === 'VariableDeclaration') {
       for (const declaration of statement.declarations) {
-        const value = declaration.init
-          ? evaluateStatic(declaration.init, environment, context)
-          : UNRESOLVED;
+        const value = declaration.init ? evaluateStatic(declaration.init, environment, context) : UNRESOLVED;
         if (context.pathUnsupported) return { kind: 'unsupported' };
         if (declaration.id.type === 'Identifier') {
           environment.set(declaration.id.name, statement.kind === 'const' ? value : UNRESOLVED);
@@ -837,9 +827,7 @@ function executeStatements(
       continue;
     }
     if (statement.type === 'ReturnStatement') {
-      const value = statement.argument
-        ? evaluateStatic(statement.argument, environment, context)
-        : UNRESOLVED;
+      const value = statement.argument ? evaluateStatic(statement.argument, environment, context) : UNRESOLVED;
       if (context.pathUnsupported) return { kind: 'unsupported' };
       return {
         kind: 'return',
@@ -848,9 +836,11 @@ function executeStatements(
     }
     if (statement.type === 'BreakStatement') return { kind: 'break' };
     if (statement.type === 'ContinueStatement') return { kind: 'continue' };
-    if (statement.type === 'EmptyStatement'
-      || statement.type === 'DebuggerStatement'
-      || statement.type === 'FunctionDeclaration') {
+    if (
+      statement.type === 'EmptyStatement' ||
+      statement.type === 'DebuggerStatement' ||
+      statement.type === 'FunctionDeclaration'
+    ) {
       continue;
     }
     return { kind: 'unsupported' };
@@ -865,11 +855,7 @@ function predeclareBindings(
   for (const statement of statements) {
     if (statement.type === 'VariableDeclaration') {
       for (const declaration of statement.declarations) {
-        bindPattern(
-          declaration.id,
-          environment,
-          statement.kind === 'var' ? UNRESOLVED : UNINITIALIZED,
-        );
+        bindPattern(declaration.id, environment, statement.kind === 'var' ? UNRESOLVED : UNINITIALIZED);
       }
     } else if (statement.type === 'FunctionDeclaration') {
       environment.set(statement.id.name, UNRESOLVED);
@@ -888,10 +874,7 @@ function predeclareFunctionScopedBindings(
   for (const statement of statements) collectFunctionScopedBindings(statement, environment);
 }
 
-function collectFunctionScopedBindings(
-  statement: Statement | ModuleDeclaration,
-  environment: StaticEnvironment,
-): void {
+function collectFunctionScopedBindings(statement: Statement | ModuleDeclaration, environment: StaticEnvironment): void {
   if (statement.type === 'VariableDeclaration') {
     if (statement.kind !== 'var') return;
     for (const declaration of statement.declarations) {
@@ -949,20 +932,12 @@ function collectFunctionScopedBindings(
   }
 }
 
-function bindPattern(
-  pattern: Pattern,
-  environment: StaticEnvironment,
-  value: StaticBinding,
-): void {
+function bindPattern(pattern: Pattern, environment: StaticEnvironment, value: StaticBinding): void {
   if (pattern.type === 'Identifier') {
     environment.set(pattern.name, value);
   } else if (pattern.type === 'ObjectPattern') {
     for (const property of pattern.properties) {
-      bindPattern(
-        property.type === 'RestElement' ? property.argument : property.value,
-        environment,
-        value,
-      );
+      bindPattern(property.type === 'RestElement' ? property.argument : property.value, environment, value);
     }
   } else if (pattern.type === 'ArrayPattern') {
     for (const element of pattern.elements) {
@@ -1034,12 +1009,14 @@ function invalidateKnownMutationCall(
 
 function isObjectAssignCall(call: CallExpression, environment: StaticEnvironment): boolean {
   if (environment.has('Object')) return false;
-  return call.callee.type === 'MemberExpression'
-    && !call.callee.computed
-    && call.callee.object.type === 'Identifier'
-    && call.callee.object.name === 'Object'
-    && call.callee.property.type === 'Identifier'
-    && call.callee.property.name === 'assign';
+  return (
+    call.callee.type === 'MemberExpression' &&
+    !call.callee.computed &&
+    call.callee.object.type === 'Identifier' &&
+    call.callee.object.name === 'Object' &&
+    call.callee.property.type === 'Identifier' &&
+    call.callee.property.name === 'assign'
+  );
 }
 
 function memberRootIdentifier(expression: Expression): string | undefined {
@@ -1053,10 +1030,12 @@ function executeForOf(
   environment: StaticEnvironment,
   context: EvaluationContext,
 ): ExecutionCompletion {
-  if (statement.left.type !== 'VariableDeclaration'
-    || statement.left.kind !== 'const'
-    || statement.left.declarations.length !== 1
-    || statement.left.declarations[0].id.type !== 'Identifier') {
+  if (
+    statement.left.type !== 'VariableDeclaration' ||
+    statement.left.kind !== 'const' ||
+    statement.left.declarations.length !== 1 ||
+    statement.left.declarations[0].id.type !== 'Identifier'
+  ) {
     return { kind: 'unsupported' };
   }
   const iterable = evaluateStatic(statement.right, environment, context);
@@ -1109,31 +1088,34 @@ function memberPropertyName(
 
 function isPromiseAllCall(call: CallExpression, environment: StaticEnvironment): boolean {
   if (environment.has('Promise')) return false;
-  return call.callee.type === 'MemberExpression'
-    && !call.callee.computed
-    && call.callee.object.type === 'Identifier'
-    && call.callee.object.name === 'Promise'
-    && call.callee.property.type === 'Identifier'
-    && call.callee.property.name === 'all';
+  return (
+    call.callee.type === 'MemberExpression' &&
+    !call.callee.computed &&
+    call.callee.object.type === 'Identifier' &&
+    call.callee.object.name === 'Promise' &&
+    call.callee.property.type === 'Identifier' &&
+    call.callee.property.name === 'all'
+  );
 }
 
-function isKnownOrchestrationHelperCall(
-  call: CallExpression,
-  environment: StaticEnvironment,
-): boolean {
-  return call.callee.type === 'Identifier'
-    && !environment.has(call.callee.name)
-    && CODEX_ORCHESTRATION_HELPERS.has(call.callee.name);
+function isKnownOrchestrationHelperCall(call: CallExpression, environment: StaticEnvironment): boolean {
+  return (
+    call.callee.type === 'Identifier' &&
+    !environment.has(call.callee.name) &&
+    CODEX_ORCHESTRATION_HELPERS.has(call.callee.name)
+  );
 }
 
 function isArrayMapCall(call: CallExpression): call is CallExpression & {
   callee: Extract<Expression, { type: 'MemberExpression' }>;
 } {
-  return call.callee.type === 'MemberExpression'
-    && !call.callee.computed
-    && call.callee.object.type !== 'Super'
-    && call.callee.property.type === 'Identifier'
-    && call.callee.property.name === 'map';
+  return (
+    call.callee.type === 'MemberExpression' &&
+    !call.callee.computed &&
+    call.callee.object.type !== 'Super' &&
+    call.callee.property.type === 'Identifier' &&
+    call.callee.property.name === 'map'
+  );
 }
 
 function isStaticObject(value: StaticEvaluation): value is StaticObject {
@@ -1157,8 +1139,7 @@ function isStaticOpaqueLeaf(value: StaticEvaluation): value is StaticOpaqueLeaf 
 }
 
 function isUnprovenPromiseInput(value: StaticValue): boolean {
-  return isStaticOpaqueLeaf(value)
-    || (isStaticObject(value) && value.properties.has('then'));
+  return isStaticOpaqueLeaf(value) || (isStaticObject(value) && value.properties.has('then'));
 }
 
 function extractDirectSkillReadPaths(command: string): string[] {
@@ -1246,9 +1227,10 @@ function statusFromLegacyOutput(
   output: string | undefined,
   statusHint: CodexSkillReadStatus | undefined,
 ): CodexSkillReadStatus {
-  const exitCode = output?.match(/Process exited with code\s+(\d+)/)?.[1]
-    ?? output?.match(/Exit code:\s+(\d+)/)?.[1]
-    ?? output?.match(/Exit status\s+(\d+)/)?.[1];
+  const exitCode =
+    output?.match(/Process exited with code\s+(\d+)/)?.[1] ??
+    output?.match(/Exit code:\s+(\d+)/)?.[1] ??
+    output?.match(/Exit status\s+(\d+)/)?.[1];
   if (exitCode !== undefined) return exitCode === '0' ? 'used' : 'failed';
   return statusHint ?? 'unknown';
 }

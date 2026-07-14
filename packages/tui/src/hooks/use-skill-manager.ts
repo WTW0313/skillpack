@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  SkillManager, ConfigManager,
-  CodexProvider, ClaudeProvider, GlobalProvider,
+  SkillManager,
+  ConfigManager,
+  CodexProvider,
+  ClaudeProvider,
+  GlobalProvider,
   SkillsShSource,
   type SkillpackConfig,
 } from '@skillpack/core';
@@ -23,64 +26,67 @@ export function useSkillManager(): SkillManagerResult {
     let cancelled = false;
 
     async function init() {
-      try {
-        const configManager = new ConfigManager();
-        const cfg = await configManager.load();
-        const mgr = new SkillManager({
-          usageProviders: [
-            {
-              provider: 'codex',
-              displayName: 'Codex',
-              supported: true,
-              artifactRoots: cfg.usage.artifactRoots.codex ?? [],
-            },
-            {
-              provider: 'claude',
-              displayName: 'Claude',
-              supported: true,
-              artifactRoots: cfg.usage.artifactRoots.claude ?? [],
-              skillRoots: cfg.providers.claude?.paths ?? [],
-            },
-          ],
-        });
-
-        const providerFactories: Record<string, () => InstanceType<typeof CodexProvider | typeof ClaudeProvider | typeof GlobalProvider>> = {
-          codex: () => new CodexProvider(cfg.providers.codex?.paths),
-          claude: () => {
-            const allPaths = cfg.providers.claude?.paths ?? [];
-            const cachePaths = allPaths.filter((p) => p.includes('plugins') || p.includes('cache'));
-            const flatPaths = allPaths.filter((p) => !p.includes('plugins') && !p.includes('cache'));
-            return new ClaudeProvider(
-              cachePaths.length > 0 ? cachePaths : undefined,
-              flatPaths.length > 0 ? flatPaths : undefined,
-            );
+      const configManager = new ConfigManager();
+      const cfg = await configManager.load();
+      const mgr = new SkillManager({
+        usageProviders: [
+          {
+            provider: 'codex',
+            displayName: 'Codex',
+            supported: true,
+            artifactRoots: cfg.usage.artifactRoots.codex ?? [],
           },
-          global: () => new GlobalProvider(cfg.providers.global?.paths),
-        };
+          {
+            provider: 'claude',
+            displayName: 'Claude',
+            supported: true,
+            artifactRoots: cfg.usage.artifactRoots.claude ?? [],
+            skillRoots: cfg.providers.claude?.paths ?? [],
+          },
+        ],
+      });
 
-        for (const [id, factory] of Object.entries(providerFactories)) {
-          if (cfg.providers[id]?.enabled) {
-            mgr.registerProvider(factory());
-          }
+      const providerFactories: Record<
+        string,
+        () => InstanceType<typeof CodexProvider | typeof ClaudeProvider | typeof GlobalProvider>
+      > = {
+        codex: () => new CodexProvider(cfg.providers.codex?.paths),
+        claude: () => {
+          const allPaths = cfg.providers.claude?.paths ?? [];
+          const cachePaths = allPaths.filter((p) => p.includes('plugins') || p.includes('cache'));
+          const flatPaths = allPaths.filter((p) => !p.includes('plugins') && !p.includes('cache'));
+          return new ClaudeProvider(
+            cachePaths.length > 0 ? cachePaths : undefined,
+            flatPaths.length > 0 ? flatPaths : undefined,
+          );
+        },
+        global: () => new GlobalProvider(cfg.providers.global?.paths),
+      };
+
+      for (const [id, factory] of Object.entries(providerFactories)) {
+        if (cfg.providers[id]?.enabled) {
+          mgr.registerProvider(factory());
         }
+      }
 
-        if (cfg.sources.skillssh?.enabled) mgr.registerSource(new SkillsShSource());
+      if (cfg.sources.skillssh?.enabled) mgr.registerSource(new SkillsShSource());
 
-        await mgr.init();
-        await mgr.scanAll(process.cwd(), cfg.projectSkillsDirs);
+      await mgr.init();
+      await mgr.scanAll(process.cwd(), cfg.projectSkillsDirs);
 
-        if (!cancelled) {
-          setManager(mgr);
-          setConfig(cfg);
-          setConfigManager(configManager);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      if (!cancelled) {
+        setManager(mgr);
+        setConfig(cfg);
+        setConfigManager(configManager);
       }
     }
 
-    init();
-    return () => { cancelled = true; };
+    init().catch((err) => {
+      if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function setUsageImportConsent(importConsent: boolean): Promise<SkillpackConfig> {

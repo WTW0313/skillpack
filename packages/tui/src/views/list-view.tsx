@@ -13,8 +13,16 @@ import { fitCell, getGlyphSet, getInventoryLayout } from '../lib/responsive-layo
 export function ListView() {
   const { exit } = useApp();
   const {
-    loading, activeTab, setActiveTab, setView, setSelectedGroup, setSelectedSkill,
-    searchQuery, setSearchQuery, refresh, inventory,
+    loading,
+    activeTab,
+    setActiveTab,
+    setView,
+    setSelectedGroup,
+    setSelectedSkill,
+    searchQuery,
+    setSearchQuery,
+    refresh,
+    inventory,
   } = useAppContext();
   const { skills, tabs } = useFilteredSkills();
   const { columns, rows } = useTerminalSize();
@@ -33,8 +41,13 @@ export function ListView() {
   });
   const visibleRows = layout.visibleRows;
 
-  useEffect(() => { refresh(); }, [refresh]);
-  useEffect(() => { setCursor(0); setScrollOffset(0); }, [activeTab]);
+  useEffect(() => {
+    refresh().catch(() => undefined);
+  }, [refresh]);
+  useEffect(() => {
+    setCursor(0);
+    setScrollOffset(0);
+  }, [activeTab]);
 
   useEffect(() => {
     if (skills.length !== prevSkillsLenRef.current) {
@@ -64,7 +77,9 @@ export function ListView() {
         counts[tab] = inventory.reduce((count, group) => count + group.instances.length, 0);
       } else {
         const providerMap: Record<string, string> = {
-          Codex: 'codex', Claude: 'claude', Global: 'global',
+          Codex: 'codex',
+          Claude: 'claude',
+          Global: 'global',
         };
         counts[tab] = inventory.reduce(
           (count, group) => count + group.instances.filter((instance) => instance.provider === providerMap[tab]).length,
@@ -75,61 +90,94 @@ export function ListView() {
     return counts;
   }, [inventory]);
 
-  useInput((input, key) => {
-    if (input === 'q') { exit(); return; }
-    if (key.escape && searchQuery) {
-      setSearchQuery('');
-      return;
-    }
-    if (key.downArrow) {
-      setCursor((c) => Math.min(c + 1, Math.max(0, skills.length - 1)));
-      return;
-    }
-    if (key.upArrow) {
-      setCursor((c) => Math.max(c - 1, 0));
-      return;
-    }
-    if (input === '/') { setSearching(true); return; }
-    if (input === 'p') { setView('project'); return; }
-    if (input === 's') { setView('settings'); return; }
-    if (input === 'i') { setView('install'); return; }
-    if (input === 'u') { setView('updates'); return; }
-    if (input === 'g') { setView('usage'); return; }
-    if (key.return && skills[cursor]) {
-      setSelectedGroup(skills[cursor].group);
-      setSelectedSkill(skills[cursor].instance);
-      setView('detail');
-      return;
-    }
-    if (key.tab) {
-      const idx = tabs.indexOf(activeTab);
-      const next = key.shift
-        ? (idx - 1 + tabs.length) % tabs.length
-        : (idx + 1) % tabs.length;
-      setActiveTab(tabs[next]);
-    }
-  }, { isActive: !searching });
+  useInput(
+    (input, key) => {
+      if (input === 'q') {
+        exit();
+        return;
+      }
+      if (key.escape && searchQuery) {
+        setSearchQuery('');
+        return;
+      }
+      if (key.downArrow) {
+        setCursor((c) => Math.min(c + 1, Math.max(0, skills.length - 1)));
+        return;
+      }
+      if (key.upArrow) {
+        setCursor((c) => Math.max(c - 1, 0));
+        return;
+      }
+      if (input === '/') {
+        setSearching(true);
+        return;
+      }
+      if (input === 'p') {
+        setView('project');
+        return;
+      }
+      if (input === 's') {
+        setView('settings');
+        return;
+      }
+      if (input === 'i') {
+        setView('install');
+        return;
+      }
+      if (input === 'u') {
+        setView('updates');
+        return;
+      }
+      if (input === 'g') {
+        setView('usage');
+        return;
+      }
+      if (key.return && skills[cursor]) {
+        setSelectedGroup(skills[cursor].group);
+        setSelectedSkill(skills[cursor].instance);
+        setView('detail');
+        return;
+      }
+      if (key.tab) {
+        const idx = tabs.indexOf(activeTab);
+        const next = key.shift ? (idx - 1 + tabs.length) % tabs.length : (idx + 1) % tabs.length;
+        setActiveTab(tabs[next]);
+      }
+    },
+    { isActive: !searching },
+  );
 
   if (loading) {
-    return <Box><Spinner label="Scanning skills…" /></Box>;
+    return (
+      <Box>
+        <Spinner label="Scanning skills…" />
+      </Box>
+    );
   }
 
   const showScroll = skills.length > visibleRows;
-  const scrollBarHeight = showScroll
-    ? Math.max(1, Math.round(visibleRows * (visibleRows / skills.length)))
-    : 0;
-  const scrollBarOffset = skills.length <= visibleRows
-    ? 0
-    : Math.round(scrollOffset / (skills.length - visibleRows) * (visibleRows - scrollBarHeight));
+  const scrollBarHeight = showScroll ? Math.max(1, Math.round(visibleRows * (visibleRows / skills.length))) : 0;
+  const scrollBarOffset =
+    skills.length <= visibleRows
+      ? 0
+      : Math.round((scrollOffset / (skills.length - visibleRows)) * (visibleRows - scrollBarHeight));
 
   return (
     <Box flexDirection="column" flexGrow={1}>
       {/* Header */}
       <Box paddingX={1}>
-        <Text bold color="magenta">{glyphs.brand} Skillpack</Text>
-        <Text dimColor>  {skills.length} instance{skills.length !== 1 ? 's' : ''}</Text>
+        <Text bold color="magenta">
+          {glyphs.brand} Skillpack
+        </Text>
+        <Text dimColor>
+          {'  '}
+          {skills.length} instance{skills.length !== 1 ? 's' : ''}
+        </Text>
         {showScroll && (
-          <Text dimColor>  {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, skills.length)} of {skills.length}</Text>
+          <Text dimColor>
+            {'  '}
+            {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, skills.length)} of {skills.length}
+          </Text>
         )}
       </Box>
 
@@ -145,7 +193,10 @@ export function ListView() {
             defaultValue={searchQuery}
             onChange={setSearchQuery}
             onSubmit={() => setSearching(false)}
-            onCancel={() => { setSearching(false); setSearchQuery(''); }}
+            onCancel={() => {
+              setSearching(false);
+              setSearchQuery('');
+            }}
           />
         </Box>
       )}
@@ -154,15 +205,17 @@ export function ListView() {
       {!searching && searchQuery && (
         <Box paddingX={1} marginTop={1}>
           <Text dimColor>filtered by </Text>
-          <Text color="magenta" bold>"{searchQuery}"</Text>
-          <Text dimColor>  esc to clear</Text>
+          <Text color="magenta" bold>
+            "{searchQuery}"
+          </Text>
+          <Text dimColor>{'  '}esc to clear</Text>
         </Box>
       )}
 
       {/* Column headers */}
       <Box paddingX={1} marginTop={1}>
         <Box gap={1}>
-          <Text>{' '}</Text>
+          <Text> </Text>
           <Text dimColor>{fitCell('NAME', layout.columns.name)}</Text>
           <Text dimColor>{fitCell('PROVIDER', layout.columns.provider)}</Text>
           <Text dimColor>{fitCell('STATUS', layout.columns.state)}</Text>
@@ -178,7 +231,7 @@ export function ListView() {
             <Box marginTop={1}>
               {searchQuery ? (
                 <>
-                  <Text dimColor>  No matches for </Text>
+                  <Text dimColor>{'  '}No matches for </Text>
                   <Text color="magenta">"{searchQuery}"</Text>
                   <Text dimColor>. Press </Text>
                   <Text bold>esc</Text>
@@ -186,7 +239,7 @@ export function ListView() {
                 </>
               ) : (
                 <>
-                  <Text dimColor>  No skills found. Press </Text>
+                  <Text dimColor>{'  '}No skills found. Press </Text>
                   <Text bold>i</Text>
                   <Text dimColor> to install or </Text>
                   <Text bold>p</Text>

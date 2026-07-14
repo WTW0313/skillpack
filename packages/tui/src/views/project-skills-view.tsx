@@ -23,8 +23,14 @@ export function ProjectSkillsView() {
   const visibleRows = layout.visibleRows;
 
   useInput((input, key) => {
-    if (input === 'q') { exit(); return; }
-    if (key.escape) { setView('list'); return; }
+    if (input === 'q') {
+      exit();
+      return;
+    }
+    if (key.escape) {
+      setView('list');
+      return;
+    }
     if (key.downArrow) {
       setCursor((c) => Math.min(c + 1, Math.max(0, projectSkills.length - 1)));
       setScrollOffset((offset) => {
@@ -54,17 +60,25 @@ export function ProjectSkillsView() {
   return (
     <Box flexDirection="column" flexGrow={1}>
       <Box paddingX={1}>
-        <Text dimColor>‹ esc  </Text>
-        <Text bold color="magenta">Project Skills</Text>
-        <Text dimColor>  {projectSkills.length} skill{projectSkills.length !== 1 ? 's' : ''}</Text>
+        <Text dimColor>‹ esc{'  '}</Text>
+        <Text bold color="magenta">
+          Project Skills
+        </Text>
+        <Text dimColor>
+          {'  '}
+          {projectSkills.length} skill{projectSkills.length !== 1 ? 's' : ''}
+        </Text>
         {showScroll && (
-          <Text dimColor>  {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, projectSkills.length)} of {projectSkills.length}</Text>
+          <Text dimColor>
+            {'  '}
+            {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, projectSkills.length)} of {projectSkills.length}
+          </Text>
         )}
       </Box>
 
       <Box paddingX={1} marginTop={1}>
         <Box gap={1}>
-          <Text>{' '}</Text>
+          <Text> </Text>
           <Text dimColor>{fitCell('NAME', tableColumns.name)}</Text>
           {tableColumns.description > 0 && <Text dimColor>{fitCell('DESCRIPTION', tableColumns.description)}</Text>}
           <Text dimColor>{fitCell('PROJECT PATH', tableColumns.path)}</Text>
@@ -75,7 +89,7 @@ export function ProjectSkillsView() {
       <Box flexDirection="column" paddingX={1} height={visibleRows}>
         {projectSkills.length === 0 ? (
           <Box marginTop={1}>
-            <Text dimColor>  No Project Skills found for this repository.</Text>
+            <Text dimColor>{'  '}No Project Skills found for this repository.</Text>
           </Box>
         ) : (
           visibleSkills.map((skill, index) => {
@@ -85,9 +99,7 @@ export function ProjectSkillsView() {
             const state = hasIssues ? 'needs attention' : overlapsInventory ? 'overlaps' : 'read-only';
             return (
               <Box key={skill.path} gap={1}>
-                <Text color={selected ? 'magenta' : undefined}>
-                  {selected ? glyphs.selected : ' '}
-                </Text>
+                <Text color={selected ? 'magenta' : undefined}>{selected ? glyphs.selected : ' '}</Text>
                 <Text bold={selected} color={selected ? 'white' : undefined}>
                   {fitCell(skill.name, tableColumns.name)}
                 </Text>

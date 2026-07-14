@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { mkdtemp, rm, mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -34,12 +34,16 @@ describe('CodexProvider', () => {
   ) {
     const pluginRoot = path.join(pluginCacheDir, marketplace, pluginName, version);
     await mkdir(path.join(pluginRoot, '.codex-plugin'), { recursive: true });
-    await writeFile(path.join(pluginRoot, '.codex-plugin', 'plugin.json'), JSON.stringify({
-      name: manifestName,
-      version,
-      skills: './skills/',
-      interface: { displayName: manifestName.toUpperCase() },
-    }), 'utf-8');
+    await writeFile(
+      path.join(pluginRoot, '.codex-plugin', 'plugin.json'),
+      JSON.stringify({
+        name: manifestName,
+        version,
+        skills: './skills/',
+        interface: { displayName: manifestName.toUpperCase() },
+      }),
+      'utf-8',
+    );
     await writeSkill(path.join(pluginRoot, 'skills', skillName), skillName);
     return pluginRoot;
   }
@@ -73,16 +77,19 @@ describe('CodexProvider', () => {
   it('does not let later TOML tables overwrite Codex skill config state', async () => {
     const skillDir = path.join(dir, 'my-skill');
     await writeSkill(skillDir, 'my-skill', 'Toggle me');
-    await writeFile(configPath, [
-      '[[skills.config]]',
-      `path = "${path.join(skillDir, 'SKILL.md')}"`,
-      'enabled = false',
-      '',
-      '[mcp_servers.example]',
-      'command = "example"',
-      'enabled = true',
-      '',
-    ].join('\n'));
+    await writeFile(
+      configPath,
+      [
+        '[[skills.config]]',
+        `path = "${path.join(skillDir, 'SKILL.md')}"`,
+        'enabled = false',
+        '',
+        '[mcp_servers.example]',
+        'command = "example"',
+        'enabled = true',
+        '',
+      ].join('\n'),
+    );
 
     const skills = await provider.scan();
 
@@ -99,7 +106,9 @@ describe('CodexProvider', () => {
 
     await expect(access(path.join(dir, 'my-skill'))).resolves.toBeUndefined();
     await expect(access(path.join(dir, '.disabled-my-skill'))).rejects.toThrow();
-    expect(await readFile(configPath, 'utf-8')).toContain(`path = "${path.join(skillDir, 'SKILL.md')}"\nenabled = false`);
+    expect(await readFile(configPath, 'utf-8')).toContain(
+      `path = "${path.join(skillDir, 'SKILL.md')}"\nenabled = false`,
+    );
 
     const skills = await provider.scan();
     expect(skills).toHaveLength(1);
@@ -116,7 +125,9 @@ describe('CodexProvider', () => {
     await provider.setEnabled(skill, true);
 
     await expect(access(path.join(dir, 'my-skill'))).resolves.toBeUndefined();
-    expect(await readFile(configPath, 'utf-8')).toContain(`path = "${path.join(skillDir, 'SKILL.md')}"\nenabled = true`);
+    expect(await readFile(configPath, 'utf-8')).toContain(
+      `path = "${path.join(skillDir, 'SKILL.md')}"\nenabled = true`,
+    );
 
     const skills = await provider.scan();
     expect(skills).toHaveLength(1);
@@ -155,15 +166,18 @@ describe('CodexProvider', () => {
     const pluginCache = path.join(dir, 'plugins', 'cache');
     const pluginProvider = new CodexProvider([pluginCache], configPath);
     await writePluginSkill(pluginCache, 'openai-curated', 'github', '1.2.3', 'yeet');
-    await writeFile(configPath, [
-      '[plugins."github@openai-curated"]',
-      'enabled = true',
-      '',
-      '[[skills.config]]',
-      `path = "${path.join(pluginCache, 'openai-curated', 'github', '1.2.3', 'skills', 'yeet', 'SKILL.md')}"`,
-      'enabled = false',
-      '',
-    ].join('\n'));
+    await writeFile(
+      configPath,
+      [
+        '[plugins."github@openai-curated"]',
+        'enabled = true',
+        '',
+        '[[skills.config]]',
+        `path = "${path.join(pluginCache, 'openai-curated', 'github', '1.2.3', 'skills', 'yeet', 'SKILL.md')}"`,
+        'enabled = false',
+        '',
+      ].join('\n'),
+    );
 
     const [skill] = await pluginProvider.scan();
 
@@ -190,7 +204,9 @@ describe('CodexProvider', () => {
 
     await pluginProvider.setEnabled(skill, false);
 
-    expect(await readFile(configPath, 'utf-8')).toContain('[plugins."product-design@openai-curated-remote"]\nenabled = false');
+    expect(await readFile(configPath, 'utf-8')).toContain(
+      '[plugins."product-design@openai-curated-remote"]\nenabled = false',
+    );
   });
 
   it('toggles Codex plugin-owned skills through the owning plugin config', async () => {
@@ -232,10 +248,12 @@ describe('CodexProvider', () => {
 
     const [skill] = await pluginProvider.scan();
 
-    expect(skill.scanIssues).toEqual([{
-      code: 'plugin-identity-mismatch',
-      message: 'Codex plugin manifest name "not-github" does not match cache plugin "github"',
-    }]);
+    expect(skill.scanIssues).toEqual([
+      {
+        code: 'plugin-identity-mismatch',
+        message: 'Codex plugin manifest name "not-github" does not match cache plugin "github"',
+      },
+    ]);
     expect(pluginProvider.getDisableStrategy(skill)).toBeUndefined();
   });
 
@@ -245,11 +263,15 @@ describe('CodexProvider', () => {
     const pluginRoot = path.join(pluginCache, 'openai-curated', 'github', '1.2.3');
     const skillDir = path.join(pluginRoot, 'skills', 'broken');
     await mkdir(path.join(pluginRoot, '.codex-plugin'), { recursive: true });
-    await writeFile(path.join(pluginRoot, '.codex-plugin', 'plugin.json'), JSON.stringify({
-      name: 'github',
-      version: '1.2.3',
-      skills: './skills/',
-    }), 'utf-8');
+    await writeFile(
+      path.join(pluginRoot, '.codex-plugin', 'plugin.json'),
+      JSON.stringify({
+        name: 'github',
+        version: '1.2.3',
+        skills: './skills/',
+      }),
+      'utf-8',
+    );
     await mkdir(skillDir, { recursive: true });
     await writeFile(path.join(skillDir, 'SKILL.md'), '---\nname: [\n---\n');
 
@@ -262,10 +284,12 @@ describe('CodexProvider', () => {
         type: 'plugin',
         pluginId: 'github@openai-curated',
       },
-      scanIssues: [{
-        code: 'invalid-skill-md',
-        message: expect.any(String),
-      }],
+      scanIssues: [
+        {
+          code: 'invalid-skill-md',
+          message: expect.any(String),
+        },
+      ],
     });
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import {
   ENTER_ALTERNATE_SCREEN,
   EXIT_ALTERNATE_SCREEN,
@@ -74,11 +74,7 @@ describe.sequential('runSkillpackCli', () => {
       exit: processLike.exit,
     });
 
-    expect(processLike.stdout.chunks).toEqual([
-      ENTER_ALTERNATE_SCREEN,
-      RESET_CURSOR_POSITION,
-      HIDE_CURSOR,
-    ]);
+    expect(processLike.stdout.chunks).toEqual([ENTER_ALTERNATE_SCREEN, RESET_CURSOR_POSITION, HIDE_CURSOR]);
 
     wait.resolve();
     await run;
@@ -126,11 +122,13 @@ describe.sequential('runSkillpackCli', () => {
       }),
     }));
 
-    await expect(runSkillpackCli({
-      process: processLike as unknown as NodeJS.Process,
-      renderApp,
-      exit: processLike.exit,
-    })).rejects.toThrow('render failed');
+    await expect(
+      runSkillpackCli({
+        process: processLike as unknown as NodeJS.Process,
+        renderApp,
+        exit: processLike.exit,
+      }),
+    ).rejects.toThrow('render failed');
 
     expect(processLike.stdout.chunks).toContain(SHOW_CURSOR);
     expect(processLike.stdout.chunks).toContain(EXIT_ALTERNATE_SCREEN);

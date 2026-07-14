@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import {
   fitCell,
   getBoundedContentLayout,
@@ -34,18 +34,11 @@ describe('getGlyphSet', () => {
 
 describe('wrapTextLines', () => {
   it('wraps long description lines into visual rows', () => {
-    expect(wrapTextLines(['alpha beta gamma delta'], 12)).toEqual([
-      'alpha beta',
-      'gamma delta',
-    ]);
+    expect(wrapTextLines(['alpha beta gamma delta'], 12)).toEqual(['alpha beta', 'gamma delta']);
   });
 
   it('splits words longer than the available width', () => {
-    expect(wrapTextLines(['supercalifragilistic'], 8)).toEqual([
-      'supercal',
-      'ifragili',
-      'stic',
-    ]);
+    expect(wrapTextLines(['supercalifragilistic'], 8)).toEqual(['supercal', 'ifragili', 'stic']);
   });
 
   it('preserves explicit blank description lines', () => {
@@ -102,14 +95,28 @@ describe('getDetailLayout', () => {
 
     expect(full.mode).toBe('full');
     expect(full.sectioned).toBe(false);
-    expect(full.sections.map((section) => section.id)).toEqual(['summary', 'paths', 'source', 'description', 'findings', 'actions']);
+    expect(full.sections.map((section) => section.id)).toEqual([
+      'summary',
+      'paths',
+      'source',
+      'description',
+      'findings',
+      'actions',
+    ]);
 
     const compact = getDetailLayout({ size: { columns: 60, rows: 18 }, hasDescription: true, hasFindings: true });
 
     expect(compact.mode).toBe('compact');
     expect(compact.sectioned).toBe(true);
     expect(compact.visibleRows).toBeGreaterThan(0);
-    expect(compact.sections.map((section) => section.id)).toEqual(['summary', 'paths', 'source', 'description', 'findings', 'actions']);
+    expect(compact.sections.map((section) => section.id)).toEqual([
+      'summary',
+      'paths',
+      'source',
+      'description',
+      'findings',
+      'actions',
+    ]);
   });
 });
 

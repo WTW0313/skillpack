@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -20,11 +20,15 @@ describe('ConfigManager', () => {
 
   it('preserves default providers and sources when a user overrides one provider path', async () => {
     const customCodexPath = path.join(root, 'custom-codex-skills');
-    await writeFile(path.join(configDir, 'config.json'), JSON.stringify({
-      providers: {
-        codex: { paths: [customCodexPath] },
-      },
-    }), 'utf-8');
+    await writeFile(
+      path.join(configDir, 'config.json'),
+      JSON.stringify({
+        providers: {
+          codex: { paths: [customCodexPath] },
+        },
+      }),
+      'utf-8',
+    );
 
     const config = await new ConfigManager(configDir).load();
 
@@ -52,10 +56,7 @@ describe('ConfigManager', () => {
 
     expect(config.providers.codex).toEqual({
       enabled: true,
-      paths: [
-        path.join(homeDir, '.codex', 'skills'),
-        path.join(homeDir, '.codex', 'plugins', 'cache'),
-      ],
+      paths: [path.join(homeDir, '.codex', 'skills'), path.join(homeDir, '.codex', 'plugins', 'cache')],
     });
     expect(config.providers.global).toEqual({
       enabled: true,
@@ -72,13 +73,17 @@ describe('ConfigManager', () => {
 
   it('merges configured Usage Artifact Roots with defaults', async () => {
     const customClaudeUsageRoot = path.join(root, 'claude-history');
-    await writeFile(path.join(configDir, 'config.json'), JSON.stringify({
-      usage: {
-        artifactRoots: {
-          claude: [customClaudeUsageRoot],
+    await writeFile(
+      path.join(configDir, 'config.json'),
+      JSON.stringify({
+        usage: {
+          artifactRoots: {
+            claude: [customClaudeUsageRoot],
+          },
         },
-      },
-    }), 'utf-8');
+      }),
+      'utf-8',
+    );
 
     const config = await new ConfigManager({ configDir, homeDir: path.join(root, 'home') }).load();
 

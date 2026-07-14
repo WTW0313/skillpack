@@ -25,20 +25,27 @@ This repo uses a single-context domain docs layout. See `docs/agents/domain.md`.
 
 - **Language**: TypeScript (ES2022, Node16 modules, strict mode)
 - **Package manager**: pnpm with workspaces
+- **Toolchain**: Vite+ (formatting, type-aware linting, tests, packaging, task orchestration)
 - **TUI framework**: Ink 6 + React 19 (terminal UI rendered via Yoga layout)
-- **Testing**: Vitest
+- **Testing**: Vite+ Test (Vitest-compatible)
 - **Parser**: YAML frontmatter in SKILL.md files
 
 ## Commands
 
 ```bash
 pnpm install          # install dependencies
-pnpm build            # build all packages (tsc)
-pnpm test             # run all tests
-pnpm dev              # watch mode for TUI
+pnpm check            # formatting, type-aware lint, and type checks
+pnpm build            # package Core and the TUI with Vite+ Pack
+pnpm test             # run all tests once
+pnpm dev              # build Core, then watch the TUI package
+
+# CI-only entry points
+pnpm check:ci
+pnpm test:ci
+pnpm build:ci         # also verifies artifacts and npm package contents
 
 # Run the app
-node packages/tui/dist/bin/skillpack.js
+node packages/tui/dist/skillpack.js
 ```
 
 ## Architecture
@@ -134,14 +141,16 @@ After any mutation (toggle, edit, delete, update), `refresh()` must be called. T
 ## Testing
 
 - Tests live in `packages/core/tests/`
-- Use `vitest` with `describe`/`it`/`expect`
+- TUI tests live in `packages/tui/tests/`
+- Import `describe`/`it`/`expect` and other test APIs from `vite-plus/test`
 - Provider tests use temp directories (`mkdtemp`) cleaned up in `afterEach`
-- TUI has no tests yet
+- `pnpm test` and `pnpm test:ci` are one-shot commands; neither starts watch mode
 
 ## Common Pitfalls
 
 - **Stale `selectedSkill`**: Always update `selectedSkill` after `refresh()` — it's a separate state from `skills[]`
 - **Import extensions**: Must use `.js` in imports (`'./foo.js'`), not `.ts` — Node16 module resolution requires it
 - **Async in `useInput`**: Fire-and-forget promises must have `.catch()` to avoid unhandled rejections crashing Ink
+- **Ink JSX whitespace**: Encode intentional runs of spaces as expressions such as `{'  '}` so formatting cannot change terminal alignment
 - **`.pnpm-store/`**: Never commit — it's in `.gitignore`
 - **ClaudeProvider custom scan**: `ClaudeProvider` overrides `scan()` with its own `scanFlat()` / `scanDeep()` — changes to `BaseProvider.scan()` don't apply to Claude skills. Any scan-level feature (symlink resolution, metadata enrichment, provider-native availability) must also be added to both Claude scan methods.

@@ -152,7 +152,10 @@ async function readTextIfExists(filePath: string): Promise<string> {
   }
 }
 
-export async function readCodexSkillConfigEnabled(configPath: string, skillMdPath: string): Promise<boolean | undefined> {
+export async function readCodexSkillConfigEnabled(
+  configPath: string,
+  skillMdPath: string,
+): Promise<boolean | undefined> {
   const text = await readTextIfExists(configPath);
   const target = path.resolve(skillMdPath);
   const entry = parseCodexSkillConfigEntries(text).find((item) => item.path && path.resolve(item.path) === target);
@@ -169,7 +172,11 @@ export async function readCodexPluginEnabled(configPath: string, pluginId: strin
   return config[pluginId];
 }
 
-export async function writeCodexSkillConfigEnabled(configPath: string, skillMdPath: string, enabled: boolean): Promise<void> {
+export async function writeCodexSkillConfigEnabled(
+  configPath: string,
+  skillMdPath: string,
+  enabled: boolean,
+): Promise<void> {
   const text = await readTextIfExists(configPath);
   const lines = text ? text.split('\n') : [];
   const target = path.resolve(skillMdPath);

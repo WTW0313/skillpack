@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { mkdtemp, rm, mkdir, writeFile, readFile, access, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -31,12 +31,19 @@ describe('ClaudeProvider', () => {
   it('reads flat skill availability from skillOverrides', async () => {
     await writeSkill(path.join(flatDir, 'deploy'), 'deploy');
     await writeSkill(path.join(flatDir, 'legacy-context'), 'legacy-context');
-    await writeFile(settingsPath, JSON.stringify({
-      skillOverrides: {
-        deploy: 'off',
-        'legacy-context': 'name-only',
-      },
-    }, null, 2));
+    await writeFile(
+      settingsPath,
+      JSON.stringify(
+        {
+          skillOverrides: {
+            deploy: 'off',
+            'legacy-context': 'name-only',
+          },
+        },
+        null,
+        2,
+      ),
+    );
 
     const skills = await provider.scan();
 
@@ -47,11 +54,18 @@ describe('ClaudeProvider', () => {
   it('keys flat skillOverrides by parsed Claude skill name, not directory name', async () => {
     const skillDir = path.join(flatDir, 'deploy-dir');
     await writeSkill(skillDir, 'deploy');
-    await writeFile(settingsPath, JSON.stringify({
-      skillOverrides: {
-        deploy: 'off',
-      },
-    }, null, 2));
+    await writeFile(
+      settingsPath,
+      JSON.stringify(
+        {
+          skillOverrides: {
+            deploy: 'off',
+          },
+        },
+        null,
+        2,
+      ),
+    );
 
     const [skill] = await provider.scan();
 
@@ -91,12 +105,22 @@ describe('ClaudeProvider', () => {
   });
 
   it('reads plugin skill availability from enabledPlugins', async () => {
-    await writeSkill(path.join(cacheDir, 'team-tools', 'deploy-plugin', '1.0.0', 'skills', 'deploy'), 'deploy-plugin:deploy');
-    await writeFile(settingsPath, JSON.stringify({
-      enabledPlugins: {
-        'deploy-plugin@team-tools': false,
-      },
-    }, null, 2));
+    await writeSkill(
+      path.join(cacheDir, 'team-tools', 'deploy-plugin', '1.0.0', 'skills', 'deploy'),
+      'deploy-plugin:deploy',
+    );
+    await writeFile(
+      settingsPath,
+      JSON.stringify(
+        {
+          enabledPlugins: {
+            'deploy-plugin@team-tools': false,
+          },
+        },
+        null,
+        2,
+      ),
+    );
 
     const skills = await provider.scan();
 
@@ -137,10 +161,12 @@ describe('ClaudeProvider', () => {
     expect(skills[0]).toMatchObject({
       name: 'missing-skill',
       provider: 'claude',
-      scanIssues: [{
-        code: 'broken-symlink',
-        message: expect.any(String),
-      }],
+      scanIssues: [
+        {
+          code: 'broken-symlink',
+          message: expect.any(String),
+        },
+      ],
     });
   });
 
@@ -159,10 +185,12 @@ describe('ClaudeProvider', () => {
         type: 'plugin',
         pluginId: 'deploy-plugin@team-tools',
       },
-      scanIssues: [{
-        code: 'invalid-skill-md',
-        message: expect.any(String),
-      }],
+      scanIssues: [
+        {
+          code: 'invalid-skill-md',
+          message: expect.any(String),
+        },
+      ],
     });
   });
 });

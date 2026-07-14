@@ -47,11 +47,12 @@ export function DetailView() {
   const instanceIssues = selectedSkill?.issues ?? [];
   const instanceNotices = selectedSkill?.notices ?? [];
   const hasFindings = relationshipNotices.length > 0 || instanceIssues.length > 0 || instanceNotices.length > 0;
-  const selectedInstanceIndex = selectedGroup && selectedSkill
-    ? selectedGroup.instances.findIndex((instance) => (
-      instance.provider === selectedSkill.provider && instance.path === selectedSkill.path
-    ))
-    : -1;
+  const selectedInstanceIndex =
+    selectedGroup && selectedSkill
+      ? selectedGroup.instances.findIndex(
+          (instance) => instance.provider === selectedSkill.provider && instance.path === selectedSkill.path,
+        )
+      : -1;
 
   const addedAt = selectedSkill?.source?.installedAt ?? selectedSkill?.source?.createdAt;
 
@@ -60,10 +61,7 @@ export function DetailView() {
     return selectedSkill.description.split('\n');
   }, [selectedSkill]);
   const descriptionWidth = Math.max(1, columns - 4);
-  const wrappedDescLines = useMemo(
-    () => wrapTextLines(descLines, descriptionWidth),
-    [descLines, descriptionWidth],
-  );
+  const wrappedDescLines = useMemo(() => wrapTextLines(descLines, descriptionWidth), [descLines, descriptionWidth]);
 
   const detailLayout = getDetailLayout({
     size: { columns, rows },
@@ -74,9 +72,9 @@ export function DetailView() {
   const fullVisibleDescRows = useMemo(() => {
     if (!selectedSkill) return 0;
     let used = 2; // padding (top + bottom)
-    used += 1;    // title
-    used += 1;    // gap before metadata
-    used += 3;    // agent, path, status
+    used += 1; // title
+    used += 1; // gap before metadata
+    used += 3; // agent, path, status
     if (selectedSkill.version) used += 1;
     if (selectedSkill.source) used += 1;
     if (selectedSkill.origin?.type === 'plugin') used += 2;
@@ -84,94 +82,116 @@ export function DetailView() {
     if (isUpdatable) used += 1; // update row
     if (addedAt) used += 1;
     if (hasFindings) used += 1 + 2 + relationshipNotices.length + instanceIssues.length + instanceNotices.length; // gap + headings + findings
-    used += 1;    // gap before description
-    used += 1;    // separator
-    used += 1;    // "description" label
-    used += 1;    // status bar
+    used += 1; // gap before description
+    used += 1; // separator
+    used += 1; // "description" label
+    used += 1; // status bar
     if (error) used += 1;
     return Math.max(0, rows - used);
-  }, [selectedSkill, relationshipNotices.length, instanceIssues.length, instanceNotices.length, hasFindings, error, rows, isUpdatable, disableStrategy]);
+  }, [
+    selectedSkill,
+    relationshipNotices.length,
+    instanceIssues.length,
+    instanceNotices.length,
+    hasFindings,
+    error,
+    rows,
+    isUpdatable,
+    disableStrategy,
+  ]);
 
-  const visibleDescRows = detailLayout.sectioned
-    ? Math.max(1, detailLayout.visibleRows - 1)
-    : fullVisibleDescRows;
+  const visibleDescRows = detailLayout.sectioned ? Math.max(1, detailLayout.visibleRows - 1) : fullVisibleDescRows;
 
   useEffect(() => {
     setDescScroll((s) => Math.min(s, Math.max(0, wrappedDescLines.length - visibleDescRows)));
   }, [wrappedDescLines.length, visibleDescRows]);
 
-  useInput((input, key) => {
-    if (key.escape) { setView('list'); return; }
-    if ((key.leftArrow || key.rightArrow) && selectedGroup && selectedSkill && selectedGroup.instances.length > 1) {
-      const currentIndex = selectedInstanceIndex >= 0 ? selectedInstanceIndex : 0;
-      const direction = key.rightArrow ? 1 : -1;
-      const nextIndex = (currentIndex + direction + selectedGroup.instances.length) % selectedGroup.instances.length;
-      setSelectedSkill(selectedGroup.instances[nextIndex]);
-      setUpdateInfo(null);
-      setError(null);
-      setNotice(null);
-      return;
-    }
-    if (key.tab && detailLayout.sectioned) {
-      const idx = detailLayout.sections.findIndex((section) => section.id === activeSection);
-      const next = key.shift
-        ? (idx - 1 + detailLayout.sections.length) % detailLayout.sections.length
-        : (idx + 1) % detailLayout.sections.length;
-      setActiveSection(detailLayout.sections[next].id);
-      return;
-    }
-    if ((input === 'o' || input === 'O') && selectedSkill) {
-      const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
-      try {
-        execSync(`${opener} "${selectedSkill.path}"`, { stdio: 'ignore' });
-      } catch { /* opener failed */ }
-      return;
-    }
-    if (input === ' ' && selectedSkill && canToggle && !busy) {
-      if (isPluginOwnedSkill(selectedSkill)) {
-        setConfirming('plugin-toggle');
+  useInput(
+    (input, key) => {
+      if (key.escape) {
+        setView('list');
         return;
       }
-      setError(null);
-      setNotice(null);
-      setBusy(true);
-      manager.toggleInventoryInstance(selectedSkill)
-        .then(() => refresh())
-        .then(() => setNotice('Availability updated.'))
-        .catch((err: Error) => setError(err.message))
-        .finally(() => setBusy(false));
-      return;
-    }
-    if (input === 'd' && selectedSkill && isRemovable) {
-      setError(null);
-      setConfirming('remove');
-    }
-    if (input === 'u' && selectedSkill && isUpdatable && !busy && !checkingUpdate && !updating) {
-      setError(null);
-      setNotice(null);
-      if (updateInfo?.hasUpdate) {
-        setConfirming('update');
-      } else if (!updateInfo) {
-        setCheckingUpdate(true);
-        manager.checkSkillUpdate(selectedSkill)
-          .then(async (info) => {
-            setUpdateInfo(info ?? { hasUpdate: false });
-            await refresh();
-          })
-          .catch((err: Error) => setError(err.message))
-          .finally(() => setCheckingUpdate(false));
+      if ((key.leftArrow || key.rightArrow) && selectedGroup && selectedSkill && selectedGroup.instances.length > 1) {
+        const currentIndex = selectedInstanceIndex >= 0 ? selectedInstanceIndex : 0;
+        const direction = key.rightArrow ? 1 : -1;
+        const nextIndex = (currentIndex + direction + selectedGroup.instances.length) % selectedGroup.instances.length;
+        setSelectedSkill(selectedGroup.instances[nextIndex]);
+        setUpdateInfo(null);
+        setError(null);
+        setNotice(null);
+        return;
       }
-    }
-    if (key.downArrow && (!detailLayout.sectioned || activeSection === 'description')) {
-      setDescScroll((s) => Math.min(s + 1, Math.max(0, wrappedDescLines.length - visibleDescRows)));
-    }
-    if (key.upArrow && (!detailLayout.sectioned || activeSection === 'description')) {
-      setDescScroll((s) => Math.max(0, s - 1));
-    }
-  }, { isActive: !confirming });
+      if (key.tab && detailLayout.sectioned) {
+        const idx = detailLayout.sections.findIndex((section) => section.id === activeSection);
+        const next = key.shift
+          ? (idx - 1 + detailLayout.sections.length) % detailLayout.sections.length
+          : (idx + 1) % detailLayout.sections.length;
+        setActiveSection(detailLayout.sections[next].id);
+        return;
+      }
+      if ((input === 'o' || input === 'O') && selectedSkill) {
+        const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
+        try {
+          execSync(`${opener} "${selectedSkill.path}"`, { stdio: 'ignore' });
+        } catch {
+          /* opener failed */
+        }
+        return;
+      }
+      if (input === ' ' && selectedSkill && canToggle && !busy) {
+        if (isPluginOwnedSkill(selectedSkill)) {
+          setConfirming('plugin-toggle');
+          return;
+        }
+        setError(null);
+        setNotice(null);
+        setBusy(true);
+        manager
+          .toggleInventoryInstance(selectedSkill)
+          .then(() => refresh())
+          .then(() => setNotice('Availability updated.'))
+          .catch((err: Error) => setError(err.message))
+          .finally(() => setBusy(false));
+        return;
+      }
+      if (input === 'd' && selectedSkill && isRemovable) {
+        setError(null);
+        setConfirming('remove');
+      }
+      if (input === 'u' && selectedSkill && isUpdatable && !busy && !checkingUpdate && !updating) {
+        setError(null);
+        setNotice(null);
+        if (updateInfo?.hasUpdate) {
+          setConfirming('update');
+        } else if (!updateInfo) {
+          setCheckingUpdate(true);
+          manager
+            .checkSkillUpdate(selectedSkill)
+            .then(async (info) => {
+              setUpdateInfo(info ?? { hasUpdate: false });
+              await refresh();
+            })
+            .catch((err: Error) => setError(err.message))
+            .finally(() => setCheckingUpdate(false));
+        }
+      }
+      if (key.downArrow && (!detailLayout.sectioned || activeSection === 'description')) {
+        setDescScroll((s) => Math.min(s + 1, Math.max(0, wrappedDescLines.length - visibleDescRows)));
+      }
+      if (key.upArrow && (!detailLayout.sectioned || activeSection === 'description')) {
+        setDescScroll((s) => Math.max(0, s - 1));
+      }
+    },
+    { isActive: !confirming },
+  );
 
   if (!selectedGroup || !selectedSkill) {
-    return <Box><Text color="red">No skill selected</Text></Box>;
+    return (
+      <Box>
+        <Text color="red">No skill selected</Text>
+      </Box>
+    );
   }
 
   if (confirming === 'remove') {
@@ -203,7 +223,8 @@ export function DetailView() {
           onConfirm={() => {
             setError(null);
             setBusy(true);
-            manager.toggleInventoryInstance(selectedSkill)
+            manager
+              .toggleInventoryInstance(selectedSkill)
               .then(() => refresh())
               .then(() => setNotice('Plugin availability updated.'))
               .catch((err: Error) => setError(err.message))
@@ -227,7 +248,8 @@ export function DetailView() {
             setError(null);
             setNotice(null);
             setUpdating(true);
-            manager.updateSkill(selectedSkill)
+            manager
+              .updateSkill(selectedSkill)
               .then(() => refresh())
               .then(() => {
                 setUpdateInfo(null);
@@ -302,7 +324,9 @@ export function DetailView() {
                 <Text dimColor>{'agent'.padEnd(10)}</Text>
                 <Text>{selectedSkill.provider}</Text>
                 {selectedGroup.instances.length > 1 && (
-                  <Text dimColor>{selectedInstanceIndex + 1}/{selectedGroup.instances.length}</Text>
+                  <Text dimColor>
+                    {selectedInstanceIndex + 1}/{selectedGroup.instances.length}
+                  </Text>
                 )}
               </Box>
               <Box gap={1}>
@@ -326,7 +350,10 @@ export function DetailView() {
               <Box flexDirection="column" marginTop={1}>
                 <Text dimColor>provider instances</Text>
                 {selectedGroup.instances.map((instance) => (
-                  <Text key={`${instance.provider}:${instance.path}`} color={instance.path === selectedSkill.path ? 'magenta' : undefined}>
+                  <Text
+                    key={`${instance.provider}:${instance.path}`}
+                    color={instance.path === selectedSkill.path ? 'magenta' : undefined}
+                  >
                     {instance.provider} {instance.enabled ? 'enabled' : 'disabled'}
                   </Text>
                 ))}
@@ -352,7 +379,10 @@ export function DetailView() {
               {selectedSkill.source && (
                 <Box gap={1}>
                   <Text dimColor>{'source'.padEnd(10)}</Text>
-                  <Text>{selectedSkill.source.type}{selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}</Text>
+                  <Text>
+                    {selectedSkill.source.type}
+                    {selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}
+                  </Text>
                 </Box>
               )}
               {selectedSkill.origin?.type === 'plugin' && (
@@ -381,7 +411,10 @@ export function DetailView() {
           ) : (
             <Box flexDirection="column">
               {descScrollable && (
-                <Text dimColor>{descScroll + 1}-{Math.min(descScroll + visibleDescRows, wrappedDescLines.length)} of {wrappedDescLines.length}</Text>
+                <Text dimColor>
+                  {descScroll + 1}-{Math.min(descScroll + visibleDescRows, wrappedDescLines.length)} of{' '}
+                  {wrappedDescLines.length}
+                </Text>
               )}
               {visibleDesc.map((line, i) => (
                 <Text key={i}>{line}</Text>
@@ -411,8 +444,10 @@ export function DetailView() {
     return (
       <Box flexDirection="column" flexGrow={1} padding={1}>
         <Box>
-          <Text dimColor>‹ esc  </Text>
-          <Text bold color="magenta">{glyphs.brand}</Text>
+          <Text dimColor>‹ esc{'  '}</Text>
+          <Text bold color="magenta">
+            {glyphs.brand}
+          </Text>
           <Text bold> {selectedSkill.name}</Text>
         </Box>
 
@@ -433,7 +468,11 @@ export function DetailView() {
           {detailLayout.sections.map((section, index) => (
             <Text key={section.id}>
               {index > 0 && <Text dimColor> │ </Text>}
-              <Text bold={section.id === activeSection} underline={section.id === activeSection} dimColor={section.id !== activeSection}>
+              <Text
+                bold={section.id === activeSection}
+                underline={section.id === activeSection}
+                dimColor={section.id !== activeSection}
+              >
                 {section.label.toLowerCase()}
               </Text>
             </Text>
@@ -464,8 +503,10 @@ export function DetailView() {
     <Box flexDirection="column" flexGrow={1} padding={1}>
       {/* Navigation + title */}
       <Box>
-        <Text dimColor>‹ esc  </Text>
-        <Text bold color="magenta">{glyphs.brand}</Text>
+        <Text dimColor>‹ esc{'  '}</Text>
+        <Text bold color="magenta">
+          {glyphs.brand}
+        </Text>
         <Text bold> {selectedSkill.name}</Text>
       </Box>
 
@@ -478,14 +519,18 @@ export function DetailView() {
         </Box>
         <Box gap={1}>
           <Text dimColor>{'providers'.padEnd(10)}</Text>
-          <Text>{selectedGroup.instances.map((instance) => (
-            `${instance.provider}:${instance.enabled ? 'enabled' : 'disabled'}`
-          )).join('  ')}</Text>
+          <Text>
+            {selectedGroup.instances
+              .map((instance) => `${instance.provider}:${instance.enabled ? 'enabled' : 'disabled'}`)
+              .join('  ')}
+          </Text>
         </Box>
         {selectedGroup.instances.length > 1 && (
           <Box gap={1}>
             <Text dimColor>{'selected'.padEnd(10)}</Text>
-            <Text>{selectedInstanceIndex + 1}/{selectedGroup.instances.length}</Text>
+            <Text>
+              {selectedInstanceIndex + 1}/{selectedGroup.instances.length}
+            </Text>
             <Text dimColor>use left/right to switch provider instance</Text>
           </Box>
         )}
@@ -495,7 +540,10 @@ export function DetailView() {
         </Box>
         <Box gap={1}>
           <Text dimColor>{'path'.padEnd(10)}</Text>
-          <Text dimColor>{selectedSkill.path}{selectedSkill.resolvedPath ? ` → ${selectedSkill.resolvedPath}` : ''}</Text>
+          <Text dimColor>
+            {selectedSkill.path}
+            {selectedSkill.resolvedPath ? ` → ${selectedSkill.resolvedPath}` : ''}
+          </Text>
         </Box>
         {selectedSkill.version && (
           <Box gap={1}>
@@ -506,7 +554,10 @@ export function DetailView() {
         {selectedSkill.source && (
           <Box gap={1}>
             <Text dimColor>{'source'.padEnd(10)}</Text>
-            <Text>{selectedSkill.source.type}{selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}</Text>
+            <Text>
+              {selectedSkill.source.type}
+              {selectedSkill.source.repo ? ` ${selectedSkill.source.repo}` : ''}
+            </Text>
             {selectedSkill.source.type === 'skillssh' && selectedSkill.source.skillFolderHash && (
               <Text dimColor> #{selectedSkill.source.skillFolderHash.slice(0, 7)}</Text>
             )}
@@ -521,7 +572,10 @@ export function DetailView() {
             </Box>
             <Box gap={1}>
               <Text dimColor>{'plugin on'.padEnd(10)}</Text>
-              <Text color={selectedSkill.origin.pluginEnabled ? 'green' : undefined} dimColor={!selectedSkill.origin.pluginEnabled}>
+              <Text
+                color={selectedSkill.origin.pluginEnabled ? 'green' : undefined}
+                dimColor={!selectedSkill.origin.pluginEnabled}
+              >
                 {selectedSkill.origin.pluginEnabled ? '● enabled' : '○ disabled'}
               </Text>
               {selectedSkill.provider === 'codex' && (
@@ -552,15 +606,15 @@ export function DetailView() {
               <>
                 <Text color="green">{updateInfo.currentVersion ?? '?'}</Text>
                 <Text color="magenta"> → </Text>
-                <Text color="green" bold>{updateInfo.latestVersion ?? '?'}</Text>
-                <Text dimColor>  press </Text>
+                <Text color="green" bold>
+                  {updateInfo.latestVersion ?? '?'}
+                </Text>
+                <Text dimColor>{'  '}press </Text>
                 <Text bold>u</Text>
                 <Text dimColor> to update</Text>
               </>
             )}
-            {!checkingUpdate && !updating && updateInfo && !updateInfo.hasUpdate && (
-              <Text dimColor>up to date ✓</Text>
-            )}
+            {!checkingUpdate && !updating && updateInfo && !updateInfo.hasUpdate && <Text dimColor>up to date ✓</Text>}
             {!checkingUpdate && !updating && !updateInfo && (
               <>
                 <Text dimColor>press </Text>
@@ -602,7 +656,10 @@ export function DetailView() {
             <Box gap={1}>
               <Text dimColor>description</Text>
               {descScroll > 0 && <Text>▲</Text>}
-              <Text dimColor>{descScroll + 1}–{Math.min(descScroll + visibleDescRows, wrappedDescLines.length)} of {wrappedDescLines.length}</Text>
+              <Text dimColor>
+                {descScroll + 1}–{Math.min(descScroll + visibleDescRows, wrappedDescLines.length)} of{' '}
+                {wrappedDescLines.length}
+              </Text>
               {descScroll + visibleDescRows < wrappedDescLines.length && <Text>▼</Text>}
             </Box>
           )}

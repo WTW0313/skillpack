@@ -20,8 +20,10 @@ export function StatusBar({ shortcuts: shortcutsOverride }: StatusBarProps = {})
       <Text dimColor>{'─'.repeat(2)} </Text>
       {visibleShortcuts.map((s, i) => (
         <Text key={s.key}>
-          {i > 0 && <Text dimColor>  </Text>}
-          <Text color="white" bold>{s.key}</Text>
+          {i > 0 && <Text dimColor>{'  '}</Text>}
+          <Text color="white" bold>
+            {s.key}
+          </Text>
           <Text dimColor> {s.displayLabel}</Text>
         </Text>
       ))}

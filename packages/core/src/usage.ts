@@ -108,10 +108,13 @@ interface UsageImportCursor {
   provider: string;
   importerVersion?: number;
   stale?: boolean;
-  artifacts: Record<string, {
-    size: number;
-    mtimeMs: number;
-  }>;
+  artifacts: Record<
+    string,
+    {
+      size: number;
+      mtimeMs: number;
+    }
+  >;
 }
 
 interface ParsedInvocationResult {
@@ -175,11 +178,11 @@ export class SkillUsageManager {
     const diagnostics: UsageImportDiagnostic[] = [];
     let skippedArtifacts = 0;
     const records: SkillInvocationRecord[] = [];
-    const claudeSkills = provider.provider === 'claude'
-      ? await readClaudeSkillCandidates(provider.skillRoots ?? [])
-      : [];
+    const claudeSkills =
+      provider.provider === 'claude' ? await readClaudeSkillCandidates(provider.skillRoots ?? []) : [];
     const cursor = await this.readCursor(provider.provider);
-    if (cursor.stale) await rm(path.join(this.dataDir, 'invocations', provider.provider), { recursive: true, force: true });
+    if (cursor.stale)
+      await rm(path.join(this.dataDir, 'invocations', provider.provider), { recursive: true, force: true });
     const nextCursor: UsageImportCursor = {
       provider: provider.provider,
       artifacts: { ...cursor.artifacts },
@@ -230,9 +233,10 @@ export class SkillUsageManager {
         if (!content) continue;
 
         const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
-        const result = provider.provider === 'claude'
-          ? await parseClaudeInvocationLines(provider.provider, file, lines, claudeSkills, currentSkills)
-          : await parseCodexInvocationLines(provider.provider, file, lines, currentSkills);
+        const result =
+          provider.provider === 'claude'
+            ? await parseClaudeInvocationLines(provider.provider, file, lines, claudeSkills, currentSkills)
+            : await parseCodexInvocationLines(provider.provider, file, lines, currentSkills);
         records.push(...result.records);
         diagnostics.push(...(result.diagnostics ?? []));
         for (const lineNumber of result.ambiguousLineNumbers) {
@@ -278,35 +282,37 @@ export class SkillUsageManager {
     const range = buildRange(input.rangeDays, input.now ?? new Date());
     return {
       range,
-      providers: await Promise.all(this.providers.map(async (provider) => {
-        const coverageReasons = coverageReasonsFor(provider);
-        if (!provider.supported) {
+      providers: await Promise.all(
+        this.providers.map(async (provider) => {
+          const coverageReasons = coverageReasonsFor(provider);
+          if (!provider.supported) {
+            return {
+              provider: provider.provider,
+              displayName: provider.displayName,
+              coverageState: coverageStateFor(provider, 0),
+              coverageReasons,
+              heatmap: [],
+              dailySkillUsage: [],
+              ranking: [],
+              diagnostics: this.latestDiagnostics.get(provider.provider) ?? [],
+            };
+          }
+          const records = await this.readProviderRecords(provider.provider, range);
+          const heatmap = buildHeatmap(records, range);
+          const dailySkillUsage = buildDailySkillUsage(records, range);
+          const ranking = buildRanking(records);
           return {
             provider: provider.provider,
             displayName: provider.displayName,
-            coverageState: coverageStateFor(provider, 0),
+            coverageState: coverageStateFor(provider, records.length),
             coverageReasons,
-            heatmap: [],
-            dailySkillUsage: [],
-            ranking: [],
+            heatmap,
+            dailySkillUsage,
+            ranking,
             diagnostics: this.latestDiagnostics.get(provider.provider) ?? [],
           };
-        }
-        const records = await this.readProviderRecords(provider.provider, range);
-        const heatmap = buildHeatmap(records, range);
-        const dailySkillUsage = buildDailySkillUsage(records, range);
-        const ranking = buildRanking(records);
-        return {
-          provider: provider.provider,
-          displayName: provider.displayName,
-          coverageState: coverageStateFor(provider, records.length),
-          coverageReasons,
-          heatmap,
-          dailySkillUsage,
-          ranking,
-          diagnostics: this.latestDiagnostics.get(provider.provider) ?? [],
-        };
-      })),
+        }),
+      ),
     };
   }
 
@@ -340,8 +346,9 @@ export class SkillUsageManager {
 
   private async readProviderRecords(provider: string, range: SkillUsageRange): Promise<SkillInvocationRecord[]> {
     const dir = path.join(this.dataDir, 'invocations', provider);
-    const files = [...new Set(datesInRange(range).map((date) => date.slice(0, 7)))]
-      .map((month) => path.join(dir, `${month}.jsonl`));
+    const files = [...new Set(datesInRange(range).map((date) => date.slice(0, 7)))].map((month) =>
+      path.join(dir, `${month}.jsonl`),
+    );
     const latestRecords = new Map<string, SkillInvocationRecord>();
 
     for (const file of files.sort()) {
@@ -382,13 +389,20 @@ export class SkillUsageManager {
   private async writeCursor(provider: string, cursor: UsageImportCursor): Promise<void> {
     const cursorPath = path.join(this.dataDir, 'cursors', `${provider}.json`);
     await mkdir(path.dirname(cursorPath), { recursive: true });
-    await writeFile(cursorPath, JSON.stringify({
-      ...cursor,
-      provider,
-      importerVersion: usageImporterVersion(provider),
-    }, null, 2) + '\n', 'utf-8');
+    await writeFile(
+      cursorPath,
+      JSON.stringify(
+        {
+          ...cursor,
+          provider,
+          importerVersion: usageImporterVersion(provider),
+        },
+        null,
+        2,
+      ) + '\n',
+      'utf-8',
+    );
   }
-
 }
 
 function usageImporterVersion(provider: string): number {
@@ -450,11 +464,13 @@ async function listJsonlFiles(root: string): Promise<string[]> {
     if (isNodeError(err) && err.code === 'ENOENT') return [];
     throw err;
   });
-  const files = await Promise.all(entries.map(async (entry) => {
-    const entryPath = path.join(root, entry.name);
-    if (entry.isDirectory()) return listJsonlFiles(entryPath);
-    return (entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith('.jsonl') ? [entryPath] : [];
-  }));
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(root, entry.name);
+      if (entry.isDirectory()) return listJsonlFiles(entryPath);
+      return (entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith('.jsonl') ? [entryPath] : [];
+    }),
+  );
   return files.flat();
 }
 
@@ -485,7 +501,8 @@ async function parseCodexInvocationLines(
     if (existing) {
       existing.status = mergeInvocationStatus(existing.status, candidate.status);
       if (candidate.startedAt < existing.startedAt) existing.startedAt = candidate.startedAt;
-      if (candidate.endedAt && (!existing.endedAt || candidate.endedAt > existing.endedAt)) existing.endedAt = candidate.endedAt;
+      if (candidate.endedAt && (!existing.endedAt || candidate.endedAt > existing.endedAt))
+        existing.endedAt = candidate.endedAt;
       if (skillIdentity.confirmed) {
         if (existing.identityConfidence === 'confirmed') {
           existing.skillPath = commonPathEvidence(existing.skillPath, candidate.skillPath);
@@ -496,31 +513,31 @@ async function parseCodexInvocationLines(
         }
         existing.identityConfidence = 'confirmed';
       }
-      existing.source ??= findCurrentSkillSource({
+      existing.source ??= findCurrentSkillSource(
+        {
+          provider,
+          skillName,
+          skillPath: candidate.skillPath,
+          resolvedPath: skillIdentity.resolvedPath,
+        },
+        currentSkills,
+      );
+      continue;
+    }
+
+    const source = findCurrentSkillSource(
+      {
         provider,
         skillName,
         skillPath: candidate.skillPath,
         resolvedPath: skillIdentity.resolvedPath,
-      }, currentSkills);
-      continue;
-    }
-
-    const source = findCurrentSkillSource({
-      provider,
-      skillName,
-      skillPath: candidate.skillPath,
-      resolvedPath: skillIdentity.resolvedPath,
-    }, currentSkills);
+      },
+      currentSkills,
+    );
 
     recordsByTurnAndSkill.set(recordKey, {
       schemaVersion: 1,
-      recordId: invocationRecordId(
-        provider,
-        candidate.sessionId,
-        candidate.turnId,
-        skillName,
-        sourceIdentity,
-      ),
+      recordId: invocationRecordId(provider, candidate.sessionId, candidate.turnId, skillName, sourceIdentity),
       provider,
       sessionId: candidate.sessionId,
       turnId: candidate.turnId,
@@ -579,12 +596,9 @@ async function parseClaudeInvocationLines(
       missingTimestampCount += message.content.filter((block) => claudeSkillName(block) !== undefined).length;
       continue;
     }
-    const sessionId = stringValue(value.sessionId)
-      ?? stringValue(value.session_id)
-      ?? path.basename(sourceFile, '.jsonl');
-    const messageId = stringValue(value.uuid)
-      ?? stringValue(message.id)
-      ?? `${sessionId}:${lineIndex + 1}`;
+    const sessionId =
+      stringValue(value.sessionId) ?? stringValue(value.session_id) ?? path.basename(sourceFile, '.jsonl');
+    const messageId = stringValue(value.uuid) ?? stringValue(message.id) ?? `${sessionId}:${lineIndex + 1}`;
 
     for (const [blockIndex, block] of message.content.entries()) {
       const skillName = claudeSkillName(block);
@@ -630,10 +644,12 @@ async function parseClaudeInvocationLines(
       message: `Skipped ${missingTimestampCount} Claude Skill invocation${missingTimestampCount === 1 ? '' : 's'} in ${path.basename(sourceFile)}: missing or invalid assistant timestamp`,
     });
   }
-  diagnostics.push(...[...unmatchedCounts.entries()].map(([skillName, count]) => ({
-    provider,
-    message: `Skipped ${count} Claude Skill invocation${count === 1 ? '' : 's'} for "${skillName}" in ${path.basename(sourceFile)}: no eligible user-level or plugin source`,
-  })));
+  diagnostics.push(
+    ...[...unmatchedCounts.entries()].map(([skillName, count]) => ({
+      provider,
+      message: `Skipped ${count} Claude Skill invocation${count === 1 ? '' : 's'} for "${skillName}" in ${path.basename(sourceFile)}: no eligible user-level or plugin source`,
+    })),
+  );
 
   return {
     records,
@@ -720,20 +736,22 @@ async function listSkillMdFiles(root: string, ancestorRealPaths = new Set<string
     if (isNodeError(err) && err.code === 'ENOENT') return [];
     throw err;
   });
-  const files = await Promise.all(entries.map(async (entry) => {
-    const entryPath = path.join(root, entry.name);
-    if (entry.isDirectory()) return listSkillMdFiles(entryPath, nextAncestors);
-    if (entry.isSymbolicLink()) {
-      const metadata = await stat(entryPath).catch(() => undefined);
-      if (metadata?.isDirectory()) {
-        const skillPath = path.join(entryPath, 'SKILL.md');
-        const skillMetadata = await stat(skillPath).catch(() => undefined);
-        return skillMetadata?.isFile() ? [skillPath] : listSkillMdFiles(entryPath, nextAncestors);
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(root, entry.name);
+      if (entry.isDirectory()) return listSkillMdFiles(entryPath, nextAncestors);
+      if (entry.isSymbolicLink()) {
+        const metadata = await stat(entryPath).catch(() => undefined);
+        if (metadata?.isDirectory()) {
+          const skillPath = path.join(entryPath, 'SKILL.md');
+          const skillMetadata = await stat(skillPath).catch(() => undefined);
+          return skillMetadata?.isFile() ? [skillPath] : listSkillMdFiles(entryPath, nextAncestors);
+        }
+        return metadata?.isFile() && entry.name === 'SKILL.md' ? [entryPath] : [];
       }
-      return metadata?.isFile() && entry.name === 'SKILL.md' ? [entryPath] : [];
-    }
-    return entry.isFile() && entry.name === 'SKILL.md' ? [entryPath] : [];
-  }));
+      return entry.isFile() && entry.name === 'SKILL.md' ? [entryPath] : [];
+    }),
+  );
   return files.flat();
 }
 
@@ -757,16 +775,18 @@ function normalizeSkillNameFromPath(skillPath: string): string {
   return pluginName ? `${pluginName}:${skillName}` : skillName;
 }
 
-function parseCodexPluginSkillPath(skillPath: string): {
-  marketplace: string;
-  plugin: string;
-  relativeSkillPath: string;
-} | undefined {
+function parseCodexPluginSkillPath(skillPath: string):
+  | {
+      marketplace: string;
+      plugin: string;
+      relativeSkillPath: string;
+    }
+  | undefined {
   const normalized = path.normalize(skillPath);
   const parts = normalized.split(path.sep).filter(Boolean);
-  const cacheIndex = parts.findIndex((part, index) => (
-    part === 'cache' && parts[index - 1] === 'plugins' && parts[index - 2] === '.codex'
-  ));
+  const cacheIndex = parts.findIndex(
+    (part, index) => part === 'cache' && parts[index - 1] === 'plugins' && parts[index - 2] === '.codex',
+  );
   if (cacheIndex < 0) return undefined;
 
   const marketplace = parts[cacheIndex + 1];
@@ -842,10 +862,7 @@ function buildRanking(records: SkillInvocationRecord[]): ProviderSkillRankingRow
   return [...rows.values()].map(finalizeUsageRow).sort(compareUsageRows).slice(0, 10);
 }
 
-function buildDailySkillUsage(
-  records: SkillInvocationRecord[],
-  range: SkillUsageRange,
-): ProviderSkillDailyUsage[] {
+function buildDailySkillUsage(records: SkillInvocationRecord[], range: SkillUsageRange): ProviderSkillDailyUsage[] {
   const byDate = new Map<string, Map<string, ProviderSkillUsageAccumulator>>();
   for (const date of datesInRange(range)) byDate.set(date, new Map());
 
@@ -859,22 +876,23 @@ function buildDailySkillUsage(
     byDate.set(date, rows);
   }
 
-  return [...byDate.entries()].map(([date, rows]) => ({
-    date,
-    rows: [...rows.values()].map(finalizeUsageRow).sort(compareUsageRows),
-  })).sort((a, b) => a.date.localeCompare(b.date));
+  return [...byDate.entries()]
+    .map(([date, rows]) => ({
+      date,
+      rows: [...rows.values()].map(finalizeUsageRow).sort(compareUsageRows),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function usageRowKey(record: SkillInvocationRecord): string {
   return `${record.skillName}\0${skillSourceIdentity(record)}`;
 }
 
-function skillSourceIdentity(
-  record: Pick<SkillInvocationRecord, 'provider' | 'skillPath' | 'resolvedPath'>,
-): string {
-  const pluginSkill = record.provider === 'codex'
-    ? parseCodexPluginSkillPath(record.skillPath ?? '') ?? parseCodexPluginSkillPath(record.resolvedPath ?? '')
-    : undefined;
+function skillSourceIdentity(record: Pick<SkillInvocationRecord, 'provider' | 'skillPath' | 'resolvedPath'>): string {
+  const pluginSkill =
+    record.provider === 'codex'
+      ? (parseCodexPluginSkillPath(record.skillPath ?? '') ?? parseCodexPluginSkillPath(record.resolvedPath ?? ''))
+      : undefined;
   if (pluginSkill) {
     return `codex-plugin\0${pluginSkill.marketplace}\0${pluginSkill.plugin}\0${pluginSkill.relativeSkillPath}`;
   }
@@ -896,10 +914,7 @@ function createUsageAccumulator(record: SkillInvocationRecord): ProviderSkillUsa
   };
 }
 
-function addRecordToUsageAccumulator(
-  accumulator: ProviderSkillUsageAccumulator,
-  record: SkillInvocationRecord,
-): void {
+function addRecordToUsageAccumulator(accumulator: ProviderSkillUsageAccumulator, record: SkillInvocationRecord): void {
   accumulator.recordCount += 1;
   if (record.skillPath) {
     accumulator.providerPathCount += 1;
@@ -920,14 +935,14 @@ function addRecordToUsageAccumulator(
 }
 
 function finalizeUsageRow(accumulator: ProviderSkillUsageAccumulator): ProviderSkillUsageRow {
-  const commonProviderPath = accumulator.providerPathCount === accumulator.recordCount
-    && accumulator.providerPaths.size === 1
-    ? [...accumulator.providerPaths][0]
-    : undefined;
-  const commonResolvedPath = accumulator.resolvedPathCount === accumulator.recordCount
-    && accumulator.resolvedPaths.size === 1
-    ? [...accumulator.resolvedPaths][0]
-    : undefined;
+  const commonProviderPath =
+    accumulator.providerPathCount === accumulator.recordCount && accumulator.providerPaths.size === 1
+      ? [...accumulator.providerPaths][0]
+      : undefined;
+  const commonResolvedPath =
+    accumulator.resolvedPathCount === accumulator.recordCount && accumulator.resolvedPaths.size === 1
+      ? [...accumulator.resolvedPaths][0]
+      : undefined;
   return {
     ...accumulator.row,
     sourcePath: commonProviderPath ?? commonResolvedPath,
@@ -935,10 +950,12 @@ function finalizeUsageRow(accumulator: ProviderSkillUsageAccumulator): ProviderS
 }
 
 function compareUsageRows(a: ProviderSkillUsageRow, b: ProviderSkillUsageRow): number {
-  return b.countedInvocations - a.countedInvocations
-    || b.failedInvocations - a.failedInvocations
-    || compareOptionalTimestampDesc(a.lastInvokedAt, b.lastInvokedAt)
-    || a.skillName.localeCompare(b.skillName);
+  return (
+    b.countedInvocations - a.countedInvocations ||
+    b.failedInvocations - a.failedInvocations ||
+    compareOptionalTimestampDesc(a.lastInvokedAt, b.lastInvokedAt) ||
+    a.skillName.localeCompare(b.skillName)
+  );
 }
 
 function compareOptionalTimestampDesc(left: string | undefined, right: string | undefined): number {
@@ -960,16 +977,23 @@ function matchesCurrentSkill(
   record: Pick<SkillInvocationRecord, 'provider' | 'skillName' | 'skillPath' | 'resolvedPath'>,
   skill: CurrentSkillReference,
 ): boolean {
-  if (record.skillPath !== undefined && skill.path !== undefined && matchesSkillMdPath(record.skillPath, skill.path)) return true;
-  if (record.resolvedPath !== undefined && skill.resolvedPath !== undefined && matchesSkillMdPath(record.resolvedPath, skill.resolvedPath)) return true;
+  if (record.skillPath !== undefined && skill.path !== undefined && matchesSkillMdPath(record.skillPath, skill.path))
+    return true;
+  if (
+    record.resolvedPath !== undefined &&
+    skill.resolvedPath !== undefined &&
+    matchesSkillMdPath(record.resolvedPath, skill.resolvedPath)
+  )
+    return true;
   return skill.provider === record.provider && skill.name === record.skillName;
 }
 
 function matchesSkillMdPath(recordPath: string, skillReferencePath: string): boolean {
   const normalizedRecordPath = path.normalize(recordPath);
   const normalizedSkillPath = path.normalize(skillReferencePath);
-  return normalizedRecordPath === normalizedSkillPath
-    || normalizedRecordPath === path.join(normalizedSkillPath, 'SKILL.md');
+  return (
+    normalizedRecordPath === normalizedSkillPath || normalizedRecordPath === path.join(normalizedSkillPath, 'SKILL.md')
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -981,9 +1005,7 @@ function stringValue(value: unknown): string | undefined {
 }
 
 function isValidInvocationTimestamp(value: string | undefined): value is string {
-  return value !== undefined
-    && /^\d{4}-\d{2}-\d{2}T/.test(value)
-    && !Number.isNaN(Date.parse(value));
+  return value !== undefined && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
 }
 
 function isNodeError(value: unknown): value is NodeJS.ErrnoException {

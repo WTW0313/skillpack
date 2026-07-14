@@ -29,8 +29,13 @@ export function SettingsView() {
   const tableColumns = getSettingsColumns({ columns, rows });
 
   useInput((input, key) => {
-    if (input === 'q') { exit(); return; }
-    if (key.escape) { setView('list'); }
+    if (input === 'q') {
+      exit();
+      return;
+    }
+    if (key.escape) {
+      setView('list');
+    }
     if (key.downArrow) {
       setScrollOffset((offset) => Math.min(offset + 1, Math.max(0, contentRows.length - visibleRows)));
     }
@@ -39,20 +44,32 @@ export function SettingsView() {
     }
   });
 
-  const providerRows = useMemo(() => Object.entries(config.providers).map(([id, provider]) => ({
-    id,
-    enabled: provider.enabled,
-    rootCount: provider.paths.length,
-  })), [config.providers]);
+  const providerRows = useMemo(
+    () =>
+      Object.entries(config.providers).map(([id, provider]) => ({
+        id,
+        enabled: provider.enabled,
+        rootCount: provider.paths.length,
+      })),
+    [config.providers],
+  );
 
-  const sourceRows = useMemo(() => Object.entries(config.sources).map(([id, source]) => ({
-    id,
-    enabled: source.enabled,
-  })), [config.sources]);
+  const sourceRows = useMemo(
+    () =>
+      Object.entries(config.sources).map(([id, source]) => ({
+        id,
+        enabled: source.enabled,
+      })),
+    [config.sources],
+  );
 
-  const usageRootRows = useMemo(() => Object.entries(config.usage.artifactRoots).flatMap(([provider, roots]) => (
-    roots.map((root) => ({ provider, root }))
-  )), [config.usage.artifactRoots]);
+  const usageRootRows = useMemo(
+    () =>
+      Object.entries(config.usage.artifactRoots).flatMap(([provider, roots]) =>
+        roots.map((root) => ({ provider, root })),
+      ),
+    [config.usage.artifactRoots],
+  );
 
   const contentRows: SettingsRow[] = useMemo(() => {
     const result: SettingsRow[] = [
@@ -71,7 +88,7 @@ export function SettingsView() {
     ];
 
     if (scanPaths.length === 0) {
-      result.push({ key: 'scan-empty', element: <Text dimColor>  No Scan Roots reported yet.</Text> });
+      result.push({ key: 'scan-empty', element: <Text dimColor>{'  '}No Scan Roots reported yet.</Text> });
     } else {
       for (const scanPath of scanPaths) {
         const scope = scanPath.provider ?? scanPath.scope;
@@ -94,7 +111,10 @@ export function SettingsView() {
     result.push({ key: 'usage-roots-gap', element: <Text> </Text> });
     result.push({ key: 'usage-roots-heading', element: <Text bold>Usage Artifact Roots</Text> });
     if (usageRootRows.length === 0) {
-      result.push({ key: 'usage-roots-empty', element: <Text dimColor>  No Usage Artifact Roots configured.</Text> });
+      result.push({
+        key: 'usage-roots-empty',
+        element: <Text dimColor>{'  '}No Usage Artifact Roots configured.</Text>,
+      });
     } else {
       for (const row of usageRootRows) {
         result.push({
@@ -120,7 +140,9 @@ export function SettingsView() {
           <Box gap={1}>
             <Text>{fitCell(provider.id, tableColumns.scope)}</Text>
             <Text color={provider.enabled ? 'green' : 'yellow'}>{formatEnabled(provider.enabled)}</Text>
-            <Text dimColor>{provider.rootCount} root{provider.rootCount === 1 ? '' : 's'}</Text>
+            <Text dimColor>
+              {provider.rootCount} root{provider.rootCount === 1 ? '' : 's'}
+            </Text>
           </Box>
         ),
       });
@@ -146,12 +168,15 @@ export function SettingsView() {
   const visibleRows = layout.visibleRows;
   const visibleContent = contentRows.slice(scrollOffset, scrollOffset + visibleRows);
   const showScroll = contentRows.length > visibleRows;
-  const settingsShortcuts: Shortcut[] = useMemo(() => [
-    { key: 'esc', label: 'back' },
-    { key: '?', label: 'help' },
-    ...(showScroll ? [{ key: '↑↓', label: 'scroll' }] : []),
-    { key: 'q', label: 'quit' },
-  ], [showScroll]);
+  const settingsShortcuts: Shortcut[] = useMemo(
+    () => [
+      { key: 'esc', label: 'back' },
+      { key: '?', label: 'help' },
+      ...(showScroll ? [{ key: '↑↓', label: 'scroll' }] : []),
+      { key: 'q', label: 'quit' },
+    ],
+    [showScroll],
+  );
 
   useEffect(() => {
     setScrollOffset((offset) => Math.min(offset, Math.max(0, contentRows.length - visibleRows)));
@@ -160,11 +185,16 @@ export function SettingsView() {
   return (
     <Box flexDirection="column" flexGrow={1}>
       <Box paddingX={1}>
-        <Text dimColor>‹ esc  </Text>
-        <Text bold color="magenta">Settings</Text>
-        <Text dimColor>  read-only</Text>
+        <Text dimColor>‹ esc{'  '}</Text>
+        <Text bold color="magenta">
+          Settings
+        </Text>
+        <Text dimColor>{'  '}read-only</Text>
         {showScroll && (
-          <Text dimColor>  {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, contentRows.length)} of {contentRows.length}</Text>
+          <Text dimColor>
+            {'  '}
+            {scrollOffset + 1}–{Math.min(scrollOffset + visibleRows, contentRows.length)} of {contentRows.length}
+          </Text>
         )}
       </Box>
 

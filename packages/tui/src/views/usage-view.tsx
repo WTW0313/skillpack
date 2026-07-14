@@ -69,7 +69,8 @@ export function UsageView() {
     }
 
     let cancelled = false;
-    manager.getSkillUsageOverview({ rangeDays })
+    manager
+      .getSkillUsageOverview({ rangeDays })
       .then((nextOverview) => {
         if (!cancelled) setOverview(nextOverview);
       })
@@ -77,7 +78,9 @@ export function UsageView() {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [hasConsent, manager, rangeDays, refreshNonce, usageImportRevision]);
 
   useEffect(() => {
@@ -133,8 +136,14 @@ export function UsageView() {
 
   useInput((input, key) => {
     if (confirmingReset) return;
-    if (input === 'q') { exit(); return; }
-    if (key.escape) { setView('list'); return; }
+    if (input === 'q') {
+      exit();
+      return;
+    }
+    if (key.escape) {
+      setView('list');
+      return;
+    }
     if (key.tab && key.shift && hasConsent && overview && overview.providers.length > 1) {
       setSelectedProviderIndex((index) => (index + overview.providers.length - 1) % overview.providers.length);
       return;
@@ -193,7 +202,9 @@ export function UsageView() {
     }
     if (input === 'r' && hasConsent) {
       setOverview(null);
-      importSkillUsage().catch((err) => { setError(err instanceof Error ? err.message : String(err)); });
+      importSkillUsage().catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+      });
     }
     if (input === 'x' && hasConsent) {
       setConfirmingReset(true);
@@ -202,8 +213,12 @@ export function UsageView() {
       setSaving(true);
       setError(null);
       setUsageImportConsent(true)
-        .catch((err) => { setError(err instanceof Error ? err.message : String(err)); })
-        .finally(() => { setSaving(false); });
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => {
+          setSaving(false);
+        });
     }
   });
 
@@ -212,7 +227,8 @@ export function UsageView() {
       <ConfirmDialog
         message="Reset Skill Usage data?"
         onConfirm={() => {
-          manager.resetSkillUsage()
+          manager
+            .resetSkillUsage()
             .then(() => {
               setConfirmingReset(false);
               setOverview(null);
@@ -223,7 +239,9 @@ export function UsageView() {
               setConfirmingReset(false);
             });
         }}
-        onCancel={() => { setConfirmingReset(false); }}
+        onCancel={() => {
+          setConfirmingReset(false);
+        }}
       />
     );
   }
@@ -231,17 +249,28 @@ export function UsageView() {
   return (
     <Box flexDirection="column" flexGrow={1}>
       <Box paddingX={1}>
-        <Text bold color="magenta">Skill Usage</Text>
-        <Text dimColor>  {rangeDays} days</Text>
+        <Text bold color="magenta">
+          Skill Usage
+        </Text>
+        <Text dimColor>
+          {'  '}
+          {rangeDays} days
+        </Text>
         {showScroll && (
-          <Text dimColor>  {boundedScrollOffset + 1}-{Math.min(boundedScrollOffset + visibleRows, contentRows.length)} of {contentRows.length}</Text>
+          <Text dimColor>
+            {'  '}
+            {boundedScrollOffset + 1}-{Math.min(boundedScrollOffset + visibleRows, contentRows.length)} of{' '}
+            {contentRows.length}
+          </Text>
         )}
       </Box>
 
       <Box flexDirection="column" paddingX={1} marginTop={1} height={hasConsent ? visibleRows : undefined}>
         {hasConsent ? (
           <>
-            {visibleContent.map((row) => <Box key={row.key}>{row.element}</Box>)}
+            {visibleContent.map((row) => (
+              <Box key={row.key}>{row.element}</Box>
+            ))}
           </>
         ) : (
           <>
@@ -263,10 +292,14 @@ export function UsageView() {
 
 function coverageBadge(state: UsageCoverageState): { label: string; color: string } {
   switch (state) {
-    case 'active': return { label: '[active]', color: 'green' };
-    case 'zero': return { label: '[zero]', color: 'yellow' };
-    case 'not-configured': return { label: '[not configured]', color: 'yellow' };
-    case 'unsupported': return { label: '[unsupported]', color: 'red' };
+    case 'active':
+      return { label: '[active]', color: 'green' };
+    case 'zero':
+      return { label: '[zero]', color: 'yellow' };
+    case 'not-configured':
+      return { label: '[not configured]', color: 'yellow' };
+    case 'unsupported':
+      return { label: '[unsupported]', color: 'red' };
   }
 }
 
@@ -288,8 +321,10 @@ function buildUsageContentRows(input: {
     key: 'providers',
     element: (
       <Text>
-        <Text dimColor>Providers  </Text>
-        {input.overview.providers.map((provider, index) => renderProviderTab(provider, index === input.selectedProviderIndex))}
+        <Text dimColor>Providers{'  '}</Text>
+        {input.overview.providers.map((provider, index) =>
+          renderProviderTab(provider, index === input.selectedProviderIndex),
+        )}
       </Text>
     ),
   });
@@ -297,7 +332,7 @@ function buildUsageContentRows(input: {
     key: 'range',
     element: (
       <Text>
-        <Text dimColor>Range      </Text>
+        <Text dimColor>Range{'      '}</Text>
         {USAGE_RANGES.map((range) => (
           <Text key={range}>{range === input.rangeDays ? `[${range}d]  ` : `${range}d  `}</Text>
         ))}
@@ -328,7 +363,12 @@ function buildUsageContentRows(input: {
   if (sideBySide) {
     const heatmapWidth = heatmapDisplayWidth(provider.heatmap);
     const detailColumns = Math.max(30, input.columns - heatmapWidth - 6);
-    const detailRows = renderSelectedDayDetail(provider, input.selectedHeatmapCell, input.selectedDayRows, detailColumns);
+    const detailRows = renderSelectedDayDetail(
+      provider,
+      input.selectedHeatmapCell,
+      input.selectedDayRows,
+      detailColumns,
+    );
     rows.push(...combineSideBySideRows(heatmapRows, detailRows, heatmapWidth, detailColumns));
   } else {
     rows.push(...heatmapRows);
@@ -349,7 +389,10 @@ function buildUsageContentRows(input: {
 }
 
 function renderProviderTab(provider: ProviderSkillUsageOverview, selected: boolean): ReactNode {
-  const suffix = provider.coverageState === 'active' ? '' : ` ${coverageBadge(provider.coverageState).label.replace(/^\[|\]$/g, '')}`;
+  const suffix =
+    provider.coverageState === 'active'
+      ? ''
+      : ` ${coverageBadge(provider.coverageState).label.replace(/^\[|\]$/g, '')}`;
   const label = `${provider.displayName}${suffix}`;
   return (
     <Text key={provider.provider} color={selected ? 'cyan' : undefined}>
@@ -441,7 +484,9 @@ function combineSideBySideRows(
       element: (
         <Box flexDirection="row">
           <Box width={leftWidth}>{left}</Box>
-          <Box marginLeft={2} width={rightWidth}>{right}</Box>
+          <Box marginLeft={2} width={rightWidth}>
+            {right}
+          </Box>
         </Box>
       ),
     });
@@ -487,8 +532,22 @@ function renderSelectedDayDetail(
   const failed = cell?.failedInvocations ?? 0;
   const result: UsageContentRow[] = [
     { key: 'detail:heading', element: <Text dimColor>Selected day</Text> },
-    { key: 'detail:summary', element: <Text>{date} · {provider.displayName}</Text> },
-    { key: 'detail:counts', element: <Text>Counted {counted} · Failed {failed}</Text> },
+    {
+      key: 'detail:summary',
+      element: (
+        <Text>
+          {date} · {provider.displayName}
+        </Text>
+      ),
+    },
+    {
+      key: 'detail:counts',
+      element: (
+        <Text>
+          Counted {counted} · Failed {failed}
+        </Text>
+      ),
+    },
   ];
 
   if (dayRows.length === 0) {
@@ -501,7 +560,8 @@ function renderSelectedDayDetail(
     key: 'detail:header',
     element: (
       <Text dimColor>
-        {fitCell('Skill', widths.skill)} {fitCell('Counted', widths.counted)} {fitCell('Failed', widths.failed)} {fitCell('Source Path', widths.sourcePath)}
+        {fitCell('Skill', widths.skill)} {fitCell('Counted', widths.counted)} {fitCell('Failed', widths.failed)}{' '}
+        {fitCell('Source Path', widths.sourcePath)}
       </Text>
     ),
   });
@@ -510,7 +570,9 @@ function renderSelectedDayDetail(
       key: `detail:${row.skillName}`,
       element: (
         <Text>
-          {fitCell(row.skillName, widths.skill)} {fitCell(String(row.countedInvocations), widths.counted)} {fitCell(formatFailed(row.failedInvocations), widths.failed)} {fitCell(formatSourcePath(row.sourcePath), widths.sourcePath)}
+          {fitCell(row.skillName, widths.skill)} {fitCell(String(row.countedInvocations), widths.counted)}{' '}
+          {fitCell(formatFailed(row.failedInvocations), widths.failed)}{' '}
+          {fitCell(formatSourcePath(row.sourcePath), widths.sourcePath)}
         </Text>
       ),
     });
@@ -519,9 +581,7 @@ function renderSelectedDayDetail(
 }
 
 function renderRankingTable(provider: ProviderSkillUsageOverview, columns: number): UsageContentRow[] {
-  const result: UsageContentRow[] = [
-    { key: 'ranking:heading', element: <Text dimColor>Provider Skill Ranking</Text> },
-  ];
+  const result: UsageContentRow[] = [{ key: 'ranking:heading', element: <Text dimColor>Provider Skill Ranking</Text> }];
   if (provider.ranking.length === 0) {
     result.push({ key: 'ranking:empty', element: <Text dimColor>No usage records for this provider and range.</Text> });
     return result;
@@ -532,7 +592,8 @@ function renderRankingTable(provider: ProviderSkillUsageOverview, columns: numbe
     key: 'ranking:header',
     element: (
       <Text dimColor>
-        {fitCell('Skill', widths.skill)} {fitCell('Counted', widths.counted)} {fitCell('Failed', widths.failed)} {fitCell('Last Used', widths.lastUsed)} {fitCell('Source Path', widths.sourcePath)}
+        {fitCell('Skill', widths.skill)} {fitCell('Counted', widths.counted)} {fitCell('Failed', widths.failed)}{' '}
+        {fitCell('Last Used', widths.lastUsed)} {fitCell('Source Path', widths.sourcePath)}
       </Text>
     ),
   });
@@ -541,7 +602,10 @@ function renderRankingTable(provider: ProviderSkillUsageOverview, columns: numbe
       key: `ranking:${row.skillName}`,
       element: (
         <Text>
-          {fitCell(row.skillName, widths.skill)} {fitCell(String(row.countedInvocations), widths.counted)} {fitCell(formatFailed(row.failedInvocations), widths.failed)} {fitCell(formatLastUsed(row.lastInvokedAt), widths.lastUsed)} {fitCell(formatSourcePath(row.sourcePath), widths.sourcePath)}
+          {fitCell(row.skillName, widths.skill)} {fitCell(String(row.countedInvocations), widths.counted)}{' '}
+          {fitCell(formatFailed(row.failedInvocations), widths.failed)}{' '}
+          {fitCell(formatLastUsed(row.lastInvokedAt), widths.lastUsed)}{' '}
+          {fitCell(formatSourcePath(row.sourcePath), widths.sourcePath)}
         </Text>
       ),
     });
@@ -549,7 +613,10 @@ function renderRankingTable(provider: ProviderSkillUsageOverview, columns: numbe
   return result;
 }
 
-function usageTableWidths(columns: number, withLastUsed: boolean): { skill: number; counted: number; failed: number; lastUsed: number; sourcePath: number } {
+function usageTableWidths(
+  columns: number,
+  withLastUsed: boolean,
+): { skill: number; counted: number; failed: number; lastUsed: number; sourcePath: number } {
   const contentWidth = Math.max(40, columns - 2);
   const counted = 7;
   const failed = 6;
@@ -562,7 +629,8 @@ function usageTableWidths(columns: number, withLastUsed: boolean): { skill: numb
 }
 
 function appendErrors(rows: UsageContentRow[], input: { usageImportError: string | null; error: string | null }) {
-  if (input.usageImportError) rows.push({ key: 'error:import', element: <Text color="red">{input.usageImportError}</Text> });
+  if (input.usageImportError)
+    rows.push({ key: 'error:import', element: <Text color="red">{input.usageImportError}</Text> });
   if (input.error) rows.push({ key: 'error:view', element: <Text color="red">{input.error}</Text> });
 }
 
@@ -603,13 +671,16 @@ function moveDateWithinRange(
 
 function nearestDateInTargetWeek(target: Date, selectableDates: string[]): string | null {
   const targetWeekStart = startOfUtcWeek(target);
-  const candidates = selectableDates.filter((date) => startOfUtcWeek(parseDate(date)).getTime() === targetWeekStart.getTime());
+  const candidates = selectableDates.filter(
+    (date) => startOfUtcWeek(parseDate(date)).getTime() === targetWeekStart.getTime(),
+  );
   if (candidates.length === 0) return null;
   const targetTime = target.getTime();
-  return candidates.sort((left, right) => (
-    Math.abs(parseDate(left).getTime() - targetTime) - Math.abs(parseDate(right).getTime() - targetTime)
-    || left.localeCompare(right)
-  ))[0];
+  return candidates.sort(
+    (left, right) =>
+      Math.abs(parseDate(left).getTime() - targetTime) - Math.abs(parseDate(right).getTime() - targetTime) ||
+      left.localeCompare(right),
+  )[0];
 }
 
 function startOfUtcWeek(date: Date): Date {

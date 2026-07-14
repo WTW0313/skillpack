@@ -7,6 +7,7 @@ import { testConfig } from '../fixtures/inventory.js';
 import { createMockManager, type MockSkillManager } from './mock-manager.js';
 
 type InkTestInstance = ReturnType<typeof render>;
+const ANSI_PATTERN = new RegExp(String.raw`\u001B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])`, 'g');
 
 export interface RenderTuiOptions {
   manager?: MockSkillManager;
@@ -40,7 +41,7 @@ export const keypress = {
 };
 
 export function stripAnsi(value: string): string {
-  return value.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
+  return value.replace(ANSI_PATTERN, '');
 }
 
 export function normalizeFrame(frame: string | undefined): string {

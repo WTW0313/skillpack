@@ -20,13 +20,20 @@ function Router() {
   const { view } = useAppContext();
 
   switch (view) {
-    case 'list': return <ListView />;
-    case 'detail': return <DetailView />;
-    case 'install': return <InstallView />;
-    case 'project': return <ProjectSkillsView />;
-    case 'settings': return <SettingsView />;
-    case 'updates': return <UpdatesView />;
-    case 'usage': return <UsageView />;
+    case 'list':
+      return <ListView />;
+    case 'detail':
+      return <DetailView />;
+    case 'install':
+      return <InstallView />;
+    case 'project':
+      return <ProjectSkillsView />;
+    case 'settings':
+      return <SettingsView />;
+    case 'updates':
+      return <UpdatesView />;
+    case 'usage':
+      return <UsageView />;
   }
 }
 
@@ -72,7 +79,12 @@ export interface AppSurfaceProps {
   terminalSize?: TerminalSize;
 }
 
-function AppSurfaceContent({ manager, config, onUsageImportConsentChange, error }: Omit<AppSurfaceProps, 'terminalSize'>) {
+function AppSurfaceContent({
+  manager,
+  config,
+  onUsageImportConsentChange,
+  error,
+}: Omit<AppSurfaceProps, 'terminalSize'>) {
   const { columns, rows } = useTerminalSize();
   const terminalMode = getTerminalMode({ columns, rows });
 
@@ -115,13 +127,13 @@ export function AppSurface({ manager, config, onUsageImportConsentChange, error,
     />
   );
 
-  return terminalSize
-    ? <TerminalSizeProvider size={terminalSize}>{content}</TerminalSizeProvider>
-    : content;
+  return terminalSize ? <TerminalSizeProvider size={terminalSize}>{content}</TerminalSizeProvider> : content;
 }
 
 export function App() {
   const { manager, config, error, setUsageImportConsent } = useSkillManager();
 
-  return <AppSurface manager={manager} config={config} onUsageImportConsentChange={setUsageImportConsent} error={error} />;
+  return (
+    <AppSurface manager={manager} config={config} onUsageImportConsentChange={setUsageImportConsent} error={error} />
+  );
 }

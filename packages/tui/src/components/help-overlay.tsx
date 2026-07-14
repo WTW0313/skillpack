@@ -20,8 +20,10 @@ export function HelpOverlay(_props: HelpOverlayProps) {
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
       <Box>
-        <Text dimColor>‹ esc/?  </Text>
-        <Text bold color="magenta">{formatViewTitle(view)} Help</Text>
+        <Text dimColor>‹ esc/?{'  '}</Text>
+        <Text bold color="magenta">
+          {formatViewTitle(view)} Help
+        </Text>
       </Box>
 
       <Box flexDirection="column" marginTop={1}>
