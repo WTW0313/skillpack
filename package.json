@@ -2,10 +2,26 @@
   "name": "skillpack",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "pnpm -r run build",
-    "test": "pnpm -r run test",
-    "dev": "pnpm --filter @skillpack/tui run dev"
+    "build": "vp run -r build",
+    "build:ci": "vp run -r build:ci",
+    "check": "vp check",
+    "check:ci": "vp check",
+    "dev": "vp run @skillpack/core#build && vp run skillpack-tui#dev",
+    "fix": "vp check --fix",
+    "format": "vp fmt . --write",
+    "format:check": "vp fmt . --check",
+    "lint": "vp lint",
+    "lint:fix": "vp lint --fix",
+    "test": "vp run -r test",
+    "test:ci": "vp run -r test:ci"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.3",
+    "typescript": "6.0.3",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.4",
+    "vite-plus": "0.2.4"
   },
   "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b"
 }

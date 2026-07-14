@@ -32,7 +32,11 @@ export abstract class BaseProvider implements ISkillProvider {
   protected async scanBasePaths(basePaths: string[]): Promise<Skill[]> {
     const skills: Skill[] = [];
     for (const basePath of basePaths) {
-      try { await access(basePath); } catch { continue; }
+      try {
+        await access(basePath);
+      } catch {
+        continue;
+      }
       const entries = await readdir(basePath, { withFileTypes: true });
       for (const entry of entries) {
         const isDisabled = entry.name.startsWith('.disabled-');
@@ -53,10 +57,12 @@ export abstract class BaseProvider implements ISkillProvider {
               scope: 'global',
               metadata: {},
               source: { type: 'local' },
-              scanIssues: [{
-                code: 'broken-symlink',
-                message: err instanceof Error ? err.message : 'Broken skill symlink',
-              }],
+              scanIssues: [
+                {
+                  code: 'broken-symlink',
+                  message: err instanceof Error ? err.message : 'Broken skill symlink',
+                },
+              ],
             });
             continue;
           }
@@ -99,10 +105,12 @@ export abstract class BaseProvider implements ISkillProvider {
             scope: 'global',
             metadata: {},
             source: { type: 'local', createdAt: dirStat?.birthtime.toISOString() },
-            scanIssues: [{
-              code: 'invalid-skill-md',
-              message: err instanceof Error ? err.message : 'Invalid SKILL.md',
-            }],
+            scanIssues: [
+              {
+                code: 'invalid-skill-md',
+                message: err instanceof Error ? err.message : 'Invalid SKILL.md',
+              },
+            ],
           });
         }
       }
@@ -142,8 +150,12 @@ export abstract class BaseProvider implements ISkillProvider {
     const dest = path.join(path.dirname(skill.path), destName);
     if (dest === skill.path) return;
     await access(dest).then(
-      () => { throw new Error(`Target ${dest} already exists`); },
-      () => { /* dest doesn't exist, good */ },
+      () => {
+        throw new Error(`Target ${dest} already exists`);
+      },
+      () => {
+        /* dest doesn't exist, good */
+      },
     );
     await rename(skill.path, dest);
   }
@@ -156,7 +168,9 @@ export abstract class BaseProvider implements ISkillProvider {
         await access(src);
         await rename(src, dest);
         return;
-      } catch { /* not found in this basePath, try next */ }
+      } catch {
+        /* not found in this basePath, try next */
+      }
     }
     throw new Error(`Disabled skill "${name}" not found in ${this.displayName}`);
   }
@@ -168,8 +182,12 @@ export abstract class BaseProvider implements ISkillProvider {
       try {
         await access(src);
         await access(dest).then(
-          () => { throw new Error(`Target ${dest} already exists`); },
-          () => { /* dest doesn't exist, good */ },
+          () => {
+            throw new Error(`Target ${dest} already exists`);
+          },
+          () => {
+            /* dest doesn't exist, good */
+          },
         );
         await rename(src, dest);
         return;

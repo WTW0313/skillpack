@@ -5,16 +5,17 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "build": "vp pack",
+    "build:ci": "vp pack",
+    "test": "vp test",
+    "test:ci": "vp test"
   },
   "dependencies": {
+    "acorn": "^8.17.0",
     "yaml": "2.9.0"
   },
   "devDependencies": {
     "@types/node": "25.9.3",
-    "typescript": "6.0.3",
-    "vitest": "4.1.8"
+    "typescript": "6.0.3"
   }
 }

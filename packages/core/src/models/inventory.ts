@@ -2,10 +2,7 @@ import type { Skill, SkillSource } from './skill.js';
 
 export type SkillIdentityConfidence = 'confirmed' | 'inferred';
 
-export type InventoryIssueCode =
-  | 'invalid-skill-md'
-  | 'broken-symlink'
-  | 'plugin-identity-mismatch';
+export type InventoryIssueCode = 'invalid-skill-md' | 'broken-symlink' | 'plugin-identity-mismatch';
 
 export type InventoryNoticeCode =
   | 'related-providers'
@@ -63,7 +60,10 @@ export interface SkillGroup {
 }
 
 export function normalizeSkillName(name: string): string {
-  return name.trim().toLowerCase().replace(/[\s_]+/g, '-');
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-');
 }
 
 function strongIdentityFor(skill: Skill): { key: string; reason: string; confirmsSingleInstance: boolean } | null {
@@ -164,7 +164,10 @@ export function buildSkillInventory(skills: Skill[], options: BuildSkillInventor
   }
 
   const assigned = new Set<Skill>();
-  const groups = new Map<string, { identity: { confidence: SkillIdentityConfidence; reason: string }; skills: Skill[] }>();
+  const groups = new Map<
+    string,
+    { identity: { confidence: SkillIdentityConfidence; reason: string }; skills: Skill[] }
+  >();
   for (const [key, group] of strongGroups) {
     if (group.skills.length < 2 && !group.confirmsSingleInstance) continue;
     for (const skill of group.skills) assigned.add(skill);
@@ -188,9 +191,10 @@ export function buildSkillInventory(skills: Skill[], options: BuildSkillInventor
     if (instances.length > 1) {
       notices.push({
         code: group.identity.confidence === 'confirmed' ? 'related-providers' : 'name-only-relationship',
-        message: group.identity.confidence === 'confirmed'
-          ? 'Skill has confirmed related provider instances'
-          : 'Skill has same-name provider instances without confirming provenance',
+        message:
+          group.identity.confidence === 'confirmed'
+            ? 'Skill has confirmed related provider instances'
+            : 'Skill has same-name provider instances without confirming provenance',
       });
     }
 

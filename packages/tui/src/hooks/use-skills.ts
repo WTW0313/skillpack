@@ -55,9 +55,10 @@ function toRows(inventory: SkillGroup[], provider: string | null): InventoryList
       id: rowId(group, instance),
       group,
       instance,
-      relatedProviders: group.identity.confidence === 'confirmed'
-        ? group.providers.filter((related) => related.provider !== instance.provider)
-        : [],
+      relatedProviders:
+        group.identity.confidence === 'confirmed'
+          ? group.providers.filter((related) => related.provider !== instance.provider)
+          : [],
       issues: instance.issues,
       notices: instance.notices,
     }));

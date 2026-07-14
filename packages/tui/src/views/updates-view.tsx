@@ -79,8 +79,14 @@ export function UpdatesView() {
   };
 
   useInput((input, key) => {
-    if (input === 'q') { exit(); return; }
-    if (key.escape) { setView('list'); return; }
+    if (input === 'q') {
+      exit();
+      return;
+    }
+    if (key.escape) {
+      setView('list');
+      return;
+    }
     if (confirmingUpdate) return;
     if (state === 'checking' || state === 'updating') return;
     if (input === 'r') {
@@ -122,8 +128,10 @@ export function UpdatesView() {
   return (
     <Box flexDirection="column" flexGrow={1} padding={1}>
       <Box>
-        <Text dimColor>‹ esc  </Text>
-        <Text bold color="magenta">Updates</Text>
+        <Text dimColor>‹ esc{'  '}</Text>
+        <Text bold color="magenta">
+          Updates
+        </Text>
       </Box>
 
       {error !== '' && (
@@ -154,7 +162,9 @@ export function UpdatesView() {
 
       {state === 'checked' && (
         <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>{updates.length} update{updates.length !== 1 ? 's' : ''} available</Text>
+          <Text dimColor>
+            {updates.length} update{updates.length !== 1 ? 's' : ''} available
+          </Text>
           <Box flexDirection="column" marginTop={1} height={resultRows}>
             {updates.length === 0 ? (
               <Text dimColor>No skills.sh updates found. Press r to check again.</Text>
@@ -165,7 +175,9 @@ export function UpdatesView() {
                 return (
                   <Box key={`${row.skill.provider}:${row.skill.name}`} gap={1}>
                     <Text color={selected ? 'magenta' : undefined}>{selected ? glyphs.selected : ' '}</Text>
-                    <Text bold={selected} color={selected ? 'white' : undefined}>{fitCell(row.skill.name, resultNameWidth)}</Text>
+                    <Text bold={selected} color={selected ? 'white' : undefined}>
+                      {fitCell(row.skill.name, resultNameWidth)}
+                    </Text>
                     <Text dimColor>{row.update.currentVersion ?? '?'}</Text>
                     <Text dimColor>→</Text>
                     <Text color="green">{row.update.latestVersion ?? 'latest'}</Text>
@@ -175,7 +187,9 @@ export function UpdatesView() {
             )}
           </Box>
           {updates.length > resultRows && (
-            <Text dimColor>{scrollOffset + 1}-{Math.min(scrollOffset + resultRows, updates.length)} of {updates.length}</Text>
+            <Text dimColor>
+              {scrollOffset + 1}-{Math.min(scrollOffset + resultRows, updates.length)} of {updates.length}
+            </Text>
           )}
         </Box>
       )}

@@ -18,14 +18,20 @@ export function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmDialogPro
   return (
     <Box flexDirection="column" gap={1}>
       <Box>
-        <Text color="yellow" bold>{glyphs.warning} </Text>
+        <Text color="yellow" bold>
+          {glyphs.warning}{' '}
+        </Text>
         <Text>{message}</Text>
       </Box>
       <Box>
-        <Text dimColor>  Press </Text>
-        <Text bold color="green">y</Text>
+        <Text dimColor>{'  '}Press </Text>
+        <Text bold color="green">
+          y
+        </Text>
         <Text dimColor> to confirm or </Text>
-        <Text bold color="red">n</Text>
+        <Text bold color="red">
+          n
+        </Text>
         <Text dimColor> to cancel</Text>
       </Box>
     </Box>

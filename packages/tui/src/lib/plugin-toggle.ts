@@ -11,11 +11,12 @@ export function isPluginOwnedSkill<T extends PluginToggleSkill | null | undefine
 export function getAffectedPluginSkills<T extends PluginToggleSkill>(skills: T[], skill: PluginToggleSkill): T[] {
   if (!isPluginOwnedSkill(skill)) return [];
   return skills
-    .filter((candidate) => (
-      candidate.provider === skill.provider
-      && candidate.origin?.type === 'plugin'
-      && candidate.origin.pluginId === skill.origin.pluginId
-    ))
+    .filter(
+      (candidate) =>
+        candidate.provider === skill.provider &&
+        candidate.origin?.type === 'plugin' &&
+        candidate.origin.pluginId === skill.origin.pluginId,
+    )
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 

@@ -40,6 +40,10 @@ _Avoid_: Global Skill, managed skill
 A skill distributed as part of a provider plugin. Its availability may depend on the owning plugin's access state as well as any provider-specific per-skill state.
 _Avoid_: Provider-local skill, independent toggle target
 
+**Built-In Skill**:
+A Skill Provider bundled skill that has no user-level or plugin-provided source directory managed by the user.
+_Avoid_: User Skill, Plugin-Owned Skill
+
 **skills.sh**:
 The external skill ecosystem and CLI used for installing, updating, and removing Global Skills.
 _Avoid_: GitHub install source, package manager
@@ -61,11 +65,11 @@ A minimal normalized fact derived from provider session artifacts about one Skil
 _Avoid_: Session transcript, prompt, response
 
 **Invocation Record ID**:
-A deterministic identifier for a Skill Invocation Record, derived from provider session evidence so repeated imports can be idempotent.
+A deterministic identifier for a Skill Invocation, derived from provider session evidence so repeated imports are idempotent and later evidence can revise the same invocation.
 _Avoid_: Random event ID, row number
 
 **Skill Usage Log**:
-The append-only JSONL storage for Skill Invocation Records, partitioned by Session-Producing Provider and month.
+The append-only JSONL storage for Skill Invocation Records, partitioned by Session-Producing Provider and invocation month. Revisions of one Invocation Record ID remain in the same provider/month partition, and the latest revision is the current fact used by aggregates.
 _Avoid_: Session transcript store, provider log, database
 
 **Invocation Identity Confidence**:
@@ -77,8 +81,12 @@ The evidence-based runtime state for a Skill Invocation, indicating whether prov
 _Avoid_: Skill Availability, Inventory Issue, inventory status
 
 **Skill Source Path**:
-The `SKILL.md` path recorded from provider session evidence for an invoked skill, falling back to a resolved path only when the evidence path is unavailable.
+The optional `SKILL.md` path shown for an invocation or aggregate. An aggregate shows a common provider-facing path when one exists, otherwise a common resolved target, and otherwise leaves the path blank.
 _Avoid_: Historical status, Scan Root, inventory path
+
+**Skill Source Identity**:
+The stable source-level identity used to group Skill Invocation Records within one Session-Producing Provider. A recognized Plugin-Owned Skill cache uses its normalized plugin identity first; other sources prefer the resolved target when known and fall back to the provider-facing Skill Source Path.
+_Avoid_: Display path, skill name, Provider Instance
 
 **Counted Invocation**:
 A Skill Invocation Record included in default Skill Usage aggregates. Failed invocations are excluded from default intensity and ranking counts but can be shown as separate failure context.
@@ -89,11 +97,11 @@ User-facing aggregates derived from Skill Invocations, used to understand which 
 _Avoid_: Skill Inventory, Skill Availability, inventory status, session history, cross-provider skill rollup
 
 **Provider Skill Ranking**:
-A Skill Usage aggregate that ranks invoked skill source paths within a Skill Provider by exact Counted Invocation count, with failed invocation count and recency as supporting context.
+A Skill Usage aggregate that ranks invoked skills within a Skill Provider by exact Counted Invocation count, separating rows by Skill Source Identity while treating versioned cache paths for one Plugin-Owned Skill as one source identity.
 _Avoid_: Global leaderboard, inventory order
 
 **Selected-Day Usage Detail**:
-The Skill Usage detail for one selected heatmap day, scoped to one Session-Producing Provider and grouped by skill source path with exact Counted Invocation and failure context for that day.
+The Skill Usage detail for one selected heatmap day, scoped to one Session-Producing Provider and grouped by skill name and stable source identity with exact Counted Invocation and failure context for that day.
 _Avoid_: Session transcript, raw invocation history, provider-wide total
 
 **Skill Usage Heatmap**:
@@ -109,7 +117,7 @@ The read-only process that derives Skill Invocation Records from provider-owned 
 _Avoid_: Runtime instrumentation, session sync
 
 **Usage Import Diagnostic**:
-A non-inventory finding from Skill Usage Import, such as skipped ambiguous provider evidence or unsupported session artifacts.
+A non-inventory finding from Skill Usage Import, such as skipped provider evidence or unsupported session artifacts. Repeated findings may be summarized with a count.
 _Avoid_: Inventory Issue, provider warning
 
 **Usage Provider Adapter**:
@@ -119,6 +127,10 @@ _Avoid_: Heuristic log parser, runtime hook
 **Usage Coverage State**:
 Whether Skillpack can derive Skill Usage for a Skill Provider, distinguishing supported providers with zero Counted Invocations from providers that are unsupported or not configured for import.
 _Avoid_: Skill Availability, zero usage
+
+**Usage Coverage Reason**:
+One specific missing prerequisite that explains a `not-configured` Usage Coverage State, such as missing Usage Artifact Roots or Skill Attribution Roots. Every Provider Skill Usage Overview carries a `coverageReasons` collection: it contains every applicable reason for `not-configured` coverage and is empty for other states. These are configuration context, not findings from an attempted import.
+_Avoid_: Usage Import Diagnostic, import error
 
 **Usage Import Consent**:
 The user's persisted opt-in that allows Skillpack to read provider-owned session artifacts for Skill Usage Import.
@@ -138,7 +150,11 @@ _Avoid_: Session state, Skillpack-owned provider state
 
 **Usage Artifact Root**:
 A provider-specific directory or file root Skillpack reads during Skill Usage Import to find supported session artifacts.
-_Avoid_: Scan Root, skill directory
+_Avoid_: Scan Root, Skill Attribution Root, skill directory
+
+**Skill Attribution Root**:
+A configured skill-content root a Usage Provider Adapter uses to match invocation evidence to eligible user-level or plugin-provided Skill sources. The same directory may also serve as an Inventory Scan Root, but attribution and inventory discovery are separate responsibilities.
+_Avoid_: Usage Artifact Root, session directory
 
 **Provider Instance**:
 A discovered skill as represented by one Skill Provider, including that provider's availability and provenance for the skill.
@@ -162,7 +178,7 @@ _Avoid_: Terminal UI Test, component test
 
 **Scan Root**:
 A directory Skillpack inspects to discover provider, shared global, or project skills.
-_Avoid_: Skill, provider, install source
+_Avoid_: Skill, provider, install source, Usage Artifact Root
 
 **Inventory Notice**:
 A non-problem inventory fact that helps the user understand provider coverage, provenance, or grouping confidence.

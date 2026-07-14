@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { SkillsShSource } from '../../src/sources/skillssh.js';
 import type { Skill } from '../../src/models/index.js';
 
@@ -13,10 +13,12 @@ describe('SkillsShSource', () => {
     const result = await source.fetch('owner/repo@skill-name');
 
     expect(result.skillName).toBe('skill-name');
-    expect(calls).toEqual([{
-      command: 'npx',
-      args: ['skills', 'add', 'owner/repo', '-g', '-y', '--skill', 'skill-name'],
-    }]);
+    expect(calls).toEqual([
+      {
+        command: 'npx',
+        args: ['skills', 'add', 'owner/repo', '-g', '-y', '--skill', 'skill-name'],
+      },
+    ]);
   });
 
   it('checks for updates through the skills CLI only when requested', async () => {
@@ -78,9 +80,11 @@ describe('SkillsShSource', () => {
 
     await source.updateViaCli('demo-skill');
 
-    expect(calls).toEqual([{
-      command: 'npx',
-      args: ['skills', 'update', 'demo-skill', '-g', '-y'],
-    }]);
+    expect(calls).toEqual([
+      {
+        command: 'npx',
+        args: ['skills', 'update', 'demo-skill', '-g', '-y'],
+      },
+    ]);
   });
 });

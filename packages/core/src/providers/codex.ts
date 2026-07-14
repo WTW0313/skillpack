@@ -39,7 +39,10 @@ async function isDirectory(filePath: string): Promise<boolean> {
   }
 }
 
-async function getSkillDirEntryStatus(entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string }, parentPath: string): Promise<SkillDirEntryStatus> {
+async function getSkillDirEntryStatus(
+  entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string },
+  parentPath: string,
+): Promise<SkillDirEntryStatus> {
   if (entry.isDirectory()) return 'directory';
   if (entry.isSymbolicLink()) {
     try {
@@ -102,13 +105,15 @@ export class CodexProvider extends BaseProvider {
 
   override async scan(): Promise<Skill[]> {
     const flatSkills = await this.scanBasePaths(this.skillPaths);
-    const hydratedFlatSkills = await Promise.all(flatSkills.map(async (skill) => {
-      const configEnabled = await readCodexSkillConfigEnabled(this.configPath, path.join(skill.path, 'SKILL.md'));
-      return {
-        ...skill,
-        enabled: skill.enabled && configEnabled !== false,
-      };
-    }));
+    const hydratedFlatSkills = await Promise.all(
+      flatSkills.map(async (skill) => {
+        const configEnabled = await readCodexSkillConfigEnabled(this.configPath, path.join(skill.path, 'SKILL.md'));
+        return {
+          ...skill,
+          enabled: skill.enabled && configEnabled !== false,
+        };
+      }),
+    );
     const pluginSkills = await this.scanPluginCache();
     return [...hydratedFlatSkills, ...pluginSkills];
   }
@@ -128,7 +133,9 @@ export class CodexProvider extends BaseProvider {
     ];
   }
 
-  override getDisableStrategy(skill: Pick<Skill, 'name' | 'path' | 'enabled' | 'origin'>): { type: 'provider-config'; description: string } | undefined {
+  override getDisableStrategy(
+    skill: Pick<Skill, 'name' | 'path' | 'enabled' | 'origin'>,
+  ): { type: 'provider-config'; description: string } | undefined {
     if (skill.origin?.type === 'plugin') {
       if (skill.origin.identityStatus === 'mismatched') return undefined;
       return {
@@ -142,10 +149,15 @@ export class CodexProvider extends BaseProvider {
     };
   }
 
-  override async setEnabled(skill: Pick<Skill, 'name' | 'path' | 'enabled' | 'origin'>, enabled: boolean): Promise<void> {
+  override async setEnabled(
+    skill: Pick<Skill, 'name' | 'path' | 'enabled' | 'origin'>,
+    enabled: boolean,
+  ): Promise<void> {
     if (skill.origin?.type === 'plugin') {
       if (skill.origin.identityStatus === 'mismatched') {
-        throw new Error(`Cannot toggle Codex plugin "${skill.origin.pluginId}" because its manifest identity does not match its cache path`);
+        throw new Error(
+          `Cannot toggle Codex plugin "${skill.origin.pluginId}" because its manifest identity does not match its cache path`,
+        );
       }
       if (skill.origin.pluginEnabled === enabled) return;
       await writeCodexPluginEnabled(this.configPath, skill.origin.pluginId, enabled);
@@ -156,13 +168,17 @@ export class CodexProvider extends BaseProvider {
   }
 
   override async disable(name: string): Promise<void> {
-    const skill = (await this.scan()).find((item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name);
+    const skill = (await this.scan()).find(
+      (item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name,
+    );
     if (!skill) throw new Error(`Skill "${name}" not found in ${this.displayName}`);
     await this.setEnabled(skill, false);
   }
 
   override async enable(name: string): Promise<void> {
-    const skill = (await this.scan()).find((item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name);
+    const skill = (await this.scan()).find(
+      (item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name,
+    );
     if (!skill) throw new Error(`Skill "${name}" not found in ${this.displayName}`);
     await this.setEnabled(skill, true);
   }
@@ -202,7 +218,11 @@ export class CodexProvider extends BaseProvider {
   private async findPluginRoots(): Promise<CodexPluginRoot[]> {
     const roots: CodexPluginRoot[] = [];
     for (const cachePath of this.pluginCachePaths) {
-      try { await access(cachePath); } catch { continue; }
+      try {
+        await access(cachePath);
+      } catch {
+        continue;
+      }
       const marketplaces = await readdir(cachePath, { withFileTypes: true });
       for (const marketplace of marketplaces) {
         if (!marketplace.isDirectory()) continue;
@@ -228,7 +248,8 @@ export class CodexProvider extends BaseProvider {
               path: rootPath,
               mtimeMs: rootStat.mtimeMs,
               manifestName: typeof manifest?.name === 'string' ? manifest.name : undefined,
-              displayName: typeof manifest?.interface?.displayName === 'string' ? manifest.interface.displayName : undefined,
+              displayName:
+                typeof manifest?.interface?.displayName === 'string' ? manifest.interface.displayName : undefined,
             });
           }
         }
@@ -245,11 +266,15 @@ export class CodexProvider extends BaseProvider {
     }
   }
 
-  private async scanPluginRoot(pluginRoot: CodexPluginRoot, pluginConfig: Record<string, boolean | undefined>): Promise<Skill[]> {
+  private async scanPluginRoot(
+    pluginRoot: CodexPluginRoot,
+    pluginConfig: Record<string, boolean | undefined>,
+  ): Promise<Skill[]> {
     const skills: Skill[] = [];
     const skillsPath = path.join(pluginRoot.path, 'skills');
     const pluginEnabled = pluginConfig[pluginRoot.pluginId] !== false;
-    const identityStatus = pluginRoot.manifestName && pluginRoot.manifestName !== pluginRoot.pluginName ? 'mismatched' : 'confirmed';
+    const identityStatus =
+      pluginRoot.manifestName && pluginRoot.manifestName !== pluginRoot.pluginName ? 'mismatched' : 'confirmed';
     const entries = await readdir(skillsPath, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -268,10 +293,15 @@ export class CodexProvider extends BaseProvider {
         skillConfigEnabled,
         identityStatus,
       };
-      const identityIssues = identityStatus === 'mismatched' ? [{
-        code: 'plugin-identity-mismatch' as const,
-        message: `Codex plugin manifest name "${pluginRoot.manifestName}" does not match cache plugin "${pluginRoot.pluginName}"`,
-      }] : [];
+      const identityIssues =
+        identityStatus === 'mismatched'
+          ? [
+              {
+                code: 'plugin-identity-mismatch' as const,
+                message: `Codex plugin manifest name "${pluginRoot.manifestName}" does not match cache plugin "${pluginRoot.pluginName}"`,
+              },
+            ]
+          : [];
       const entryStatus = await getSkillDirEntryStatus(entry, skillsPath);
       if (entryStatus === 'broken-symlink') {
         skills.push({
@@ -285,10 +315,7 @@ export class CodexProvider extends BaseProvider {
           metadata: {},
           origin,
           source: { type: 'local' },
-          scanIssues: [
-            ...identityIssues,
-            { code: 'broken-symlink', message: 'Broken skill symlink' },
-          ],
+          scanIssues: [...identityIssues, { code: 'broken-symlink', message: 'Broken skill symlink' }],
         });
         continue;
       }

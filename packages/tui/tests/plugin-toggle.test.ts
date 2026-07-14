@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { formatPluginToggleMessage } from '../src/lib/plugin-toggle.js';
 import type { Skill } from '@skillpack/core';
 
@@ -19,10 +19,7 @@ function pluginSkill(provider: string, name: string): Pick<Skill, 'name' | 'prov
 describe('formatPluginToggleMessage', () => {
   it('uses provider-agnostic wording for plugin-owned skills', () => {
     const skill = pluginSkill('claude', 'deploy');
-    const message = formatPluginToggleMessage(skill, [
-      skill,
-      pluginSkill('claude', 'audit'),
-    ]);
+    const message = formatPluginToggleMessage(skill, [skill, pluginSkill('claude', 'audit')]);
 
     expect(message).toBe('Disable plugin deploy-plugin@team-tools? This affects 2 skills: audit, deploy.');
     expect(message).not.toContain('Codex');

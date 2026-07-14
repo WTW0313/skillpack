@@ -65,9 +65,7 @@ const DETAIL_BASE: Shortcut[] = [
   { key: '←→', label: 'provider instance', compactLabel: 'provider' },
 ];
 
-const DETAIL_TAIL: Shortcut[] = [
-  { key: 'o', label: 'open folder', compactLabel: 'open' },
-];
+const DETAIL_TAIL: Shortcut[] = [{ key: 'o', label: 'open folder', compactLabel: 'open' }];
 
 interface ShortcutContext {
   view: ViewType;
@@ -83,13 +81,13 @@ export function getShortcutsForView({ view, selectedSkill, canToggle }: Shortcut
   const isRemovable = selectedSkill?.provider === 'global' && sourceType === 'skillssh';
   const detailBase = canToggle
     ? [
-      ...DETAIL_BASE,
-      {
-        key: 'space',
-        label: selectedSkill?.origin?.type === 'plugin' ? 'toggle plugin' : 'toggle',
-        compactLabel: 'toggle',
-      },
-    ]
+        ...DETAIL_BASE,
+        {
+          key: 'space',
+          label: selectedSkill?.origin?.type === 'plugin' ? 'toggle plugin' : 'toggle',
+          compactLabel: 'toggle',
+        },
+      ]
     : DETAIL_BASE;
   const tail = isRemovable ? [...DETAIL_TAIL, { key: 'd', label: 'delete' }] : DETAIL_TAIL;
 

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Build and test
+    name: Check, test, and build
     runs-on: ubuntu-latest
 
     steps:
@@ -28,14 +28,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.18.0
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm build
+      - name: Check
+        run: pnpm check:ci
 
       - name: Test
-        run: pnpm test
+        run: pnpm test:ci
+
+      - name: Build and verify package
+        run: pnpm build:ci

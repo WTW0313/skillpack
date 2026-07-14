@@ -16,17 +16,13 @@ export function TabBar({ tabs, activeTab, counts }: TabBarProps) {
         return (
           <Box key={tab}>
             {i > 0 && <Text dimColor> │ </Text>}
-            <Text
-              color={isActive ? 'white' : undefined}
-              bold={isActive}
-              dimColor={!isActive}
-              underline={isActive}
-            >
+            <Text color={isActive ? 'white' : undefined} bold={isActive} dimColor={!isActive} underline={isActive}>
               {tab}
             </Text>
             {count !== undefined && (
               <Text dimColor={!isActive} color={isActive ? 'white' : undefined}>
-                {' '}{count}
+                {' '}
+                {count}
               </Text>
             )}
           </Box>

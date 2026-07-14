@@ -42,8 +42,14 @@ export function InstallView() {
 
   useInput((_input, key) => {
     if (key.escape) {
-      if (step === 'query') { setView('list'); return; }
-      if (step === 'results') { setStep('query'); return; }
+      if (step === 'query') {
+        setView('list');
+        return;
+      }
+      if (step === 'results') {
+        setStep('query');
+        return;
+      }
       return;
     }
 
@@ -53,7 +59,10 @@ export function InstallView() {
       if (key.downArrow) setCursor((c) => Math.min(c + 1, Math.max(0, results.length - 1)));
       if (key.upArrow) setCursor((c) => Math.max(c - 1, 0));
       if (key.return && results[cursor]) {
-        doInstall(results[cursor].identifier);
+        doInstall(results[cursor].identifier).catch((err) => {
+          setError(err instanceof Error ? err.message : String(err));
+          setStep('results');
+        });
       }
     }
   });
@@ -79,14 +88,9 @@ export function InstallView() {
 
   const doInstall = async (identifier: string) => {
     setStep('installing');
-    try {
-      await manager.installFromSource('skillssh', identifier, 'global');
-      await refresh();
-      setView('list');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setStep('results');
-    }
+    await manager.installFromSource('skillssh', identifier, 'global');
+    await refresh();
+    setView('list');
   };
 
   const stepLabels = ['query', 'results'];
@@ -96,8 +100,10 @@ export function InstallView() {
     <Box flexDirection="column" flexGrow={1} padding={1}>
       {/* Header */}
       <Box>
-        <Text dimColor>‹ esc  </Text>
-        <Text bold color="magenta">Install Skill</Text>
+        <Text dimColor>‹ esc{'  '}</Text>
+        <Text bold color="magenta">
+          Install Skill
+        </Text>
       </Box>
 
       {/* Progress breadcrumb */}
@@ -126,14 +132,15 @@ export function InstallView() {
         <Box flexDirection="column" marginTop={1}>
           <Text dimColor>Search skills.sh</Text>
           {searching ? (
-            <Box marginTop={1}><Spinner label="Searching…" /></Box>
+            <Box marginTop={1}>
+              <Spinner label="Searching…" />
+            </Box>
           ) : (
             <Box marginTop={1}>
-              <Text color="magenta" bold>{glyphs.selected} </Text>
-              <TextInput
-                placeholder="search keyword…"
-                onSubmit={handleQuerySubmit}
-              />
+              <Text color="magenta" bold>
+                {glyphs.selected}{' '}
+              </Text>
+              <TextInput placeholder="search keyword…" onSubmit={handleQuerySubmit} />
             </Box>
           )}
         </Box>
@@ -141,7 +148,9 @@ export function InstallView() {
 
       {step === 'results' && (
         <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>{results.length} result{results.length !== 1 ? 's' : ''}</Text>
+          <Text dimColor>
+            {results.length} result{results.length !== 1 ? 's' : ''}
+          </Text>
           <Box flexDirection="column" marginTop={1} height={resultRows}>
             {results.length === 0 ? (
               <Text dimColor>Nothing found. Press esc to try again.</Text>
@@ -153,17 +162,28 @@ export function InstallView() {
                     <Text color={absoluteIndex === cursor ? 'magenta' : undefined}>
                       {absoluteIndex === cursor ? glyphs.selected : ' '}
                     </Text>
-                    <Text bold={absoluteIndex === cursor} color={absoluteIndex === cursor ? 'white' : undefined} dimColor={absoluteIndex !== cursor}>
+                    <Text
+                      bold={absoluteIndex === cursor}
+                      color={absoluteIndex === cursor ? 'white' : undefined}
+                      dimColor={absoluteIndex !== cursor}
+                    >
                       {fitCell(r.name, resultNameWidth)}
                     </Text>
-                    {r.description && <Text dimColor wrap="truncate"> {r.description}</Text>}
+                    {r.description && (
+                      <Text dimColor wrap="truncate">
+                        {' '}
+                        {r.description}
+                      </Text>
+                    )}
                   </Box>
                 );
               })
             )}
           </Box>
           {results.length > resultRows && (
-            <Text dimColor>{scrollOffset + 1}-{Math.min(scrollOffset + resultRows, results.length)} of {results.length}</Text>
+            <Text dimColor>
+              {scrollOffset + 1}-{Math.min(scrollOffset + resultRows, results.length)} of {results.length}
+            </Text>
           )}
         </Box>
       )}

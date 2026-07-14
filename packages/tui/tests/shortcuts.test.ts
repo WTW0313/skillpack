@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { getShortcutsForView } from '../src/lib/shortcuts.js';
 import type { SkillInventoryInstance } from '@skillpack/core';
 

@@ -22,7 +22,9 @@ export function useTerminalSize() {
       setSize({ columns: stdout.columns, rows: stdout.rows });
     };
     stdout.on('resize', onResize);
-    return () => { stdout.off('resize', onResize); };
+    return () => {
+      stdout.off('resize', onResize);
+    };
   }, [stdout]);
 
   return override ?? size;

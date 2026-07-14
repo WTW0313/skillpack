@@ -10,7 +10,7 @@ Unified TUI manager for agent skills across Codex, Claude, and Global (`~/.agent
 - **Project Skills** — scans read-only project skill directories (`.codex/skills`, `.claude/skills`, `.agents/skills`) in a separate view
 - **Provider-native availability** — reads provider config when available and uses `.disabled-` renaming only as a fallback
 - **Skill Inventory** — groups provider instances by Skill Identity and surfaces deterministic Health Signals
-- **Skill Usage** — derives aggregate Codex skill usage from local session artifacts after explicit consent
+- **Skill Usage** — derives aggregate Codex and Claude skill usage from local session artifacts after explicit consent
 - **skills.sh installs** — installs, updates, and removes Global Skills through the skills.sh CLI
 - **Manual updates** — checks updates only when requested
 - **Fuzzy search** — filter skills by name or description
@@ -39,6 +39,21 @@ pnpm install
 pnpm build
 node packages/tui/dist/skillpack.js
 ```
+
+## Development
+
+Contributing requires a Vite+-supported Node.js release (20.19+, 22.18+, or 24.11+) and pnpm 11. The published CLI still supports Node.js 18 and newer.
+
+```bash
+pnpm check          # format check, type-aware lint, and type check
+pnpm format         # format supported source and config files
+pnpm lint           # type-aware lint and type check
+pnpm test           # run all package tests once
+pnpm build          # package Core and the TUI
+pnpm dev            # build Core, then watch the TUI package
+```
+
+CI uses the explicit `pnpm check:ci`, `pnpm test:ci`, and `pnpm build:ci` entry points. The final command also verifies the Core exports, CLI shebang and executable bit, ESM syntax, source-map policy, and npm package contents.
 
 ## Quick Start
 
@@ -129,7 +144,7 @@ Skillpack stores its configuration at `~/.config/skillpack/config.json`. On firs
 }
 ```
 
-`usage.importConsent` defaults to `false`. When enabled from the TUI, Skillpack imports supported provider artifacts into derived JSONL records under `~/.local/share/skillpack/usage/`. The current importer supports Codex session artifacts. Claude appears in the Usage view for coverage, but Claude usage import is not supported yet.
+`usage.importConsent` defaults to `false`. When enabled from the TUI, Skillpack imports supported Codex and Claude artifacts into derived JSONL records under `~/.local/share/skillpack/usage/`. Claude usage is derived from structured `Skill` tool calls that match user-level or plugin-provided skills in configured Claude Scan Roots. Built-In Skills and Claude Project Skills are not counted in the current Claude adapter.
 
 The Settings view shows both Scan Roots and Usage Artifact Roots so you can verify which local directories Skillpack will inspect.
 

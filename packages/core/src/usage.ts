@@ -2,10 +2,17 @@ import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { deriveCodexUsageEvidence } from './codex-usage-evidence.js';
+import { parseSkillMd } from './parser.js';
+import { isSupportedClaudeArtifactPath } from './usage-paths.js';
 
-const USAGE_IMPORTER_VERSION = 6;
+const USAGE_IMPORTER_VERSIONS: Readonly<Record<string, number>> = {
+  codex: 9,
+  claude: 8,
+};
 
 export type UsageCoverageState = 'unsupported' | 'not-configured' | 'zero' | 'active';
+export type UsageCoverageReason = 'missing-artifact-roots' | 'missing-attribution-roots' | 'provider-not-configured';
 export type SkillInvocationStatus = 'loaded' | 'used' | 'failed' | 'unknown';
 
 export interface SkillUsageProviderConfig {
@@ -14,6 +21,7 @@ export interface SkillUsageProviderConfig {
   supported: boolean;
   configured?: boolean;
   artifactRoots?: string[];
+  skillRoots?: string[];
 }
 
 export interface SkillUsageOverviewInput {
@@ -100,33 +108,46 @@ interface UsageImportCursor {
   provider: string;
   importerVersion?: number;
   stale?: boolean;
-  artifacts: Record<string, {
-    size: number;
-    mtimeMs: number;
-  }>;
+  artifacts: Record<
+    string,
+    {
+      size: number;
+      mtimeMs: number;
+    }
+  >;
 }
 
 interface ParsedInvocationResult {
   records: SkillInvocationRecord[];
   ambiguousLineNumbers: number[];
+  diagnostics?: UsageImportDiagnostic[];
 }
 
-interface CodexSkillReadCandidate {
-  callId: string;
-  lineIndex: number;
-  sessionId: string;
-  turnId: string;
-  startedAt: string;
-  endedAt?: string;
-  rawSkillPath: string;
+interface ClaudeSkillCandidate {
+  name: string;
   skillPath: string;
-  statusHint?: SkillInvocationStatus;
+  resolvedPath: string;
+}
+
+interface ParsedJsonlRecord {
+  lineIndex: number;
+  value: Record<string, unknown>;
+}
+
+interface ProviderSkillUsageAccumulator {
+  row: Omit<ProviderSkillUsageRow, 'sourcePath'>;
+  recordCount: number;
+  providerPathCount: number;
+  providerPaths: Set<string>;
+  resolvedPathCount: number;
+  resolvedPaths: Set<string>;
 }
 
 export interface ProviderSkillUsageOverview {
   provider: string;
   displayName: string;
   coverageState: UsageCoverageState;
+  coverageReasons: UsageCoverageReason[];
   heatmap: SkillUsageHeatmapCell[];
   dailySkillUsage: ProviderSkillDailyUsage[];
   ranking: ProviderSkillRankingRow[];
@@ -157,12 +178,16 @@ export class SkillUsageManager {
     const diagnostics: UsageImportDiagnostic[] = [];
     let skippedArtifacts = 0;
     const records: SkillInvocationRecord[] = [];
+    const claudeSkills =
+      provider.provider === 'claude' ? await readClaudeSkillCandidates(provider.skillRoots ?? []) : [];
     const cursor = await this.readCursor(provider.provider);
-    if (cursor.stale) await rm(path.join(this.dataDir, 'invocations', provider.provider), { recursive: true, force: true });
+    if (cursor.stale)
+      await rm(path.join(this.dataDir, 'invocations', provider.provider), { recursive: true, force: true });
     const nextCursor: UsageImportCursor = {
       provider: provider.provider,
       artifacts: { ...cursor.artifacts },
     };
+    const seenRealArtifacts = new Set<string>();
 
     for (const root of provider.artifactRoots ?? []) {
       const files = await listJsonlFiles(root).catch((err) => {
@@ -179,6 +204,26 @@ export class SkillUsageManager {
         if (!metadata) continue;
         const cursorEntry = cursor.artifacts[file];
         if (cursorEntry?.size === metadata.size && cursorEntry.mtimeMs === metadata.mtimeMs) continue;
+        if (provider.provider === 'claude' && !isSupportedClaudeArtifactPath(root, file)) {
+          skippedArtifacts += 1;
+          diagnostics.push({
+            provider: provider.provider,
+            message: `Skipped unsupported Claude artifact path: ${path.relative(root, file)}`,
+          });
+          nextCursor.artifacts[file] = { size: metadata.size, mtimeMs: metadata.mtimeMs };
+          continue;
+        }
+        const realArtifactPath = await realpath(file).catch((err) => {
+          diagnostics.push({ provider: provider.provider, message: err instanceof Error ? err.message : String(err) });
+          skippedArtifacts += 1;
+          return null;
+        });
+        if (!realArtifactPath) continue;
+        if (seenRealArtifacts.has(realArtifactPath)) {
+          nextCursor.artifacts[file] = { size: metadata.size, mtimeMs: metadata.mtimeMs };
+          continue;
+        }
+        seenRealArtifacts.add(realArtifactPath);
 
         const content = await readFile(file, 'utf-8').catch((err) => {
           diagnostics.push({ provider: provider.provider, message: err instanceof Error ? err.message : String(err) });
@@ -188,8 +233,12 @@ export class SkillUsageManager {
         if (!content) continue;
 
         const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
-        const result = await parseCodexInvocationLines(provider.provider, file, lines, currentSkills);
+        const result =
+          provider.provider === 'claude'
+            ? await parseClaudeInvocationLines(provider.provider, file, lines, claudeSkills, currentSkills)
+            : await parseCodexInvocationLines(provider.provider, file, lines, currentSkills);
         records.push(...result.records);
+        diagnostics.push(...(result.diagnostics ?? []));
         for (const lineNumber of result.ambiguousLineNumbers) {
           skippedArtifacts += 1;
           diagnostics.push({
@@ -217,6 +266,7 @@ export class SkillUsageManager {
     const results: SkillUsageImportResult[] = [];
     for (const provider of this.providers) {
       if (!provider.supported || !provider.artifactRoots?.length) continue;
+      if (provider.provider === 'claude' && !provider.skillRoots?.length) continue;
       results.push(await this.importProvider(provider.provider, currentSkills));
     }
     return results;
@@ -232,32 +282,37 @@ export class SkillUsageManager {
     const range = buildRange(input.rangeDays, input.now ?? new Date());
     return {
       range,
-      providers: await Promise.all(this.providers.map(async (provider) => {
-        if (!provider.supported) {
+      providers: await Promise.all(
+        this.providers.map(async (provider) => {
+          const coverageReasons = coverageReasonsFor(provider);
+          if (!provider.supported) {
+            return {
+              provider: provider.provider,
+              displayName: provider.displayName,
+              coverageState: coverageStateFor(provider, 0),
+              coverageReasons,
+              heatmap: [],
+              dailySkillUsage: [],
+              ranking: [],
+              diagnostics: this.latestDiagnostics.get(provider.provider) ?? [],
+            };
+          }
+          const records = await this.readProviderRecords(provider.provider, range);
+          const heatmap = buildHeatmap(records, range);
+          const dailySkillUsage = buildDailySkillUsage(records, range);
+          const ranking = buildRanking(records);
           return {
             provider: provider.provider,
             displayName: provider.displayName,
-            coverageState: coverageStateFor(provider, 0),
-            heatmap: [],
-            dailySkillUsage: [],
-            ranking: [],
+            coverageState: coverageStateFor(provider, records.length),
+            coverageReasons,
+            heatmap,
+            dailySkillUsage,
+            ranking,
             diagnostics: this.latestDiagnostics.get(provider.provider) ?? [],
           };
-        }
-        const records = await this.readProviderRecords(provider.provider, range);
-        const heatmap = buildHeatmap(records, range);
-        const dailySkillUsage = buildDailySkillUsage(records, range);
-        const ranking = buildRanking(records);
-        return {
-          provider: provider.provider,
-          displayName: provider.displayName,
-          coverageState: coverageStateFor(provider, records.length),
-          heatmap,
-          dailySkillUsage,
-          ranking,
-          diagnostics: this.latestDiagnostics.get(provider.provider) ?? [],
-        };
-      })),
+        }),
+      ),
     };
   }
 
@@ -273,10 +328,11 @@ export class SkillUsageManager {
     for (const [partition, partitionRecords] of byPartition) {
       await mkdir(path.dirname(partition), { recursive: true });
       const existing = await readFile(partition, 'utf-8').catch(() => '');
-      const seen = existingRecordIds(existing);
+      const latest = latestSerializedRecords(existing);
       const newRecords = partitionRecords.filter((record) => {
-        if (seen.has(record.recordId)) return false;
-        seen.add(record.recordId);
+        const serialized = JSON.stringify(record);
+        if (latest.get(record.recordId) === serialized) return false;
+        latest.set(record.recordId, serialized);
         return true;
       });
       if (newRecords.length === 0) continue;
@@ -290,36 +346,39 @@ export class SkillUsageManager {
 
   private async readProviderRecords(provider: string, range: SkillUsageRange): Promise<SkillInvocationRecord[]> {
     const dir = path.join(this.dataDir, 'invocations', provider);
-    const files = await listJsonlFiles(dir).catch(() => []);
-    const records: SkillInvocationRecord[] = [];
+    const files = [...new Set(datesInRange(range).map((date) => date.slice(0, 7)))].map((month) =>
+      path.join(dir, `${month}.jsonl`),
+    );
+    const latestRecords = new Map<string, SkillInvocationRecord>();
 
-    for (const file of files) {
+    for (const file of files.sort()) {
       const content = await readFile(file, 'utf-8').catch(() => '');
       for (const line of content.split(/\r?\n/)) {
         if (!line.trim()) continue;
         try {
           const record = JSON.parse(line) as SkillInvocationRecord;
           const date = record.startedAt.slice(0, 10);
-          if (date >= range.from && date <= range.to) records.push(record);
+          if (date >= range.from && date <= range.to) latestRecords.set(record.recordId, record);
         } catch {
           // Ignore malformed derived records; provider import diagnostics cover source artifacts.
         }
       }
     }
 
-    return records;
+    return [...latestRecords.values()];
   }
 
   private async readCursor(provider: string): Promise<UsageImportCursor> {
     const cursorPath = path.join(this.dataDir, 'cursors', `${provider}.json`);
     const content = await readFile(cursorPath, 'utf-8').catch(() => '');
     if (!content) return { provider, artifacts: {} };
+    const importerVersion = usageImporterVersion(provider);
     try {
       const cursor = JSON.parse(content) as UsageImportCursor;
-      if (cursor.importerVersion !== USAGE_IMPORTER_VERSION) return { provider, stale: true, artifacts: {} };
+      if (cursor.importerVersion !== importerVersion) return { provider, stale: true, artifacts: {} };
       return {
         provider,
-        importerVersion: USAGE_IMPORTER_VERSION,
+        importerVersion,
         artifacts: cursor.artifacts ?? {},
       };
     } catch {
@@ -330,21 +389,40 @@ export class SkillUsageManager {
   private async writeCursor(provider: string, cursor: UsageImportCursor): Promise<void> {
     const cursorPath = path.join(this.dataDir, 'cursors', `${provider}.json`);
     await mkdir(path.dirname(cursorPath), { recursive: true });
-    await writeFile(cursorPath, JSON.stringify({
-      ...cursor,
-      provider,
-      importerVersion: USAGE_IMPORTER_VERSION,
-    }, null, 2) + '\n', 'utf-8');
+    await writeFile(
+      cursorPath,
+      JSON.stringify(
+        {
+          ...cursor,
+          provider,
+          importerVersion: usageImporterVersion(provider),
+        },
+        null,
+        2,
+      ) + '\n',
+      'utf-8',
+    );
   }
+}
 
+function usageImporterVersion(provider: string): number {
+  return USAGE_IMPORTER_VERSIONS[provider] ?? 8;
 }
 
 function coverageStateFor(provider: SkillUsageProviderConfig, recordCount = 0): UsageCoverageState {
   if (!provider.supported) return 'unsupported';
-  if (!provider.artifactRoots?.length) return 'not-configured';
-  if (provider.configured === false) return 'not-configured';
+  if (coverageReasonsFor(provider).length > 0) return 'not-configured';
   if (recordCount > 0) return 'active';
   return 'zero';
+}
+
+function coverageReasonsFor(provider: SkillUsageProviderConfig): UsageCoverageReason[] {
+  if (!provider.supported) return [];
+  const reasons: UsageCoverageReason[] = [];
+  if (!provider.artifactRoots?.length) reasons.push('missing-artifact-roots');
+  if (provider.provider === 'claude' && !provider.skillRoots?.length) reasons.push('missing-attribution-roots');
+  if (provider.configured === false) reasons.push('provider-not-configured');
+  return reasons;
 }
 
 function buildRange(days: 7 | 30 | 90, now: Date): SkillUsageRange {
@@ -367,23 +445,18 @@ function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function recordInRange(record: SkillInvocationRecord, range: SkillUsageRange): boolean {
-  const date = record.startedAt.slice(0, 10);
-  return date >= range.from && date <= range.to;
-}
-
-function existingRecordIds(content: string): Set<string> {
-  const ids = new Set<string>();
+function latestSerializedRecords(content: string): Map<string, string> {
+  const records = new Map<string, string>();
   for (const line of content.split(/\r?\n/)) {
     if (!line.trim()) continue;
     try {
       const value = JSON.parse(line) as { recordId?: unknown };
-      if (typeof value.recordId === 'string') ids.add(value.recordId);
+      if (typeof value.recordId === 'string') records.set(value.recordId, JSON.stringify(value));
     } catch {
       // Ignore malformed derived records when deduplicating new writes.
     }
   }
-  return ids;
+  return records;
 }
 
 async function listJsonlFiles(root: string): Promise<string[]> {
@@ -391,11 +464,13 @@ async function listJsonlFiles(root: string): Promise<string[]> {
     if (isNodeError(err) && err.code === 'ENOENT') return [];
     throw err;
   });
-  const files = await Promise.all(entries.map(async (entry) => {
-    const entryPath = path.join(root, entry.name);
-    if (entry.isDirectory()) return listJsonlFiles(entryPath);
-    return entry.isFile() && entry.name.endsWith('.jsonl') ? [entryPath] : [];
-  }));
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(root, entry.name);
+      if (entry.isDirectory()) return listJsonlFiles(entryPath);
+      return (entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith('.jsonl') ? [entryPath] : [];
+    }),
+  );
   return files.flat();
 }
 
@@ -406,122 +481,63 @@ async function parseCodexInvocationLines(
   currentSkills?: CurrentSkillReference[],
 ): Promise<ParsedInvocationResult> {
   const ambiguousLineNumbers: number[] = [];
-  const candidates: CodexSkillReadCandidate[] = [];
-  const outputs = new Map<string, { output: string; endedAt?: string }>();
-  let sessionId = path.basename(sourceFile, '.jsonl');
-  let currentTurnId = sessionId;
-  let cwd: string | undefined;
-
-  for (const [index, line] of lines.entries()) {
-    let value: unknown;
-    try {
-      value = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (!isRecord(value)) continue;
-
-    const payload = isRecord(value.payload) ? value.payload : {};
-    if (value.type === 'session_meta') {
-      sessionId = stringValue(payload.session_id) ?? stringValue(payload.id) ?? sessionId;
-      currentTurnId = sessionId;
-      cwd = stringValue(payload.cwd) ?? cwd;
-      continue;
-    }
-    if (value.type === 'event_msg' && stringValue(payload.type) === 'task_started') {
-      currentTurnId = stringValue(payload.turn_id) ?? currentTurnId;
-      continue;
-    }
-    if (value.type === 'turn_context') {
-      currentTurnId = stringValue(payload.turn_id) ?? currentTurnId;
-      cwd = stringValue(payload.cwd) ?? cwd;
-      continue;
-    }
-    if (value.type !== 'response_item') continue;
-
-    const payloadType = stringValue(payload.type);
-    if (payloadType === 'function_call') {
-      const callId = stringValue(payload.call_id);
-      const toolName = stringValue(payload.name);
-      const startedAt = stringValue(value.timestamp);
-      if (!callId || toolName !== 'exec_command' || !startedAt) continue;
-
-      const command = parseExecCommand(payload);
-      if (!command?.cmd) continue;
-      const skillPaths = extractDirectSkillReadPaths(command.cmd);
-      if (skillPaths.length === 0) continue;
-
-      const commandCwd = resolveCommandCwd(command.workdir, cwd);
-      for (const rawSkillPath of skillPaths) {
-        const skillPath = resolveSkillPath(rawSkillPath, commandCwd);
-        candidates.push({
-          callId,
-          lineIndex: index,
-          sessionId,
-          turnId: currentTurnId,
-          startedAt,
-          rawSkillPath,
-          skillPath,
-          statusHint: normalizeStatus(stringValue(payload.status)),
-        });
-      }
-    } else if (payloadType === 'function_call_output') {
-      const callId = stringValue(payload.call_id);
-      const output = stringValue(payload.output);
-      const endedAt = stringValue(value.timestamp);
-      if (callId && output) outputs.set(callId, { output, endedAt });
-    }
-  }
+  const evidence = deriveCodexUsageEvidence({ sourceFile, lines });
 
   const recordsByTurnAndSkill = new Map<string, SkillInvocationRecord>();
-  for (const candidate of candidates) {
-    const skillIdentity = await readSkillIdentity(candidate.skillPath, candidate.rawSkillPath);
+  for (const candidate of evidence.reads) {
+    const skillIdentity = await readSkillIdentity(candidate.skillPath);
     const skillName = skillIdentity.name;
     if (!skillName || !candidate.sessionId || !candidate.turnId || !candidate.startedAt) {
       ambiguousLineNumbers.push(candidate.lineIndex + 1);
       continue;
     }
-    const evidence = statusFromToolOutput(outputs.get(candidate.callId), candidate.statusHint);
-    const sourcePath = sourcePathForRecord({
+    const sourceIdentity = skillSourceIdentity({
+      provider,
       skillPath: candidate.skillPath,
       resolvedPath: skillIdentity.resolvedPath,
     });
-    const recordKey = `${candidate.turnId}\0${skillName}\0${sourcePath ?? ''}`;
+    const recordKey = `${candidate.turnId}\0${skillName}\0${sourceIdentity}`;
     const existing = recordsByTurnAndSkill.get(recordKey);
     if (existing) {
-      existing.status = mergeInvocationStatus(existing.status, evidence.status);
+      existing.status = mergeInvocationStatus(existing.status, candidate.status);
       if (candidate.startedAt < existing.startedAt) existing.startedAt = candidate.startedAt;
-      if (evidence.endedAt && (!existing.endedAt || evidence.endedAt > existing.endedAt)) existing.endedAt = evidence.endedAt;
+      if (candidate.endedAt && (!existing.endedAt || candidate.endedAt > existing.endedAt))
+        existing.endedAt = candidate.endedAt;
       if (skillIdentity.confirmed) {
-        existing.skillPath = candidate.skillPath;
-        existing.resolvedPath = skillIdentity.resolvedPath;
+        if (existing.identityConfidence === 'confirmed') {
+          existing.skillPath = commonPathEvidence(existing.skillPath, candidate.skillPath);
+          existing.resolvedPath = commonPathEvidence(existing.resolvedPath, skillIdentity.resolvedPath);
+        } else {
+          existing.skillPath = candidate.skillPath;
+          existing.resolvedPath = skillIdentity.resolvedPath;
+        }
         existing.identityConfidence = 'confirmed';
       }
-      existing.source ??= findCurrentSkillSource({
+      existing.source ??= findCurrentSkillSource(
+        {
+          provider,
+          skillName,
+          skillPath: candidate.skillPath,
+          resolvedPath: skillIdentity.resolvedPath,
+        },
+        currentSkills,
+      );
+      continue;
+    }
+
+    const source = findCurrentSkillSource(
+      {
         provider,
         skillName,
         skillPath: candidate.skillPath,
         resolvedPath: skillIdentity.resolvedPath,
-      }, currentSkills);
-      continue;
-    }
-
-    const source = findCurrentSkillSource({
-      provider,
-      skillName,
-      skillPath: candidate.skillPath,
-      resolvedPath: skillIdentity.resolvedPath,
-    }, currentSkills);
+      },
+      currentSkills,
+    );
 
     recordsByTurnAndSkill.set(recordKey, {
       schemaVersion: 1,
-      recordId: invocationRecordId(
-        provider,
-        candidate.sessionId,
-        candidate.turnId,
-        skillName,
-        sourcePath,
-      ),
+      recordId: invocationRecordId(provider, candidate.sessionId, candidate.turnId, skillName, sourceIdentity),
       provider,
       sessionId: candidate.sessionId,
       turnId: candidate.turnId,
@@ -530,86 +546,216 @@ async function parseCodexInvocationLines(
       resolvedPath: skillIdentity.resolvedPath,
       source,
       identityConfidence: skillIdentity.confirmed ? 'confirmed' : 'inferred',
-      status: evidence.status,
+      status: candidate.status,
       startedAt: candidate.startedAt,
-      endedAt: evidence.endedAt ?? null,
+      endedAt: candidate.endedAt ?? null,
     });
   }
 
-  return { records: [...recordsByTurnAndSkill.values()], ambiguousLineNumbers };
+  const diagnostics = evidence.findings.map((finding) => ({
+    provider,
+    message: `Skipped ${finding.count} potential Codex Skill invocation${finding.count === 1 ? '' : 's'} in ${path.basename(sourceFile)}: ${finding.reason}`,
+  }));
+  return { records: [...recordsByTurnAndSkill.values()], ambiguousLineNumbers, diagnostics };
 }
 
-function parseExecCommand(payload: Record<string, unknown>): { cmd: string; workdir?: string } | undefined {
-  const raw = stringValue(payload.arguments) ?? stringValue(payload.input);
-  if (!raw) return undefined;
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch {
-    return undefined;
+async function parseClaudeInvocationLines(
+  provider: string,
+  sourceFile: string,
+  lines: string[],
+  skillCandidates: ClaudeSkillCandidate[],
+  currentSkills?: CurrentSkillReference[],
+): Promise<ParsedInvocationResult> {
+  const records: SkillInvocationRecord[] = [];
+  const unmatchedCounts = new Map<string, number>();
+  const realArtifactPath = await realpath(sourceFile).catch(() => sourceFile);
+  const toolResults = new Map<string, { failed: boolean; endedAt?: string }>();
+  let missingTimestampCount = 0;
+  const parsed = parseJsonlRecords(lines);
+
+  for (const { value } of parsed.records) {
+    const message = isRecord(value.message) ? value.message : undefined;
+    if (!message || !Array.isArray(message.content)) continue;
+    for (const block of message.content) {
+      if (!isRecord(block) || block.type !== 'tool_result') continue;
+      const toolUseId = stringValue(block.tool_use_id);
+      if (!toolUseId) continue;
+      toolResults.set(toolUseId, {
+        failed: block.is_error === true,
+        endedAt: stringValue(value.timestamp),
+      });
+    }
   }
-  if (!isRecord(value)) return undefined;
-  const cmd = stringValue(value.cmd);
-  if (!cmd) return undefined;
+
+  for (const { lineIndex, value } of parsed.records) {
+    if (value.type !== 'assistant') continue;
+    const message = isRecord(value.message) ? value.message : undefined;
+    if (!message || message.role !== 'assistant' || !Array.isArray(message.content)) continue;
+    const startedAt = stringValue(value.timestamp);
+    if (!isValidInvocationTimestamp(startedAt)) {
+      missingTimestampCount += message.content.filter((block) => claudeSkillName(block) !== undefined).length;
+      continue;
+    }
+    const sessionId =
+      stringValue(value.sessionId) ?? stringValue(value.session_id) ?? path.basename(sourceFile, '.jsonl');
+    const messageId = stringValue(value.uuid) ?? stringValue(message.id) ?? `${sessionId}:${lineIndex + 1}`;
+
+    for (const [blockIndex, block] of message.content.entries()) {
+      const skillName = claudeSkillName(block);
+      if (!skillName) continue;
+      const matches = skillCandidates.filter((candidate) => candidate.name === skillName);
+      if (matches.length === 0) {
+        unmatchedCounts.set(skillName, (unmatchedCounts.get(skillName) ?? 0) + 1);
+        continue;
+      }
+      const sourceMatch = resolveClaudeSkillSource(matches);
+      const toolUseId = stringValue(block.id) ?? `${messageId}:${blockIndex}`;
+      const toolResult = toolResults.get(toolUseId);
+      records.push({
+        schemaVersion: 1,
+        recordId: claudeInvocationRecordId(provider, realArtifactPath, sessionId, messageId, toolUseId),
+        provider,
+        sessionId,
+        turnId: messageId,
+        skillName,
+        skillPath: sourceMatch.skillPath,
+        resolvedPath: sourceMatch.resolvedPath,
+        source: sourceMatch.confirmed
+          ? findCurrentSkillSource({ provider, skillName, ...sourceMatch }, currentSkills)
+          : undefined,
+        identityConfidence: sourceMatch.confirmed ? 'confirmed' : 'inferred',
+        status: toolResult?.failed ? 'failed' : 'used',
+        startedAt,
+        endedAt: toolResult?.endedAt ?? null,
+      });
+    }
+  }
+
+  const diagnostics: UsageImportDiagnostic[] = [];
+  if (parsed.malformedLineCount > 0) {
+    diagnostics.push({
+      provider,
+      message: `Skipped ${parsed.malformedLineCount} malformed JSONL line${parsed.malformedLineCount === 1 ? '' : 's'} in ${path.basename(sourceFile)}`,
+    });
+  }
+  if (missingTimestampCount > 0) {
+    diagnostics.push({
+      provider,
+      message: `Skipped ${missingTimestampCount} Claude Skill invocation${missingTimestampCount === 1 ? '' : 's'} in ${path.basename(sourceFile)}: missing or invalid assistant timestamp`,
+    });
+  }
+  diagnostics.push(
+    ...[...unmatchedCounts.entries()].map(([skillName, count]) => ({
+      provider,
+      message: `Skipped ${count} Claude Skill invocation${count === 1 ? '' : 's'} for "${skillName}" in ${path.basename(sourceFile)}: no eligible user-level or plugin source`,
+    })),
+  );
+
   return {
-    cmd,
-    workdir: stringValue(value.workdir),
+    records,
+    ambiguousLineNumbers: [],
+    diagnostics,
   };
 }
 
-function extractDirectSkillReadPaths(command: string): string[] {
-  const paths: string[] = [];
-  const segments = command.split(/\s*(?:&&|\|\||;|\n)\s*/);
-  for (const segment of segments) {
-    const commandName = basenameOfCommand(firstShellToken(segment));
-    if (!isDirectFileReadCommand(commandName)) continue;
-    paths.push(...extractSkillPaths(segment));
+function claudeSkillName(block: unknown): string | undefined {
+  if (!isRecord(block) || block.type !== 'tool_use' || block.name !== 'Skill' || !isRecord(block.input)) {
+    return undefined;
   }
-  return paths;
+  return stringValue(block.input.skill)?.trim() || undefined;
 }
 
-function firstShellToken(segment: string): string | undefined {
-  return segment.trim().match(/^(\S+)/)?.[1];
-}
-
-function basenameOfCommand(command: string | undefined): string | undefined {
-  if (!command) return undefined;
-  return path.basename(command);
-}
-
-function isDirectFileReadCommand(command: string | undefined): boolean {
-  return command === 'cat'
-    || command === 'sed'
-    || command === 'nl'
-    || command === 'head'
-    || command === 'tail'
-    || command === 'bat';
-}
-
-function extractSkillPaths(segment: string): string[] {
-  const paths: string[] = [];
-  const pathPattern = /(?:^|\s|['"])(~?\.?\.?\/?[^'"\s]*\/skills\/[^'"\s]+\/SKILL\.md)(?=$|\s|['"])/g;
-  for (const match of segment.matchAll(pathPattern)) {
-    const skillPath = match[1];
-    if (!skillPath.includes('<') && !skillPath.includes('>')) paths.push(skillPath);
+function parseJsonlRecords(lines: string[]): { records: ParsedJsonlRecord[]; malformedLineCount: number } {
+  const records: ParsedJsonlRecord[] = [];
+  let malformedLineCount = 0;
+  for (const [lineIndex, line] of lines.entries()) {
+    try {
+      const value: unknown = JSON.parse(line);
+      if (isRecord(value)) records.push({ lineIndex, value });
+    } catch {
+      malformedLineCount += 1;
+    }
   }
-  return paths;
+  return { records, malformedLineCount };
 }
 
-function resolveCommandCwd(workdir: string | undefined, cwd: string | undefined): string | undefined {
-  if (!workdir) return cwd;
-  if (path.isAbsolute(workdir)) return workdir;
-  return cwd ? path.resolve(cwd, workdir) : path.resolve(workdir);
+function resolveClaudeSkillSource(matches: ClaudeSkillCandidate[]): {
+  skillPath?: string;
+  resolvedPath?: string;
+  confirmed: boolean;
+} {
+  const resolvedPaths = [...new Set(matches.map((candidate) => candidate.resolvedPath))];
+  if (resolvedPaths.length !== 1) return { confirmed: false };
+  return {
+    skillPath: matches.length === 1 ? matches[0].skillPath : undefined,
+    resolvedPath: resolvedPaths[0],
+    confirmed: true,
+  };
 }
 
-function resolveSkillPath(rawSkillPath: string, cwd: string | undefined): string {
-  if (rawSkillPath === '~') return os.homedir();
-  if (rawSkillPath.startsWith('~/')) return path.join(os.homedir(), rawSkillPath.slice(2));
-  if (path.isAbsolute(rawSkillPath)) return path.normalize(rawSkillPath);
-  return path.resolve(cwd ?? process.cwd(), rawSkillPath);
+function claudeInvocationRecordId(
+  provider: string,
+  realArtifactPath: string,
+  sessionId: string,
+  messageId: string,
+  toolUseId: string,
+): string {
+  return createHash('sha256')
+    .update(JSON.stringify({ provider, realArtifactPath, sessionId, messageId, toolUseId }))
+    .digest('hex');
 }
 
-async function readSkillIdentity(skillPath: string, rawSkillPath: string): Promise<{
+async function readClaudeSkillCandidates(roots: string[]): Promise<ClaudeSkillCandidate[]> {
+  const candidates: ClaudeSkillCandidate[] = [];
+  for (const root of roots) {
+    for (const skillPath of await listSkillMdFiles(root)) {
+      const content = await readFile(skillPath, 'utf-8').catch(() => '');
+      if (!content) continue;
+      try {
+        const parsed = parseSkillMd(content);
+        const name = parsed.name.trim();
+        if (!name) continue;
+        candidates.push({
+          name,
+          skillPath,
+          resolvedPath: await realpath(skillPath).catch(() => skillPath),
+        });
+      } catch {
+        // Invalid skill metadata is not eligible Claude runtime source evidence.
+      }
+    }
+  }
+  return candidates;
+}
+
+async function listSkillMdFiles(root: string, ancestorRealPaths = new Set<string>()): Promise<string[]> {
+  const resolvedRoot = await realpath(root).catch(() => root);
+  if (ancestorRealPaths.has(resolvedRoot)) return [];
+  const nextAncestors = new Set(ancestorRealPaths).add(resolvedRoot);
+  const entries = await readdir(root, { withFileTypes: true }).catch((err) => {
+    if (isNodeError(err) && err.code === 'ENOENT') return [];
+    throw err;
+  });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(root, entry.name);
+      if (entry.isDirectory()) return listSkillMdFiles(entryPath, nextAncestors);
+      if (entry.isSymbolicLink()) {
+        const metadata = await stat(entryPath).catch(() => undefined);
+        if (metadata?.isDirectory()) {
+          const skillPath = path.join(entryPath, 'SKILL.md');
+          const skillMetadata = await stat(skillPath).catch(() => undefined);
+          return skillMetadata?.isFile() ? [skillPath] : listSkillMdFiles(entryPath, nextAncestors);
+        }
+        return metadata?.isFile() && entry.name === 'SKILL.md' ? [entryPath] : [];
+      }
+      return entry.isFile() && entry.name === 'SKILL.md' ? [entryPath] : [];
+    }),
+  );
+  return files.flat();
+}
+
+async function readSkillIdentity(skillPath: string): Promise<{
   name: string;
   resolvedPath?: string;
   confirmed: boolean;
@@ -625,24 +771,31 @@ async function readSkillIdentity(skillPath: string, rawSkillPath: string): Promi
 function normalizeSkillNameFromPath(skillPath: string): string {
   const normalized = path.normalize(skillPath);
   const skillName = path.basename(path.dirname(normalized));
-  const parts = normalized.split(path.sep).filter(Boolean);
-  const cacheIndex = parts.findIndex((part, index) => (
-    part === 'cache' && parts[index - 1] === 'plugins' && parts[index - 2] === '.codex'
-  ));
-  const pluginName = cacheIndex >= 0 ? parts[cacheIndex + 2] : undefined;
+  const pluginName = parseCodexPluginSkillPath(normalized)?.plugin;
   return pluginName ? `${pluginName}:${skillName}` : skillName;
 }
 
-function statusFromToolOutput(
-  output: { output: string; endedAt?: string } | undefined,
-  statusHint: SkillInvocationStatus | undefined,
-): { status: SkillInvocationStatus; endedAt?: string } {
-  const exitCode = output?.output.match(/Process exited with code\s+(\d+)/)?.[1]
-    ?? output?.output.match(/Exit code:\s+(\d+)/)?.[1]
-    ?? output?.output.match(/Exit status\s+(\d+)/)?.[1];
-  if (exitCode !== undefined) return { status: exitCode === '0' ? 'used' : 'failed', endedAt: output?.endedAt };
-  if (statusHint && statusHint !== 'unknown') return { status: statusHint, endedAt: output?.endedAt };
-  return { status: 'unknown', endedAt: output?.endedAt };
+function parseCodexPluginSkillPath(skillPath: string):
+  | {
+      marketplace: string;
+      plugin: string;
+      relativeSkillPath: string;
+    }
+  | undefined {
+  const normalized = path.normalize(skillPath);
+  const parts = normalized.split(path.sep).filter(Boolean);
+  const cacheIndex = parts.findIndex(
+    (part, index) => part === 'cache' && parts[index - 1] === 'plugins' && parts[index - 2] === '.codex',
+  );
+  if (cacheIndex < 0) return undefined;
+
+  const marketplace = parts[cacheIndex + 1];
+  const plugin = parts[cacheIndex + 2];
+  const skillsIndex = parts.indexOf('skills', cacheIndex + 3);
+  const relativeSkillPath = skillsIndex >= 0 ? parts.slice(skillsIndex + 1).join('/') : '';
+  if (!marketplace || !plugin || !relativeSkillPath) return undefined;
+
+  return { marketplace, plugin, relativeSkillPath };
 }
 
 function mergeInvocationStatus(left: SkillInvocationStatus, right: SkillInvocationStatus): SkillInvocationStatus {
@@ -652,15 +805,19 @@ function mergeInvocationStatus(left: SkillInvocationStatus, right: SkillInvocati
   return 'unknown';
 }
 
+function commonPathEvidence(left: string | undefined, right: string | undefined): string | undefined {
+  return left === right ? left : undefined;
+}
+
 function invocationRecordId(
   provider: string,
   sessionId: string,
   turnId: string,
   skillName: string,
-  sourcePath: string | undefined,
+  sourceIdentity: string,
 ): string {
   return createHash('sha256')
-    .update(JSON.stringify({ provider, sessionId, turnId, skillName, sourcePath }))
+    .update(JSON.stringify({ provider, sessionId, turnId, skillName, sourceIdentity }))
     .digest('hex');
 }
 
@@ -694,70 +851,111 @@ function datesInRange(range: SkillUsageRange): string[] {
 }
 
 function buildRanking(records: SkillInvocationRecord[]): ProviderSkillRankingRow[] {
-  const rows = new Map<string, ProviderSkillUsageRow>();
+  const rows = new Map<string, ProviderSkillUsageAccumulator>();
   for (const record of records) {
     const rowKey = usageRowKey(record);
-    const row = rows.get(rowKey) ?? createUsageRow(record);
-    addRecordToUsageRow(row, record);
-    rows.set(rowKey, row);
+    const accumulator = rows.get(rowKey) ?? createUsageAccumulator(record);
+    addRecordToUsageAccumulator(accumulator, record);
+    rows.set(rowKey, accumulator);
   }
 
-  return [...rows.values()].sort(compareUsageRows).slice(0, 10);
+  return [...rows.values()].map(finalizeUsageRow).sort(compareUsageRows).slice(0, 10);
 }
 
-function buildDailySkillUsage(
-  records: SkillInvocationRecord[],
-  range: SkillUsageRange,
-): ProviderSkillDailyUsage[] {
-  const byDate = new Map<string, Map<string, ProviderSkillUsageRow>>();
+function buildDailySkillUsage(records: SkillInvocationRecord[], range: SkillUsageRange): ProviderSkillDailyUsage[] {
+  const byDate = new Map<string, Map<string, ProviderSkillUsageAccumulator>>();
   for (const date of datesInRange(range)) byDate.set(date, new Map());
 
   for (const record of records) {
     const date = record.startedAt.slice(0, 10);
-    const rows = byDate.get(date) ?? new Map<string, ProviderSkillUsageRow>();
+    const rows = byDate.get(date) ?? new Map<string, ProviderSkillUsageAccumulator>();
     const rowKey = usageRowKey(record);
-    const row = rows.get(rowKey) ?? createUsageRow(record);
-    addRecordToUsageRow(row, record);
-    rows.set(rowKey, row);
+    const accumulator = rows.get(rowKey) ?? createUsageAccumulator(record);
+    addRecordToUsageAccumulator(accumulator, record);
+    rows.set(rowKey, accumulator);
     byDate.set(date, rows);
   }
 
-  return [...byDate.entries()].map(([date, rows]) => ({
-    date,
-    rows: [...rows.values()].sort(compareUsageRows),
-  })).sort((a, b) => a.date.localeCompare(b.date));
+  return [...byDate.entries()]
+    .map(([date, rows]) => ({
+      date,
+      rows: [...rows.values()].map(finalizeUsageRow).sort(compareUsageRows),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function usageRowKey(record: SkillInvocationRecord): string {
-  return `${record.skillName}\0${sourcePathForRecord(record) ?? ''}`;
+  return `${record.skillName}\0${skillSourceIdentity(record)}`;
 }
 
-function createUsageRow(record: SkillInvocationRecord): ProviderSkillUsageRow {
+function skillSourceIdentity(record: Pick<SkillInvocationRecord, 'provider' | 'skillPath' | 'resolvedPath'>): string {
+  const pluginSkill =
+    record.provider === 'codex'
+      ? (parseCodexPluginSkillPath(record.skillPath ?? '') ?? parseCodexPluginSkillPath(record.resolvedPath ?? ''))
+      : undefined;
+  if (pluginSkill) {
+    return `codex-plugin\0${pluginSkill.marketplace}\0${pluginSkill.plugin}\0${pluginSkill.relativeSkillPath}`;
+  }
+  return record.resolvedPath ?? record.skillPath ?? '';
+}
+
+function createUsageAccumulator(record: SkillInvocationRecord): ProviderSkillUsageAccumulator {
   return {
-    skillName: record.skillName,
-    sourcePath: sourcePathForRecord(record),
-    countedInvocations: 0,
-    failedInvocations: 0,
+    row: {
+      skillName: record.skillName,
+      countedInvocations: 0,
+      failedInvocations: 0,
+    },
+    recordCount: 0,
+    providerPathCount: 0,
+    providerPaths: new Set(),
+    resolvedPathCount: 0,
+    resolvedPaths: new Set(),
   };
 }
 
-function addRecordToUsageRow(
-  row: ProviderSkillUsageRow,
-  record: SkillInvocationRecord,
-): void {
-  if (record.status === 'failed') {
-    row.failedInvocations += 1;
-  } else {
-    row.countedInvocations += 1;
+function addRecordToUsageAccumulator(accumulator: ProviderSkillUsageAccumulator, record: SkillInvocationRecord): void {
+  accumulator.recordCount += 1;
+  if (record.skillPath) {
+    accumulator.providerPathCount += 1;
+    accumulator.providerPaths.add(record.skillPath);
   }
-  if (!row.lastInvokedAt || record.startedAt > row.lastInvokedAt) row.lastInvokedAt = record.startedAt;
+  if (record.resolvedPath) {
+    accumulator.resolvedPathCount += 1;
+    accumulator.resolvedPaths.add(record.resolvedPath);
+  }
+  if (record.status === 'failed') {
+    accumulator.row.failedInvocations += 1;
+  } else {
+    accumulator.row.countedInvocations += 1;
+  }
+  if (!accumulator.row.lastInvokedAt || record.startedAt > accumulator.row.lastInvokedAt) {
+    accumulator.row.lastInvokedAt = record.startedAt;
+  }
+}
+
+function finalizeUsageRow(accumulator: ProviderSkillUsageAccumulator): ProviderSkillUsageRow {
+  const commonProviderPath =
+    accumulator.providerPathCount === accumulator.recordCount && accumulator.providerPaths.size === 1
+      ? [...accumulator.providerPaths][0]
+      : undefined;
+  const commonResolvedPath =
+    accumulator.resolvedPathCount === accumulator.recordCount && accumulator.resolvedPaths.size === 1
+      ? [...accumulator.resolvedPaths][0]
+      : undefined;
+  return {
+    ...accumulator.row,
+    sourcePath: commonProviderPath ?? commonResolvedPath,
+  };
 }
 
 function compareUsageRows(a: ProviderSkillUsageRow, b: ProviderSkillUsageRow): number {
-  return b.countedInvocations - a.countedInvocations
-    || b.failedInvocations - a.failedInvocations
-    || compareOptionalTimestampDesc(a.lastInvokedAt, b.lastInvokedAt)
-    || a.skillName.localeCompare(b.skillName);
+  return (
+    b.countedInvocations - a.countedInvocations ||
+    b.failedInvocations - a.failedInvocations ||
+    compareOptionalTimestampDesc(a.lastInvokedAt, b.lastInvokedAt) ||
+    a.skillName.localeCompare(b.skillName)
+  );
 }
 
 function compareOptionalTimestampDesc(left: string | undefined, right: string | undefined): number {
@@ -765,10 +963,6 @@ function compareOptionalTimestampDesc(left: string | undefined, right: string | 
   if (left === undefined) return 1;
   if (right === undefined) return -1;
   return right.localeCompare(left);
-}
-
-function sourcePathForRecord(record: Pick<SkillInvocationRecord, 'skillPath' | 'resolvedPath'>): string | undefined {
-  return record.skillPath ?? record.resolvedPath;
 }
 
 function findCurrentSkillSource(
@@ -783,21 +977,23 @@ function matchesCurrentSkill(
   record: Pick<SkillInvocationRecord, 'provider' | 'skillName' | 'skillPath' | 'resolvedPath'>,
   skill: CurrentSkillReference,
 ): boolean {
-  if (record.skillPath !== undefined && skill.path !== undefined && matchesSkillMdPath(record.skillPath, skill.path)) return true;
-  if (record.resolvedPath !== undefined && skill.resolvedPath !== undefined && matchesSkillMdPath(record.resolvedPath, skill.resolvedPath)) return true;
+  if (record.skillPath !== undefined && skill.path !== undefined && matchesSkillMdPath(record.skillPath, skill.path))
+    return true;
+  if (
+    record.resolvedPath !== undefined &&
+    skill.resolvedPath !== undefined &&
+    matchesSkillMdPath(record.resolvedPath, skill.resolvedPath)
+  )
+    return true;
   return skill.provider === record.provider && skill.name === record.skillName;
 }
 
 function matchesSkillMdPath(recordPath: string, skillReferencePath: string): boolean {
   const normalizedRecordPath = path.normalize(recordPath);
   const normalizedSkillPath = path.normalize(skillReferencePath);
-  return normalizedRecordPath === normalizedSkillPath
-    || normalizedRecordPath === path.join(normalizedSkillPath, 'SKILL.md');
-}
-
-function normalizeStatus(value: string | undefined): SkillInvocationStatus {
-  if (value === 'loaded' || value === 'used' || value === 'failed') return value;
-  return 'unknown';
+  return (
+    normalizedRecordPath === normalizedSkillPath || normalizedRecordPath === path.join(normalizedSkillPath, 'SKILL.md')
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -806,6 +1002,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function isValidInvocationTimestamp(value: string | undefined): value is string {
+  return value !== undefined && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
 }
 
 function isNodeError(value: unknown): value is NodeJS.ErrnoException {

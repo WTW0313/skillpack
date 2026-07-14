@@ -6,15 +6,20 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+const ANSI_SGR_PATTERN = new RegExp(String.raw`\u001B\[[0-9;]*m`, 'g');
 
 type CommandResult = { stdout: string; stderr: string };
-type CommandRunner = (command: string, args: string[], options: {
-  timeout: number;
-  env: NodeJS.ProcessEnv;
-}) => Promise<CommandResult>;
+type CommandRunner = (
+  command: string,
+  args: string[],
+  options: {
+    timeout: number;
+    env: NodeJS.ProcessEnv;
+  },
+) => Promise<CommandResult>;
 
 function stripAnsi(s: string): string {
-  return s.replace(/\x1b\[[0-9;]*m/g, '');
+  return s.replace(ANSI_SGR_PATTERN, '');
 }
 
 function parseSearchOutput(raw: string): RemoteSkill[] {
@@ -26,7 +31,8 @@ function parseSearchOutput(raw: string): RemoteSkill[] {
     const match = line.match(/^(\S+\/\S+@\S+)\s+(\S+)\s+installs?/);
     if (!match) continue;
     const identifier = match[1];
-    const installs = parseFloat(match[2].replace(/K/i, '')) * (match[2].includes('K') || match[2].includes('k') ? 1000 : 1);
+    const installs =
+      parseFloat(match[2].replace(/K/i, '')) * (match[2].includes('K') || match[2].includes('k') ? 1000 : 1);
     const parts = identifier.split('@');
     const skillName = parts[parts.length - 1] ?? identifier;
 
@@ -81,10 +87,14 @@ export class SkillsShSource implements IInstallSource {
         env: { ...process.env, NO_COLOR: '1' },
       });
     } catch (err: unknown) {
-      const stderr = err && typeof err === 'object' && 'stderr' in err
-        ? stripAnsi(String((err as { stderr: string }).stderr)).trim() : '';
-      const stdout = err && typeof err === 'object' && 'stdout' in err
-        ? stripAnsi(String((err as { stdout: string }).stdout)).trim() : '';
+      const stderr =
+        err && typeof err === 'object' && 'stderr' in err
+          ? stripAnsi(String((err as { stderr: string }).stderr)).trim()
+          : '';
+      const stdout =
+        err && typeof err === 'object' && 'stdout' in err
+          ? stripAnsi(String((err as { stdout: string }).stdout)).trim()
+          : '';
       const detail = stderr || stdout || (err instanceof Error ? err.message : String(err));
       throw new Error(`Install failed: ${detail}`);
     }
@@ -96,7 +106,9 @@ export class SkillsShSource implements IInstallSource {
     if (skill.source?.type !== 'skillssh') return null;
     try {
       return parseUpdateForSkill(await this.runCheckCommand(), skill);
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
     return null;
   }
 

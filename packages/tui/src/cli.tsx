@@ -34,7 +34,11 @@ export async function runSkillpackCli(options: SkillpackCliOptions = {}): Promis
   const stdin = options.stdin ?? processLike.stdin;
   const stderr = options.stderr ?? processLike.stderr;
   const renderApp = options.renderApp ?? render;
-  const exit = options.exit ?? ((code: number) => { processLike.exit(code); });
+  const exit =
+    options.exit ??
+    ((code: number) => {
+      processLike.exit(code);
+    });
   const app = options.app ?? React.createElement(App);
   let instance: Pick<Instance, 'unmount' | 'waitUntilExit'> | null = null;
   let exitCode = 0;

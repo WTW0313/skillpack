@@ -74,18 +74,21 @@ export function AppProvider({ manager, config, onUsageImportConsentChange, child
   const [usageImportError, setUsageImportError] = useState<string | null>(null);
   const [usageImportRevision, setUsageImportRevision] = useState(0);
 
-  const setUsageImportConsent = useCallback(async (importConsent: boolean) => {
-    const nextConfig = onUsageImportConsentChange
-      ? await onUsageImportConsentChange(importConsent)
-      : {
-        ...currentConfig,
-        usage: {
-          ...currentConfig.usage,
-          importConsent,
-        },
-      };
-    setCurrentConfig(nextConfig);
-  }, [currentConfig, onUsageImportConsentChange]);
+  const setUsageImportConsent = useCallback(
+    async (importConsent: boolean) => {
+      const nextConfig = onUsageImportConsentChange
+        ? await onUsageImportConsentChange(importConsent)
+        : {
+            ...currentConfig,
+            usage: {
+              ...currentConfig.usage,
+              importConsent,
+            },
+          };
+      setCurrentConfig(nextConfig);
+    },
+    [currentConfig, onUsageImportConsentChange],
+  );
 
   const importSkillUsage = useCallback(async () => {
     setUsageImporting(true);
@@ -125,24 +128,47 @@ export function AppProvider({ manager, config, onUsageImportConsentChange, child
     });
     setSelectedSkill((prev) => {
       if (!prev) return null;
-      const nextGroup = newInventory.find((group) => group.instances.some((instance) => (
-        instance.provider === prev.provider && instance.path === prev.path
-      )));
-      const nextInstance = nextGroup?.instances.find((instance) => (
-        instance.provider === prev.provider && instance.path === prev.path
-      ));
+      const nextGroup = newInventory.find((group) =>
+        group.instances.some((instance) => instance.provider === prev.provider && instance.path === prev.path),
+      );
+      const nextInstance = nextGroup?.instances.find(
+        (instance) => instance.provider === prev.provider && instance.path === prev.path,
+      );
       return nextInstance ?? nextGroup?.instances[0] ?? null;
     });
     setLoading(false);
   }, [manager, currentConfig]);
 
   return (
-    <AppContext.Provider value={{
-      manager, config: currentConfig, skills, inventory, projectSkills, scanPaths, duplicates, activeTab, view,
-      selectedGroup, selectedSkill, searchQuery, loading, usageImporting, usageImportError, usageImportRevision,
-      setActiveTab, setView, setSelectedGroup, setSelectedSkill, setSearchQuery, setLoading,
-      setUsageImportConsent, importSkillUsage, refresh,
-    }}>
+    <AppContext.Provider
+      value={{
+        manager,
+        config: currentConfig,
+        skills,
+        inventory,
+        projectSkills,
+        scanPaths,
+        duplicates,
+        activeTab,
+        view,
+        selectedGroup,
+        selectedSkill,
+        searchQuery,
+        loading,
+        usageImporting,
+        usageImportError,
+        usageImportRevision,
+        setActiveTab,
+        setView,
+        setSelectedGroup,
+        setSelectedSkill,
+        setSearchQuery,
+        setLoading,
+        setUsageImportConsent,
+        importSkillUsage,
+        refresh,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

@@ -15,13 +15,10 @@ export function SearchInput({ defaultValue, onChange, onSubmit, onCancel }: Sear
 
   return (
     <Box>
-      <Text color="magenta" bold>/ </Text>
-      <TextInput
-        defaultValue={defaultValue}
-        placeholder="filter skills…"
-        onChange={onChange}
-        onSubmit={onSubmit}
-      />
+      <Text color="magenta" bold>
+        /{' '}
+      </Text>
+      <TextInput defaultValue={defaultValue} placeholder="filter skills…" onChange={onChange} onSubmit={onSubmit} />
     </Box>
   );
 }

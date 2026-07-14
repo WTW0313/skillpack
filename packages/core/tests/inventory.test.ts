@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test';
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -48,16 +48,18 @@ describe('Skill Inventory', () => {
   });
 
   it('does not create findings for a single local skill with name-only identity', () => {
-    const inventory = buildSkillInventory([{
-      name: 'local-codex',
-      description: '',
-      provider: 'codex',
-      path: path.join(root, 'codex', 'local-codex'),
-      enabled: true,
-      scope: 'global',
-      metadata: {},
-      source: { type: 'local' },
-    }]);
+    const inventory = buildSkillInventory([
+      {
+        name: 'local-codex',
+        description: '',
+        provider: 'codex',
+        path: path.join(root, 'codex', 'local-codex'),
+        enabled: true,
+        scope: 'global',
+        metadata: {},
+        source: { type: 'local' },
+      },
+    ]);
 
     expect(inventory).toHaveLength(1);
     expect(inventory[0].identity.confidence).toBe('inferred');
@@ -161,16 +163,18 @@ describe('Skill Inventory', () => {
   });
 
   it('does not expose enable or disable actions for skills.sh-managed Global Skills', () => {
-    const inventory = buildSkillInventory([{
-      name: 'managed-global',
-      description: '',
-      provider: 'global',
-      path: path.join(root, 'global', 'managed-global'),
-      enabled: true,
-      scope: 'global',
-      metadata: {},
-      source: { type: 'skillssh', repo: 'owner/repo' },
-    }]);
+    const inventory = buildSkillInventory([
+      {
+        name: 'managed-global',
+        description: '',
+        provider: 'global',
+        path: path.join(root, 'global', 'managed-global'),
+        enabled: true,
+        scope: 'global',
+        metadata: {},
+        source: { type: 'skillssh', repo: 'owner/repo' },
+      },
+    ]);
 
     expect(inventory).toHaveLength(1);
     expect(inventory[0].identity.confidence).toBe('confirmed');
@@ -207,43 +211,53 @@ describe('Skill Inventory', () => {
   });
 
   it('does not expose toggle actions when the provider has no Disable Strategy', () => {
-    const inventory = buildSkillInventory([{
-      name: 'plugin-skill',
-      description: '',
-      provider: 'codex',
-      path: path.join(root, 'codex', 'plugin-skill'),
-      enabled: true,
-      scope: 'global',
-      metadata: {},
-      origin: {
-        type: 'plugin',
-        pluginId: 'github@openai-curated',
-        pluginName: 'github',
-        marketplace: 'openai-curated',
-        pluginEnabled: true,
-        identityStatus: 'mismatched',
+    const inventory = buildSkillInventory(
+      [
+        {
+          name: 'plugin-skill',
+          description: '',
+          provider: 'codex',
+          path: path.join(root, 'codex', 'plugin-skill'),
+          enabled: true,
+          scope: 'global',
+          metadata: {},
+          origin: {
+            type: 'plugin',
+            pluginId: 'github@openai-curated',
+            pluginName: 'github',
+            marketplace: 'openai-curated',
+            pluginEnabled: true,
+            identityStatus: 'mismatched',
+          },
+          source: { type: 'local' },
+        },
+      ],
+      {
+        getDisableStrategy: () => undefined,
       },
-      source: { type: 'local' },
-    }], {
-      getDisableStrategy: () => undefined,
-    });
+    );
 
     expect(inventory[0].instances[0].actions).toEqual([]);
   });
 
   it('surfaces remembered skills.sh update checks as notices', () => {
-    const inventory = buildSkillInventory([{
-      name: 'managed-global',
-      description: '',
-      provider: 'global',
-      path: path.join(root, 'global', 'managed-global'),
-      enabled: true,
-      scope: 'global',
-      metadata: {},
-      source: { type: 'skillssh', repo: 'owner/repo' },
-    }], {
-      hasUpdate: () => true,
-    });
+    const inventory = buildSkillInventory(
+      [
+        {
+          name: 'managed-global',
+          description: '',
+          provider: 'global',
+          path: path.join(root, 'global', 'managed-global'),
+          enabled: true,
+          scope: 'global',
+          metadata: {},
+          source: { type: 'skillssh', repo: 'owner/repo' },
+        },
+      ],
+      {
+        hasUpdate: () => true,
+      },
+    );
 
     expect(inventory[0].instances[0].notices.map((notice) => notice.code)).toContain('update-available');
     expect(inventory[0].issues).toEqual([]);

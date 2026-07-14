@@ -2,36 +2,34 @@
   "name": "skillpack-tui",
   "version": "0.3.0",
   "description": "Unified TUI manager for agent skills across Codex, Claude, and Global",
-  "type": "module",
-  "bin": {
-    "skillpack": "./dist/skillpack.js"
-  },
-  "files": [
-    "dist"
-  ],
-  "engines": {
-    "node": ">=18"
-  },
   "keywords": [
-    "cli",
-    "tui",
     "agent",
-    "skills",
     "claude",
+    "cli",
     "codex",
-    "ink"
+    "ink",
+    "skills",
+    "tui"
   ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/WTW0313/skillpack.git"
   },
+  "bin": {
+    "skillpack": "./dist/skillpack.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "scripts": {
-    "build": "tsup",
-    "build:dev": "tsc",
-    "dev": "tsc --watch",
-    "test": "vitest run --passWithNoTests",
-    "prepublishOnly": "pnpm run build"
+    "build": "vp pack",
+    "build:ci": "vp pack && node ../../scripts/verify-package.mjs",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "test:ci": "vp test",
+    "prepublishOnly": "pnpm --dir ../.. check:ci && pnpm --dir ../.. test:ci && pnpm --dir ../.. build:ci"
   },
   "dependencies": {
     "@inkjs/ui": "2.0.0",
@@ -45,8 +43,9 @@
     "@types/node": "25.9.3",
     "@types/react": "19.2.17",
     "ink-testing-library": "^4.0.0",
-    "tsup": "^8.5.1",
-    "typescript": "6.0.3",
-    "vitest": "4.1.8"
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

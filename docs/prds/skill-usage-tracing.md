@@ -31,7 +31,7 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 13. As a Skillpack user, I want the Provider Skill Ranking capped to the top 10 skills, so that the output stays focused and scannable.
 14. As a Skillpack user, I want Project Skills included when they are invoked, so that repository-owned skills are not omitted from usage analysis.
 15. As a Skillpack user, I want usage rows to show the Skill Source Path, so that unscanned Project Skills and moved skills remain understandable without relying on Inventory status.
-16. As a Skillpack user, I want same-named skills from different source paths separated in usage aggregates, so that project-local skills are not collapsed into misleading totals.
+16. As a Skillpack user, I want same-named skills with different Skill Source Identities separated in usage aggregates, while aliases and versioned cache locations for one logical source remain combined, so that project-local skills are not collapsed and source aliases or plugin upgrades do not create duplicate rows.
 17. As a Skillpack user, I want unsupported providers shown differently from zero-usage providers, so that missing coverage is not mistaken for inactivity.
 18. As a Skillpack user, I want Usage Import Diagnostics when artifacts are skipped, so that I can understand why usage may be incomplete.
 19. As a Skillpack user, I want Skillpack to skip ambiguous provider evidence, so that false invocation records are not created.
@@ -53,36 +53,66 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 - Runtime hooks and instrumentation are out of scope.
 - Usage Import requires explicit Usage Import Consent before the first read of provider session artifacts.
 - After consent, Skillpack may run bounded incremental Skill Usage Import on startup using Usage Import Cursors.
+- The first Claude import scans all supported artifacts and retains every recoverable invocation; subsequent imports use artifact cursors. Display range limits do not discard older derived records.
 - The first shippable implementation should prove Codex end to end before adding Claude.
 - The Codex adapter reads the real `~/.codex/sessions/**/*.jsonl` and `~/.codex/archived_sessions/*.jsonl` event formats, not a synthetic `skill_invocation` format.
 - `~/.codex/logs_2.sqlite` is not a counting source because it includes rendered skill metadata and can confuse available skills with invoked skills.
-- Codex skill usage is derived only from `response_item` events with `payload.type === "function_call"` where an `exec_command` directly reads `.../skills/<skill>/SKILL.md`; `session_meta` and `turn_context` provide session, turn, and cwd context for session identity, turn identity, and relative path resolution.
+- Codex skill usage is derived only from supported `response_item` execution evidence where an `exec_command` directly reads `.../skills/<skill>/SKILL.md`. The adapter supports both historical `payload.type === "function_call"` / `name === "exec_command"` envelopes and current orchestrated `payload.type === "custom_tool_call"` / `name === "exec"` envelopes. Both normalize to the same Skill Invocation candidate model; `session_meta` and `turn_context` provide session, turn, and cwd context for session identity, turn identity, and relative path resolution.
+- Orchestrated `exec` input is parsed as untrusted data with Acorn, which is a direct core runtime dependency used only to produce an ESTree syntax tree. A Skillpack-owned static evaluator never executes session JavaScript and supports literals and static string composition, statically initialized `const` string/object/array bindings whose evaluated values are not observably mutated, property reads and shorthand properties, multiple direct calls, statically known array `.map()` and `for...of` iterations, and `Promise.all()` wrappers. Unshadowed Codex orchestration helpers (`text`, `image`, `generatedImage`, `store`, `load`, `notify`, and `yield_control`) are transparent only for ordered argument inspection. Direct `SKILL.md` path matching is applied only to concrete shell commands produced by static evaluation and ignores paths after an unquoted shell-comment marker. Raw-source `SKILL.md` checks may inform diagnostics but must not skip AST parsing, because supported static composition can construct that token without containing it contiguously in source. Unknown calls, spread arguments, shadowed helpers or built-ins, implicit object coercion, thenable assimilation, observable mutation, unsupported control flow, and otherwise unprovable paths stop inference. Acorn does not identify skills or run commands.
+- Static interpretation is bounded per orchestrated envelope to 1,000,000 source code units, 10,000 evaluation steps, 10,000 static iterations, 100 nested evaluation frames, 256 resolved commands, 256 extracted Skill paths per command, 1,000,000 code units in one derived string, and 10,000,000 cumulatively retained derived-string code units. String limits are checked before concatenation. A budget breach fails closed and discards partial command evidence from that envelope. Orchestrated parsing produces high-signal Usage Import Diagnostics only when parsing fails with potential Skill evidence, a real nested `tools.exec_command` with potential Skill evidence cannot resolve its command or working directory inside the supported static subset, or a budget is exceeded while fixed Skill evidence is present. Diagnostics are aggregated by artifact and reason and never retain source JavaScript, commands, or output. Unrelated programs and dynamic calls with no Skill evidence are silently ignored.
 - Codex import excludes system/developer text, AGENTS.md text, available-skill lists, rendered skill metadata, ordinary text mentions, and search/script output such as `rg`, `grep`, or `python` commands that merely mention `SKILL.md`.
 - Codex usage is global across configured Codex artifact roots and is not scoped to Skillpack's startup cwd.
-- Codex records are deduplicated by `(turn_id, skill_name, source_path)` so segmented reads of the same `SKILL.md` in one turn count as one invocation while same-named skills from different paths stay separate.
+- Codex records are deduplicated by `(turn_id, skill_name, Skill Source Identity)`, and Codex Invocation Record IDs use the same identity, so segmented or aliased reads of one logical Skill in one turn count once while same-named skills with distinct source identities remain separate.
 - Codex skill names are normalized from the skill path directory, with plugin-owned Codex skills represented as `plugin-name:skill-name`.
-- Codex `function_call_output` exit-code evidence maps successful reads to `used` and failed reads to `failed`.
-- Claude Usage Import is intentionally unsupported in the first Codex-first slice and appears as unsupported coverage until a real Claude session adapter is added.
+- Codex plugin cache paths are aggregated by stable marketplace, plugin, and skill identity while ignoring the cache version directory. This normalized Plugin-Owned Skill identity takes precedence over `resolvedPath`; otherwise distinct real cache targets would recreate one row per version. If one aggregate contains more than one concrete cache path, its displayed Skill Source Path is blank rather than choosing an arbitrary historical version.
+- Historical Codex `function_call_output` exit-code evidence maps successful reads to `used` and failed reads to `failed`. For orchestrated `exec` envelopes, outer wrapper completion and script-level output are not nested command status evidence; a statically confirmed read remains `unknown` unless a reliable one-to-one nested exit result is present. Skillpack does not infer nested status from wrapper status, human-readable output, or error text.
+- Claude usage is derived from assistant `tool_use` blocks where `name === "Skill"` in Claude project JSONL transcripts and subagent JSONL transcripts.
+- The initial Claude Usage Provider Adapter counts only user-level and plugin-provided skills found through configured Skill Attribution Roots. Project Skills and Built-In Skills are excluded.
+- Claude source paths are resolved best-effort from current known Claude skill locations. If an invocation name matches more than one user-level or plugin-provided source, Skillpack counts the invocation with a blank source path rather than assigning it to an arbitrary source. If it matches no eligible source, Skillpack skips it with a Usage Import Diagnostic because the transcript cannot distinguish deleted user content from Built-In or deferred Project Skills.
+- Claude invocation names are trimmed and matched exactly against parsed `SKILL.md` names. The adapter does not lowercase names, strip namespaces, or infer identity from directory names.
+- Each Claude `Skill` tool_use block counts as one Skill Invocation. Claude records are not deduplicated by turn and skill because the structured tool_use block is already the invocation evidence.
+- Claude Invocation Record IDs are derived from provider, real artifact path, session identity, message or line identity, and `tool_use.id`, with stable fallbacks when transcript fields are missing.
+- Claude Skill Invocations are recorded as `used` by default. If a matching structured `tool_result` has `is_error === true`, the invocation is recorded as `failed`; stderr text, loader logs, and natural-language summaries are not status evidence.
+- If later incremental import evidence changes a Claude invocation's status, Skillpack appends a revision with the same Invocation Record ID. Reads and aggregates use only the latest record for each ID.
+- Otherwise-valid Claude `Skill` tool calls with a non-empty invoked name but no valid assistant-record timestamp are skipped with a Usage Import Diagnostic. Malformed calls and empty skill names are not counted as missing-timestamp Skill Invocations. File modification time is not invocation-time evidence; a matching tool result timestamp is used only as optional `endedAt`.
+- Repeated skipped Claude invocations are aggregated into one Usage Import Diagnostic per real artifact, skill name, and reason, with the skipped invocation count included.
+- Claude artifact discovery follows JSONL file symlinks, resolves them with `realpath`, and parses each real artifact once so shared subagent transcripts are not double-counted.
+- Claude artifact discovery accepts only `<encoded-cwd>/<session-uuid>.jsonl` and `<encoded-cwd>/<session-uuid>/subagents/agent-*.jsonl`; other JSONL path shapes are skipped with aggregated diagnostics.
+- Claude artifact discovery rejects paths outside the configured Usage Artifact Root before evaluating those shapes. The containment guard rejects empty, parent-traversing, and absolute `path.relative` results so Windows cross-volume or cross-share paths cannot be treated as root members.
+- Malformed Claude JSONL lines are skipped without failing the artifact, with one diagnostic per artifact containing the malformed-line count and no raw content. Valid auto-compact summaries are ignored without diagnostics, accepting that compacted structured calls cannot be recovered.
+- Claude usage is global across configured Claude artifact roots and is not scoped to Skillpack's startup cwd.
+- Claude Usage Import is independent of the Claude Skill Inventory provider's enabled state. Usage Import Consent authorizes artifact reads, while configured Claude Skill Attribution Roots provide eligible user-level and plugin source candidates for attribution. These roots currently reuse the Claude provider's configured paths but have a separate Usage responsibility.
+- Current Skill Availability does not filter Claude attribution candidates; disabled user-level skills and disabled plugins remain eligible evidence for historical usage while their source content exists.
+- Claude plugin attribution uses configured runtime Skill Attribution Roots such as `~/.claude/plugins/cache`; marketplace checkout directories are not considered unless explicitly configured as a Skill Attribution Root.
+- Multiple cached plugin versions are not resolved by semver or file timestamps. Distinct real targets remain source-ambiguous and produce a name-only Counted Invocation; aliases sharing one real target are collapsed normally.
+- For a symlinked Claude skill, `skillPath` retains the provider-facing `SKILL.md` path and `resolvedPath` retains its real target. Outside the normalized Plugin-Owned Skill cache exception, Skill Source Identity prefers `resolvedPath` when available and falls back to `skillPath`; presentation considers `skillPath` separately.
+- Claude source candidates are collapsed by realpath before attribution. Multiple aliases to one real target retain that `resolvedPath` and leave `skillPath` blank unless exactly one provider-facing path exists; multiple distinct real targets remain source-ambiguous.
 - Global Skills and Project Skills are skill scopes in usage identity, not session-producing runtimes.
-- Skill Invocation Records persist minimal facts only: provider, raw skill evidence, best resolved skill identity evidence, session/turn identity, timestamps, Skill Invocation Status, and deterministic Invocation Record ID.
+- Skill Invocation Records persist minimal facts only: provider, normalized provider-facing Skill Source Path evidence, best resolved skill identity evidence, session/turn identity, timestamps, Skill Invocation Status, and deterministic Invocation Record ID. Literal path tokens from provider tool arguments are transient parser input and are not retained separately.
 - Prompts, responses, tool arguments, file contents, and full transcripts are never persisted by Skillpack.
 - Skill Invocation Status is evidence-based: loaded, used, failed, or unknown.
 - Failed invocation records are stored but excluded from default Counted Invocation totals.
-- Provider Skill Ranking ranks by exact Counted Invocation count within one Skill Provider and keeps same-named skills from different Skill Source Paths as separate rows.
+- Provider Skill Ranking ranks by exact Counted Invocation count within one Skill Provider and keeps same-named skills with different Skill Source Identities as separate rows, except for versioned cache paths belonging to one stable Plugin-Owned Skill identity.
 - Skill Usage Heatmap intensity uses exact Counted Invocation volume across the selected range with one scale across providers.
 - Skill Usage does not roll up same-name skills across providers in v1.
-- Skill Usage includes Project Skills when session evidence identifies them.
+- Skill Usage can include Project Skills when a supported Usage Provider Adapter identifies them; Project Skills are deferred for the initial Claude adapter.
 - Skill Usage rows show Skill Source Path instead of current/historical status, because Usage should not depend on current scan-root coverage.
-- Usage Coverage State distinguishes supported zero usage from unsupported or not configured providers.
+- An aggregate displays its provider-facing `skillPath` when all records share one, otherwise its common `resolvedPath` when all records share one, and otherwise a blank Skill Source Path. Skillpack never selects one path arbitrarily from conflicting evidence.
+- Usage Coverage State distinguishes supported zero usage from unsupported or not configured providers. Every Provider Skill Usage Overview carries `coverageReasons: UsageCoverageReason[]`; the array is empty for `active`, `zero`, and `unsupported` coverage, while a `not-configured` provider includes every applicable `missing-artifact-roots`, `missing-attribution-roots`, or `provider-not-configured` reason without hiding simultaneous gaps behind a priority order.
+- `importAllProviders()` omits providers whose import did not run because required configuration is missing. `SkillUsageImportResult` represents an attempted import; configuration gaps are exposed through Usage Coverage State and Usage Coverage Reasons instead of synthetic import results or Usage Import Diagnostics.
 - Usage Provider Adapters parse only stable, known provider artifact formats.
-- Ambiguous or unsupported provider evidence is skipped with Usage Import Diagnostics.
-- Usage Import Cursors include an importer version so parser fixes can force a one-time rescan of unchanged artifacts.
-- The Skill Usage Log is append-only JSONL partitioned by Session-Producing Provider and month.
+- Unsupported provider evidence is skipped with Usage Import Diagnostics. Ambiguous source attribution may still be counted when the provider evidence proves a real Skill Invocation by name.
+- Usage Import Cursors include a provider-specific importer version so one adapter's parser fixes can force a one-time rescan of its unchanged artifacts without rebuilding unrelated providers.
+- The current importer-version mapping is Codex `9` and Claude `8`; Codex `9` introduces current orchestrated `custom_tool_call` / `exec` evidence while Claude's parser remains unchanged at `8`.
+- Changes to provider invocation identity or deduplication semantics increment that provider's importer version and rebuild only that provider's derived records so obsolete record IDs do not remain alongside corrected records.
+- The Skill Usage Log is append-only JSONL partitioned by Session-Producing Provider and invocation month; repeated Invocation Record IDs are revisions and only the latest record is current. Every revision of one Invocation Record ID preserves its provider and `startedAt` month. Range queries treat the `YYYY-MM.jsonl` partition name as authoritative and read only months overlapping the requested date range; parser changes that would move records across months require an importer-version rebuild.
 - Skill Usage Records are retained until Skill Usage Reset.
 - Skill Usage Reset deletes Skillpack's derived Skill Usage Log and Usage Import Cursors only.
 - The TUI gets a top-level Skill Usage View reachable with `g`.
 - The Skill Usage View uses provider tabs to switch the selected Session-Producing Provider.
-- Unsupported and not-configured provider tabs remain selectable, but they show an explanatory empty state instead of fabricated heatmap or table data.
+- Claude uses the existing Skill Usage View without provider-specific screens or controls; enabling its adapter changes coverage and aggregate data only.
+- Unsupported and not-configured provider tabs remain selectable, but they show an explanatory empty state instead of fabricated heatmap or table data. A not-configured empty state uses all of its Usage Coverage Reasons rather than assuming Usage Artifact Roots are always the missing prerequisite.
+- Not-configured empty-state copy lists every missing prerequisite in one sentence: missing artifact roots use `<Provider> Usage Artifact Roots are not configured.`, missing attribution roots use `<Provider> Skill Attribution Roots are not configured.`, both use `<Provider> Usage Artifact Roots and Skill Attribution Roots are not configured.`, and `provider-not-configured` alone uses `<Provider> Usage Import is not configured.` Configuration reasons are not repeated as Usage Import Diagnostics.
 - The Skill Usage View combines a GitHub-style provider/day heatmap, selected-day usage detail, and an always-present Provider Skill Ranking table.
 - The Usage view uses `tab` and `shift+tab` to switch providers, `1`/`2`/`3` to select the 7/30/90 day ranges, up/down arrows to move the selected heatmap day by one day, and left/right arrows to move by one week.
 - Heatmap navigation does not wrap at range boundaries.
@@ -103,7 +133,7 @@ Skill Usage is separate from Skill Inventory. Inventory answers what is currentl
 - The heatmap uses a GitHub-style calendar layout with weeks as columns and days aligned by weekday rows.
 - The heatmap uses a high-contrast colored palette for activity levels; zero-count cells should be visually quiet but not rendered as a grayscale intensity ramp.
 - The selected heatmap cell shows exact date, provider, Counted Invocation count, failed invocation count, and per-skill aggregate usage for that day.
-- Selected-Day Usage Detail is grouped by skill source path and does not expose session-level or turn-level raw invocation history.
+- Selected-Day Usage Detail is grouped by stable skill source identity and does not expose session-level or turn-level raw invocation history.
 - Selected-Day Usage Detail appears to the right of the heatmap on wide terminals and below the heatmap on narrower terminals.
 - Selected-Day Usage Detail columns are Skill, Counted, Failed, and Source Path.
 - Selected-Day Usage Detail should show all skills used on the selected day whenever possible.
@@ -139,8 +169,15 @@ interface SkillInvocationRecord {
 - Tests should exercise public interfaces through real temporary files rather than mocking internal storage functions.
 - Provider session artifacts are local-substitutable dependencies: tests should use fixture directories and files that represent supported provider formats.
 - Usage Provider Adapter tests should verify observable import results and diagnostics, not internal parser steps.
+- Codex adapter fixtures should retain regression coverage for both historical direct execution envelopes and current orchestrated execution envelopes so compatibility cannot regress independently.
+- Codex execution evidence extraction should live behind one pure batch internal module interface that accepts one artifact's `sourceFile` and JSONL `lines`, then returns minimal Skill read evidence plus aggregated finding reasons. The module owns session/turn/cwd state, envelope dispatch, Acorn parsing, static evaluation, final-command Skill path matching, output correlation, status evidence, and diagnostic aggregation; it must not expose AST nodes, source JavaScript, shell commands, or output to callers.
+- Orchestrated execution fixtures should cover the supported static subset plus strings, comments, dynamic expressions, lexical shadowing, unsupported control flow, mutation, helper argument ordering, analysis-budget exhaustion, and malformed JavaScript that must not be executed or mistaken for invocation evidence.
+- Static-subset fixtures should include multiple direct calls, statically initialized `const` bindings without observable mutation, static template interpolation, static array `.map()`, static `for...of`, and `Promise.all()` wrappers, while mutable or runtime-derived values remain negative cases.
+- A fixture that statically constructs `SKILL.md` from separate string fragments must remain countable, proving that raw-source pattern checks are not a parsing gate.
+- Diagnostic fixtures should verify aggregation by artifact and reason, omit raw source/command/output, and avoid findings for unrelated or dynamically unresolvable exec calls with no Skill evidence.
 - JSONL store tests should verify idempotent repeated imports, provider/month partitioning, retention until reset, and range-bounded reads.
-- Aggregate tests should use independent literal records to verify Counted Invocation totals, failed exclusion, source-path separation, and provider-specific rankings.
+- Cursor tests should verify that a provider-specific importer version change rebuilds only the affected provider while preserving unrelated provider partitions and cursors.
+- Aggregate tests should use independent literal records to verify Counted Invocation totals, failed exclusion, distinct source-identity separation, resolved-target alias folding, plugin cache version folding, and provider-specific rankings.
 - TUI tests can be added where the existing Ink test harness supports them; otherwise the first TUI slice should keep rendering logic factored so core aggregate behavior carries most coverage.
 - Do not mock Skillpack's own modules from each other in core tests.
 - Do not assert call counts between internal collaborators.
@@ -153,16 +190,16 @@ interface SkillInvocationRecord {
 - Raw invocation history browsing.
 - Exporting usage aggregates.
 - Cross-provider skill rollups.
-- Claude Skill Usage Import before a real Claude session artifact adapter exists.
+- Claude Project Skill attribution in the initial Claude adapter.
 - SQLite or another database dependency.
 - Inferring task success from session outcomes.
 - Mutating provider-owned session artifacts.
 - Deleting provider-owned session history.
 - Treating Usage Import Diagnostics as Inventory Issues.
-- Adding support for providers beyond Codex in the first implementation wave.
+- Adding support for providers beyond Codex and Claude.
 
 ## Further Notes
 
 This PRD builds on the provider-native direction: Skillpack remains a management and analysis console, not the canonical owner of provider runtime state.
 
-Relevant ADRs: ADR-0039 through ADR-0048.
+Relevant ADRs: ADR-0039 through ADR-0060.

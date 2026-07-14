@@ -8,19 +8,34 @@ import { parseSkillMd } from '../parser.js';
 
 type SkillDirEntryStatus = 'directory' | 'broken-symlink' | 'other';
 
-async function getSkillDirEntryStatus(entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string }, parentPath: string): Promise<SkillDirEntryStatus> {
+async function getSkillDirEntryStatus(
+  entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string },
+  parentPath: string,
+): Promise<SkillDirEntryStatus> {
   if (entry.isDirectory()) return 'directory';
   if (entry.isSymbolicLink()) {
-    try { return (await stat(path.join(parentPath, entry.name))).isDirectory() ? 'directory' : 'other'; } catch { return 'broken-symlink'; }
+    try {
+      return (await stat(path.join(parentPath, entry.name))).isDirectory() ? 'directory' : 'other';
+    } catch {
+      return 'broken-symlink';
+    }
   }
   return 'other';
 }
 
-async function isDirEntry(entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string }, parentPath: string): Promise<boolean> {
-  return await getSkillDirEntryStatus(entry, parentPath) === 'directory';
+async function isDirEntry(
+  entry: { isDirectory(): boolean; isSymbolicLink(): boolean; name: string },
+  parentPath: string,
+): Promise<boolean> {
+  return (await getSkillDirEntryStatus(entry, parentPath)) === 'directory';
 }
 
-function pluginOrigin(publisher: string, pluginName: string, version: string, pluginEnabled: boolean): NonNullable<Skill['origin']> {
+function pluginOrigin(
+  publisher: string,
+  pluginName: string,
+  version: string,
+  pluginEnabled: boolean,
+): NonNullable<Skill['origin']> {
   return {
     type: 'plugin',
     pluginId: `${pluginName}@${publisher}`,
@@ -114,7 +129,11 @@ export class ClaudeProvider extends BaseProvider {
     const skills: Skill[] = [];
     const skillOverrides = getStringRecord(settings.skillOverrides);
     for (const basePath of this.flatPaths) {
-      try { await access(basePath); } catch { continue; }
+      try {
+        await access(basePath);
+      } catch {
+        continue;
+      }
       const entries = await readdir(basePath, { withFileTypes: true });
       for (const entry of entries) {
         const isDisabled = entry.name.startsWith('.disabled-');
@@ -132,10 +151,12 @@ export class ClaudeProvider extends BaseProvider {
             scope: 'global',
             metadata: {},
             source: { type: 'local' },
-            scanIssues: [{
-              code: 'broken-symlink',
-              message: 'Broken skill symlink',
-            }],
+            scanIssues: [
+              {
+                code: 'broken-symlink',
+                message: 'Broken skill symlink',
+              },
+            ],
           });
           continue;
         }
@@ -178,10 +199,12 @@ export class ClaudeProvider extends BaseProvider {
             scope: 'global',
             metadata: {},
             source: { type: 'local', createdAt: dirStat?.birthtime.toISOString() },
-            scanIssues: [{
-              code: 'invalid-skill-md',
-              message: err instanceof Error ? err.message : 'Invalid SKILL.md',
-            }],
+            scanIssues: [
+              {
+                code: 'invalid-skill-md',
+                message: err instanceof Error ? err.message : 'Invalid SKILL.md',
+              },
+            ],
           });
         }
       }
@@ -193,7 +216,11 @@ export class ClaudeProvider extends BaseProvider {
     const skills: Skill[] = [];
     const enabledPlugins = getBooleanRecord(settings.enabledPlugins);
     for (const basePath of this.basePaths) {
-      try { await access(basePath); } catch { continue; }
+      try {
+        await access(basePath);
+      } catch {
+        continue;
+      }
       const publishers = await readdir(basePath, { withFileTypes: true });
       for (const pub of publishers) {
         if (!(await isDirEntry(pub, basePath))) continue;
@@ -207,7 +234,11 @@ export class ClaudeProvider extends BaseProvider {
           for (const ver of versions) {
             if (!(await isDirEntry(ver, pluginPath))) continue;
             const skillsDir = path.join(pluginPath, ver.name, 'skills');
-            try { await access(skillsDir); } catch { continue; }
+            try {
+              await access(skillsDir);
+            } catch {
+              continue;
+            }
             const skillEntries = await readdir(skillsDir, { withFileTypes: true });
             for (const entry of skillEntries) {
               const isDisabled = entry.name.startsWith('.disabled-');
@@ -228,10 +259,12 @@ export class ClaudeProvider extends BaseProvider {
                   metadata: {},
                   origin,
                   source: { type: 'local' },
-                  scanIssues: [{
-                    code: 'broken-symlink',
-                    message: 'Broken skill symlink',
-                  }],
+                  scanIssues: [
+                    {
+                      code: 'broken-symlink',
+                      message: 'Broken skill symlink',
+                    },
+                  ],
                 });
                 continue;
               }
@@ -248,12 +281,19 @@ export class ClaudeProvider extends BaseProvider {
                 const resolved = await realpath(skillPath);
                 const dirStat = await stat(resolved);
                 skills.push({
-                  name: parsed.name || skillDirName, description: parsed.description,
-                  provider: this.id, path: skillPath,
+                  name: parsed.name || skillDirName,
+                  description: parsed.description,
+                  provider: this.id,
+                  path: skillPath,
                   resolvedPath: resolved !== skillPath ? resolved : undefined,
                   version: ver.name !== 'unknown' ? ver.name : undefined,
-                  enabled: !isDisabled && pluginEnabled, scope: 'global',
-                  metadata: { license: parsed.metadata.license, author: parsed.metadata.author ?? pub.name, tags: parsed.metadata.tags },
+                  enabled: !isDisabled && pluginEnabled,
+                  scope: 'global',
+                  metadata: {
+                    license: parsed.metadata.license,
+                    author: parsed.metadata.author ?? pub.name,
+                    tags: parsed.metadata.tags,
+                  },
                   origin,
                   source: { type: 'local', createdAt: dirStat.birthtime.toISOString() },
                 });
@@ -272,10 +312,12 @@ export class ClaudeProvider extends BaseProvider {
                   metadata: {},
                   origin,
                   source: { type: 'local', createdAt: dirStat?.birthtime.toISOString() },
-                  scanIssues: [{
-                    code: 'invalid-skill-md',
-                    message: err instanceof Error ? err.message : 'Invalid SKILL.md',
-                  }],
+                  scanIssues: [
+                    {
+                      code: 'invalid-skill-md',
+                      message: err instanceof Error ? err.message : 'Invalid SKILL.md',
+                    },
+                  ],
                 });
               }
             }
@@ -309,7 +351,9 @@ export class ClaudeProvider extends BaseProvider {
   }
 
   override async disable(name: string): Promise<void> {
-    const skill = (await this.scan()).find((item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name);
+    const skill = (await this.scan()).find(
+      (item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name,
+    );
     if (skill) {
       await this.setEnabled(skill, false);
       return;
@@ -322,8 +366,12 @@ export class ClaudeProvider extends BaseProvider {
       try {
         await access(src);
         await access(dest).then(
-          () => { throw new Error(`Target ${dest} already exists`); },
-          () => { /* good */ },
+          () => {
+            throw new Error(`Target ${dest} already exists`);
+          },
+          () => {
+            /* good */
+          },
         );
         await rename(src, dest);
         return;
@@ -333,7 +381,11 @@ export class ClaudeProvider extends BaseProvider {
     }
     // Then deep cache paths
     for (const basePath of this.basePaths) {
-      try { await access(basePath); } catch { continue; }
+      try {
+        await access(basePath);
+      } catch {
+        continue;
+      }
       const publishers = await readdir(basePath, { withFileTypes: true });
       for (const pub of publishers) {
         if (!(await isDirEntry(pub, basePath))) continue;
@@ -346,14 +398,22 @@ export class ClaudeProvider extends BaseProvider {
           for (const ver of versions) {
             if (!(await isDirEntry(ver, pluginPath))) continue;
             const skillsDir = path.join(pluginPath, ver.name, 'skills');
-            try { await access(skillsDir); } catch { continue; }
+            try {
+              await access(skillsDir);
+            } catch {
+              continue;
+            }
             const src = path.join(skillsDir, name);
             const dest = path.join(skillsDir, `.disabled-${name}`);
             try {
               await access(src);
               await access(dest).then(
-                () => { throw new Error(`Target ${dest} already exists`); },
-                () => { /* dest doesn't exist, good */ },
+                () => {
+                  throw new Error(`Target ${dest} already exists`);
+                },
+                () => {
+                  /* dest doesn't exist, good */
+                },
               );
               await rename(src, dest);
               return;
@@ -368,7 +428,9 @@ export class ClaudeProvider extends BaseProvider {
   }
 
   override async enable(name: string): Promise<void> {
-    const skill = (await this.scan()).find((item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name);
+    const skill = (await this.scan()).find(
+      (item) => item.name === name || path.basename(item.path).replace(/^\.disabled-/, '') === name,
+    );
     if (skill) {
       await this.setEnabled(skill, true);
       return;
@@ -382,11 +444,17 @@ export class ClaudeProvider extends BaseProvider {
         await access(src);
         await rename(src, dest);
         return;
-      } catch { /* try next */ }
+      } catch {
+        /* try next */
+      }
     }
     // Then deep cache paths
     for (const basePath of this.basePaths) {
-      try { await access(basePath); } catch { continue; }
+      try {
+        await access(basePath);
+      } catch {
+        continue;
+      }
       const publishers = await readdir(basePath, { withFileTypes: true });
       for (const pub of publishers) {
         if (!(await isDirEntry(pub, basePath))) continue;
@@ -399,14 +467,20 @@ export class ClaudeProvider extends BaseProvider {
           for (const ver of versions) {
             if (!(await isDirEntry(ver, pluginPath))) continue;
             const skillsDir = path.join(pluginPath, ver.name, 'skills');
-            try { await access(skillsDir); } catch { continue; }
+            try {
+              await access(skillsDir);
+            } catch {
+              continue;
+            }
             const src = path.join(skillsDir, `.disabled-${name}`);
             const dest = path.join(skillsDir, name);
             try {
               await access(src);
               await rename(src, dest);
               return;
-            } catch { /* not found here, try next */ }
+            } catch {
+              /* not found here, try next */
+            }
           }
         }
       }
@@ -440,7 +514,11 @@ function getBooleanRecord(value: unknown): Record<string, boolean> {
   );
 }
 
-async function setClaudeSkillOverride(settingsPath: string, skillName: string, state: ClaudeSkillOverride): Promise<void> {
+async function setClaudeSkillOverride(
+  settingsPath: string,
+  skillName: string,
+  state: ClaudeSkillOverride,
+): Promise<void> {
   const settings = await readJsonSettings(settingsPath);
   settings.skillOverrides = {
     ...getStringRecord(settings.skillOverrides),
